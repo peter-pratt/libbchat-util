@@ -1,0 +1,538 @@
+#pragma once
+
+#include "address.hpp"
+#include "connection_ids.hpp"
+#include "crypto.hpp"
+#include "result.hpp"
+#include "stream.hpp"
+#include "utils.hpp"
+
+#include <oxenc/common.h>
+
+#include <ngtcp2/ngtcp2.h>
+#include <ngtcp2/ngtcp2_crypto.h>
+
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <span>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
+namespace oxen::quic
+{
+    struct IOContext;
+    class Datagrams;
+    struct Packet;
+    class Endpoint;
+    class Network;
+    class Loop;
+    namespace dgram
+    {
+        struct rotating_buffer;
+    }
+
+    inline constexpr uint64_t MAX_ACTIVE_CIDS{4};
+    inline constexpr size_t NGTCP2_RETRY_SCIDLEN{18};
+
+    // called when a connection's handshake completes
+    // the server will call this when it sends the final handshake packet
+    // the client will call this when it receives that final handshake packet
+    using connection_established_callback = std::function<void(Connection& conn)>;
+
+    // called when a connection closes or times out before the handshake completes
+    using connection_closed_callback = std::function<void(Connection& conn, uint64_t ec)>;
+
+    class Connection : public std::enable_shared_from_this<Connection>
+    {
+        friend class Endpoint;
+        friend class Stream;
+        friend class Datagrams;
+        friend class TestHelper;
+        friend struct dgram::rotating_buffer;
+        friend struct connection_callbacks;
+        friend void conn_set_validated(Connection&);
+
+      public:
+        // Non-movable/non-copyable; you must always hold a Connection in a shared_ptr
+        Connection(const Connection&) = delete;
+        Connection& operator=(const Connection&) = delete;
+        Connection(Connection&&) = delete;
+        Connection& operator=(Connection&&) = delete;
+
+        // Construct and initialize a new inbound/outbound connection to/from a remote
+        //      ep: owning endpoints
+        //      scid: local ("primary") CID used for this connection (random for outgoing)
+        //		dcid: remote CID used for this connection
+        //      path: network path used to reach remote client
+        //      ctx: IO session dedicated for this connection context
+        //      alpns: passed directly to TLS session for handshake negotiation. The server
+        //          will select the first in the client's list it also supports, so the user
+        //          should list them in decreasing priority. If the user does not specify alpns,
+        //          the default will be set
+        //      default_handshake_timeout: the default timeout for handshaking for the endpoint
+        //          (individual connections might have this overridden via connect option).
+        //      remote_pk: optional parameter used by clients to verify the pubkey of the remote
+        //          endpoint during handshake negotiation. For servers, omit this parameter or
+        //          pass std::nullopt
+        //		hdr: optional parameter to pass to ngtcp2 for server specific details
+        static std::shared_ptr<Connection> make_conn(
+                Endpoint& ep,
+                ConnectionID rid,
+                const quic_cid& scid,
+                const quic_cid& dcid,
+                const Path& path,
+                std::shared_ptr<IOContext> ctx,
+                std::span<const std::string> alpns,
+                std::chrono::nanoseconds default_handshake_timeout,
+                std::optional<std::vector<unsigned char>> remote_pk = std::nullopt,
+                ngtcp2_pkt_hd* hdr = nullptr,
+                std::optional<ngtcp2_token_type> token_type = std::nullopt,
+                ngtcp2_cid* ocid = nullptr,
+                bool disable_mtu_discovery = false);
+
+        TLSSession* get_session() const { return tls_session.get(); }
+        TLSCreds* get_creds() const { return tls_creds.get(); }
+
+        // Returns the remote pubkey, if known (and empty otherwise).  For a client this is known
+        // from construction; for a server, this is known only after handshake completes, but even
+        // then might not be known if a client pubkey is not required for incoming connections (see
+        // GNUTLSCreds).
+        std::span<const unsigned char> remote_key() const;
+
+        Direction direction() const { return dir; }
+
+        /// Queues an incoming stream of the given StreamT type, forwarding the given arguments to
+        /// the StreamT constructor.  The stream will be given the next unseen incoming connection
+        /// ID; it will be made ready once the associated stream id is seen from the remote
+        /// connection.  Note that this constructor bypasses the stream constructor callback for the
+        /// applicable stream id.
+        template <std::derived_from<Stream> StreamT, typename... Args, typename EndpointDeferred = Endpoint>
+        std::shared_ptr<StreamT> queue_incoming_stream(Args&&... args)
+        {
+            // We defer resolution of `Endpoint` here via `EndpointDeferred` because the header only
+            // has a forward declaration; the user of this method needs to have the full definition
+            // available to call this.
+            return std::static_pointer_cast<StreamT>(queue_incoming_stream_impl([&](Connection& c, EndpointDeferred& e) {
+                return e.job_queue.template make_shared<StreamT>(c, e, std::forward<Args>(args)...);
+            }));
+        }
+
+        /// Queues a default incoming Stream object, either via the stream constructor callback (if
+        /// set) or the default Stream constructor (if no constructor callback, or the callback
+        /// returns nullptr).  The stream object will be made ready once the associated next
+        /// incoming stream ID is observed from the other end.
+        std::shared_ptr<Stream> queue_incoming_stream();
+
+        /// Opens a new outgoing stream to the other end of the connection of the given StreamT
+        /// type, forwarding the given arguments to the StreamT constructor.  The returned stream
+        /// may or may not be ready (and have an id assigned) based on whether there are available
+        /// stream ids on the connection.  Check `->ready` on the returned instance to check.  If
+        /// not ready the stream will be queued and become ready once a stream id becomes available,
+        /// such as from an increase in available stream ids resulting from the closure of an
+        /// existing stream.  Note that this constructor bypasses the stream constructor callback
+        /// for the applicable stream id.
+        template <std::derived_from<Stream> StreamT = Stream, typename... Args, typename EndpointDeferred = Endpoint>
+        std::shared_ptr<StreamT> open_stream(Args&&... args)
+        {
+            return std::static_pointer_cast<StreamT>(open_stream_impl([&](Connection& c, EndpointDeferred& e) {
+                return e.job_queue.template make_shared<StreamT>(c, e, std::forward<Args>(args)...);
+            }));
+        }
+
+        /// Opens a bog standard Stream connection to the other end of the connection.  This version
+        /// of open_stream takes no arguments; it will invoke the stream constructor callback (if
+        /// configured) and otherwise will fall back to construct a default Stream.  See the
+        /// comments in the templated version of the method, above, for details about the readiness
+        /// of the returned stream.
+        std::shared_ptr<Stream> open_stream();
+
+        /// Returns a stream object for the stream with the given id, if the stream exists (and, if
+        /// StreamT is specified, is of the given Stream subclass).  Returns nullptr if the id is
+        /// not currently an open stream; throws std::invalid_argument if the stream exists but is
+        /// not an instance of the given StreamT type.
+        template <std::derived_from<Stream> StreamT = Stream>
+        std::shared_ptr<StreamT> maybe_stream(int64_t id)
+        {
+            auto s = get_stream_impl(id);
+            if (!s)
+                return nullptr;
+            if constexpr (!std::same_as<StreamT, Stream>)
+            {
+                if (auto st = std::dynamic_pointer_cast<StreamT>(std::move(s)))
+                    return st;
+                throw std::invalid_argument{
+                        "Stream ID " + std::to_string(id) + " is not an instance of the requested Stream subclass"};
+            }
+            else
+                return s;
+        }
+
+        /// Returns a stream object for the stream with the given id, if the stream exists (and, if
+        /// StreamT is specified, is of the given Stream subclass).  Otherwise throws
+        /// std::out_of_range if the stream was not found, and std::invalid_argument if the stream
+        /// was found, but is not an instance of StreamT.
+        template <std::derived_from<Stream> StreamT = Stream>
+        std::shared_ptr<StreamT> get_stream(int64_t id)
+        {
+            if (auto s = maybe_stream<StreamT>(id))
+                return s;
+            throw std::out_of_range{"Could not find a stream with ID " + std::to_string(id)};
+        }
+
+        /// Returns the number of streams that are currently open
+        size_t num_streams_active() const;
+
+        /// Returns the number of streams that have been created but are not yet active on the
+        /// connection; they will become active once the connection negotiates an increase to the
+        /// maximum number of streams, *or* when an existing stream closes, opening a stream slot on
+        /// the connection.
+        size_t num_streams_pending() const;
+
+        /// Returns the maximum number of active streams that the connection currently allows.
+        uint64_t get_max_streams() const;
+
+        /// Returns the number of new streams that may still be activated on this connection.
+        uint64_t get_streams_available() const;
+
+        /// Returns a copy of the current Path in use by this connection.
+        Path path() const;
+
+        /// Returns a copy of the local address of the path in use by this connection.  (If you want
+        /// both local and remote then prefer to call `path()` once instead of local() and remote()
+        /// separately).
+        Address local() const;
+
+        /// Returns a copy of the remote address of the path in use by this connection.  (If you
+        /// want both local and remote then prefer to call `path()` once instead of local() and
+        /// remote() separately).
+        Address remote() const;
+
+        /// Returns the maximum datagram size accepted by this connection.  This depends on the
+        /// negotiated QUIC connection and can change over time, but will generally be somewhere in
+        /// the 1150-1450 range when not using datagram splitting on the connection, or double that
+        /// with datagram splitting enabled.
+        size_t get_max_datagram_size() const;
+
+        /// Sets the maximum split datagram queue lookahead for coalescing split datagrams.  This is
+        /// how far we look ahead in the datagram queue to find "small" pieces of split datagrams
+        /// that we can send ahead of schedule if including those helps fill out a quic packet.
+        ///
+        /// For example, suppose an application is sending packets of size 1500 with a max (unsplit)
+        /// datagram size of 1350, and sends 6 such packets in a row, split into
+        /// [Aa][Bb][Cc][Dd][Ee][Ff], where each "A-F" part of the split will be 1350 bytes and each
+        /// a-f part is the remaining 150 bytes.  With a lookahead of 4 of higher (and assuming no
+        /// conflicting stream and ACK data that might take up some quic packet space) this could
+        /// result in coalescing the a-f values into one single QUIC packet containing 6 small
+        /// datagram pieces, so that we send:
+        ///
+        /// [A] [abcdef] [B] [C] [D] [E] [F]
+        ///
+        /// Whereas when this is set to 0, only the packet at the head of the queue will be
+        /// considered.  Note that even with lookahead set to 0, some coalescing is still possible
+        /// without ever including something that isn't at the head of the queue, e.g.
+        ///
+        /// [A] [ab] [B] [C] [cd] [D] [E] [ef] [F]
+        ///
+        /// Note that this lookahead will never cause *complete* packets to be delivered out of
+        /// order: the remote end will always receive complete (i.e. after recombining) packets in
+        /// the same order the application queued them (assuming no reordering outside our control
+        /// happens along the network path).  Effectively what that means is that this option allows
+        /// us to opportunistically send small pieces of split packets ahead of schedule, if we have
+        /// extra space in a QUIC packet being built.
+        ///
+        /// A value of 0 disables lookahead, and a negative value restores the default (which is
+        /// currently 8, but could change in the future).
+        ///
+        /// If setting this to a higher value, take care that the application at the other end of
+        /// the connection is not using too small of a split datagram receive buffer: packets *will*
+        /// be lost if the remote receive buffer is not large enough to handle the gap in
+        /// out-of-order partial packet delivery.  (The default split receive buffer is more than
+        /// sufficient for any feasible lookahead value, but very small receive buffers with very
+        /// large lookaheads might not be).
+        void set_split_datagram_lookahead(int n);
+        int get_split_datagram_lookahead() const;
+        bool packet_splitting_enabled() const { return _packet_splitting; }
+
+        /// Obtains the current max datagram size *if* it has changed since the last time this
+        /// method was called (or if this method has never been called), otherwise returns nullopt.
+        /// This is designed to allow classes to react to changes in the maximum datagram size, if
+        /// needed, by periodically polling this and updating as needed when the value changes.
+        /// When there have not been changes then calling this is cheap (just an atomic bool
+        /// access); a trip to the event loop thread is necessary to retrieve the value when
+        /// changed, but changes are relatively infrequent.
+        ///
+        /// This feature is for non-standard/exotic uses: if you don't care about changes to the
+        /// size (for example, if you use splitting and know the size will always be sufficient)
+        /// then you can safely never worry about this function.
+        std::optional<size_t> max_datagram_size_changed() const;
+
+        /// Initiates connection closing, transmitting the given error code to the other size as the
+        /// reason for the connection closing.
+        void close_connection(uint64_t error_code = 0);
+
+        /// Returns a pointer to the Datagrams object for the connection, if this connection has
+        /// datagrams enabled, through which datagrams can be sent via the send() method.  Returns
+        /// nullptr if this connection does not support datagrams.
+        std::shared_ptr<Datagrams> datagrams();
+
+        /// Returns true if datagrams are enabled on this connection.
+        bool datagrams_enabled() const { return static_cast<bool>(dgrams); }
+
+        size_t num_streams_active_impl() const { return _streams.size(); }
+        size_t num_streams_pending_impl() const { return pending_streams.size(); }
+
+        bool is_closing() const { return closing; }
+        bool is_draining() const { return draining; }
+
+        bool is_outbound() const { return _is_outbound; }
+        bool is_inbound() const { return not is_outbound(); }
+        std::string direction_str() { return is_inbound() ? "SERVER"s : "CLIENT"s; }
+
+        // Returns true if handshaking has finished on this connection.
+        bool is_handshaked() const { return handshaked; }
+        // Returns true if handshaking is finished on this connection and confirmed on the server.
+        // (For incoming connections, this will always be the same as is_handshaked()).
+        bool is_handshake_confirmed() const { return handshake_confirmed; }
+
+        Endpoint& endpoint() { return _endpoint; }
+        const Endpoint& endpoint() const { return _endpoint; }
+
+        // Returns the connection's negotiated ALPN.  Only available after the connection is
+        // established (typically once handshaked, but can be earlier for an incoming 0-RTT
+        // connection).  Before that this will return an empty string.
+        std::string_view selected_alpn() const;
+
+        size_t get_max_datagram_piece() const;
+
+        std::optional<size_t> max_datagram_size_changed();
+
+        const ConnectionID& reference_id() const { return _ref_id; }
+
+        void set_close_quietly();
+
+        bool closing_quietly() const { return _close_quietly; }
+
+      private:
+        void packet_io_ready();
+        void halt_events();
+        stream_data_callback get_default_data_callback() const;
+
+        connection_established_callback conn_established_cb;
+        connection_closed_callback conn_closed_cb;
+
+        void set_remote_addr(const ngtcp2_addr& new_remote);
+
+        void store_associated_cid(const quic_cid& cid);
+        void delete_associated_cid(const quic_cid& cid);
+        const std::unordered_set<quic_cid>& associated_cids() const { return _associated_cids; }
+
+        void store_associated_reset(const hashed_reset_token& htoken);
+        void delete_associated_reset(const hashed_reset_token& htoken);
+        const std::unordered_set<hashed_reset_token>& associated_reset_tokens() const { return _associated_resets; }
+
+        int client_handshake_completed();
+        void client_handshake_confirmed();
+
+        int server_handshake_completed();
+
+        int recv_stateless_reset(std::span<const uint8_t, NGTCP2_STATELESS_RESET_TOKENLEN> token);
+
+        int client_path_validation(const ngtcp2_path* path, bool res, uint32_t flags);
+
+        int server_path_validation(const ngtcp2_path* path, bool res, uint32_t flags);
+
+        void set_new_path(Path new_path);
+
+        uint64_t get_streams_available_impl() const;
+
+        // Called when the endpoint drops its shared pointer to this Connection, to have this
+        // Connection clear itself from all of its streams and then drop the streams.  (This is a
+        // sort of pseudo-destruction to leave the involved objects as empty shells since there
+        // might be shared pointers in application space that keep the connection and/or stream
+        // alive after it gets dropped from libquic internal structures).
+        void drop_streams();
+
+        // private Constructor (publicly construct via `make_conn` instead, so that we can properly
+        // set up the shared_from_this shenanigans).
+        Connection(
+                Endpoint& ep,
+                ConnectionID rid,
+                const quic_cid& scid,
+                const quic_cid& dcid,
+                const Path& path,
+                std::shared_ptr<IOContext> ctx,
+                std::span<const std::string> alpns,
+                std::chrono::nanoseconds default_handshake_timeout,
+                std::optional<std::vector<unsigned char>> remote_pk = std::nullopt,
+                ngtcp2_pkt_hd* hdr = nullptr,
+                std::optional<ngtcp2_token_type> token_type = std::nullopt,
+                ngtcp2_cid* ocid = nullptr,
+                bool disable_mtu_discovery = false);
+
+        Endpoint& _endpoint;
+        Loop& _loop;
+        std::shared_ptr<IOContext> context;
+        Direction dir;
+        bool _is_outbound;
+
+        const ConnectionID _ref_id;
+
+        std::unordered_set<quic_cid> _associated_cids;
+        std::unordered_set<hashed_reset_token> _associated_resets;
+
+        const quic_cid _source_cid;
+        quic_cid _dest_cid;
+
+        Path _path;
+
+        // True if we are attempting 0-RTT (i.e. enabled it and we found the needed session data)
+        // and are still in the 0-RTT period:
+        bool _early_data{false};
+
+        const uint64_t _max_streams{DEFAULT_MAX_BIDI_STREAMS};
+        const bool _packet_splitting{false};
+        mutable size_t _last_max_dgram_piece{0};
+        mutable std::atomic<bool> _max_dgram_size_changed{true};
+
+        std::atomic<bool> _close_quietly{false};
+        std::vector<unsigned char> remote_pubkey{};
+
+        void revert_early_channels();
+        void reset_early_datagrams();
+
+        struct connection_deleter
+        {
+            inline void operator()(ngtcp2_conn* c) const { ngtcp2_conn_del(c); }
+        };
+
+        // underlying ngtcp2 connection object
+        std::unique_ptr<ngtcp2_conn, connection_deleter> conn;
+
+        std::shared_ptr<TLSCreds> tls_creds;
+        std::unique_ptr<TLSSession> tls_session;
+
+        event_ptr packet_retransmit_timer;
+        event_ptr packet_io_trigger;
+
+        void on_packet_io_ready();
+
+        struct pkt_tx_timer_updater;
+        bool send(pkt_tx_timer_updater* pkt_updater = nullptr);
+
+        void flush_packets(std::chrono::steady_clock::time_point tp);
+
+        std::array<std::byte, MAX_PMTUD_UDP_PAYLOAD * DATAGRAM_BATCH_SIZE> send_buffer;
+        std::array<size_t, DATAGRAM_BATCH_SIZE> send_buffer_size;
+        uint8_t send_ecn = 0;
+        size_t n_packets = 0;
+
+        void schedule_packet_retransmit(std::chrono::steady_clock::time_point ts);
+
+        bool draining = false;
+        bool closing = false;
+        bool handshaked = false;
+        bool handshake_confirmed = false;
+
+        // There are multiple points at which we can call the conn_established_cb: in a normal 1-RTT
+        // connection, it happens after handshake completes, but with 0-RTT it can happen when early
+        // stream or datagram data is received *before* handshake completes.  check_established() is
+        // called from the various locations, and invokes the callback the first time it is called.
+        void check_established();
+        bool establish_hook_called = false;
+
+        // Invokes the stream_construct_cb, if present; if not present, or if it returns nullptr,
+        // then the given `make_stream` gets invoked to create a default stream.
+        std::shared_ptr<Stream> construct_stream(
+                const std::function<std::shared_ptr<Stream>(Connection& c, Endpoint& e)>& default_stream,
+                std::optional<int64_t> stream_id = std::nullopt);
+
+        std::shared_ptr<Stream> queue_incoming_stream_impl(
+                std::function<std::shared_ptr<Stream>(Connection& c, Endpoint& e)> make_stream);
+
+        std::shared_ptr<Stream> open_stream_impl(
+                std::function<std::shared_ptr<Stream>(Connection& c, Endpoint& e)> make_stream);
+
+        std::shared_ptr<Stream> get_stream_impl(int64_t id);
+
+        // holds a mapping of active streams
+        std::map<int64_t, std::shared_ptr<Stream>> _streams;
+        std::map<int64_t, std::shared_ptr<Stream>> _stream_queue;
+
+        int64_t next_incoming_stream_id = is_outbound() ? 1 : 0;
+
+        // datagram "pseudo-stream"
+        std::shared_ptr<Datagrams> dgrams;
+        // "pseudo-stream" to represent ngtcp2 stream ID -1
+        std::shared_ptr<Stream> pseudo_stream;
+        // holds queue of pending streams not yet ready to broadcast
+        // streams are added to the back and popped from the front (FIFO)
+        std::deque<std::shared_ptr<Stream>> pending_streams;
+
+        void init(
+                ngtcp2_settings& settings,
+                ngtcp2_transport_params& params,
+                ngtcp2_callbacks& callbacks,
+                std::chrono::nanoseconds handshake_timeout,
+                bool disable_mtu_discovery);
+
+        io_result read_packet(const Packet& pkt);
+
+        /********* TEST SUITE FUNCTIONALITY *********/
+        void set_local_addr(Address new_local);
+        bool debug_datagram_drop_enabled{false};
+        bool debug_datagram_counter_enabled{false};
+        int debug_datagram_counter{0};  // Used for either of the above (only one at a time)
+
+      public:
+        // public to be called by endpoint handing this connection a packet
+        void handle_conn_packet(const Packet& pkt);
+        // these are public so ngtcp2 can access them from callbacks
+        int stream_opened(int64_t id);
+        int stream_ack(int64_t id, size_t size);
+        int stream_receive(int64_t id, std::span<const std::byte> data, bool fin);
+        void stream_execute_close(Stream& s, uint64_t app_code);
+        void stream_closed(int64_t id, uint64_t app_code);
+        void close_all_streams();
+        void check_pending_streams(uint64_t available);
+        int recv_datagram(std::span<const std::byte> data);
+        int ack_datagram(uint64_t dgram_id);
+        int recv_token(const uint8_t* token, size_t tokenlen);
+
+        // Implicit conversion of Connection to the underlying ngtcp2_conn* (so that you can pass a
+        // Connection directly to ngtcp2 functions taking a ngtcp2_conn* argument).
+        template <typename T>
+            requires std::same_as<T, ngtcp2_conn>
+        operator T*() const
+        {
+            return conn.get();
+        }
+
+        // returns number of currently pending streams for use in test cases
+        size_t num_pending() const { return pending_streams.size(); }
+
+        ~Connection();
+    };
+
+    using connection_interface [[deprecated("use Connection directly instead")]] = Connection;
+
+    extern "C"
+    {
+        ngtcp2_conn* get_conn(ngtcp2_crypto_conn_ref* conn_ref);
+
+        void log_printer(void* user_data, const char* fmt, ...);
+    }
+
+}  // namespace oxen::quic

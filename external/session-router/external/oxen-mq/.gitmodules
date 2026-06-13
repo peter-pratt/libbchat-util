@@ -1,0 +1,12 @@
+[submodule "cppzmq"]
+	path = cppzmq
+	url = https://github.com/zeromq/cppzmq.git
+[submodule "Catch2"]
+	path = tests/Catch2
+	url = https://github.com/catchorg/Catch2.git
+[submodule "oxen-encoding"]
+	path = oxen-encoding
+	url = https://github.com/session-foundation/oxen-encoding.git
+[submodule "oxen-logging"]
+	path = oxen-logging
+	url = https://github.com/oxen-io/oxen-logging.git

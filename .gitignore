@@ -1,0 +1,8 @@
+/build*/
+/Build*/
+/compile_commands.json
+/.cache/
+/.vscode/
+.DS_STORE
+/beldex_test
+/build.log
