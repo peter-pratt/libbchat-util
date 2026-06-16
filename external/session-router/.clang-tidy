@@ -1,8 +1,0 @@
-HeaderFilterRegex: 'llarp/.*'
-Checks: 
-'readability-else-after-return,
-clang-analyzer-core-*,modernize-*,
--modernize-use-trailing-return-type,
--modernize-use-nodiscard,
-bugprone-*,
--bugprone-easily-swappable-parameters'

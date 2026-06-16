@@ -1,4 +1,0 @@
-[Allow session-router-client to set DNS settings]
-Identity=unix-user:_session
-Action=org.freedesktop.resolve1.set-dns-servers;org.freedesktop.resolve1.set-domains
-ResultAny=yes
