@@ -61,7 +61,7 @@ endif()
 option(BUILD_STATIC_DEPS "Build all dependencies statically rather than trying to link to them on the system" ${static_default})
 option(STATIC_BUNDLE "Build a single static .a containing everything (both code and dependencies)" ${static_default})
 
-if(BUILD_SHARED_LIBS OR libsession_IS_TOPLEVEL_PROJECT)
+if(BUILD_SHARED_LIBS OR libbchat_IS_TOPLEVEL_PROJECT)
     set(install_default ON)
 else()
     set(install_default OFF)
@@ -145,18 +145,18 @@ if(STATIC_BUNDLE)
 
     include(combine_archives)
 
-    combine_archives(session-util libsession-static-bundle "${LIBSESSION_STATIC_BUNDLE_LIBS}")
+    combine_archives(bchat-util libbchat-static-bundle "${LIBBCHAT_STATIC_BUNDLE_LIBS}")
     set(lib_folder lib)
     if(IOS)
         set(lib_folder "${lib_folder}-${ARCH}")
     endif()
 
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libsession-util.a
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbchat-util.a
         ARCHIVE DESTINATION ${lib_folder})
 endif()
 
 
-option(WITH_TESTS "Enable unit tests" ${libsession_IS_TOPLEVEL_PROJECT})
+option(WITH_TESTS "Enable unit tests" ${libbchat_IS_TOPLEVEL_PROJECT})
 if(WITH_TESTS)
     add_subdirectory(tests)
 endif()
@@ -165,20 +165,20 @@ endif()
 if(LIBBCHAT_INSTALL)
 
     install(
-        TARGETS ${libsession_export_targets}
-        EXPORT libsessionConfig
+        TARGETS ${libbchat_export_targets}
+        EXPORT libbchatConfig
         DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
 
-    install(DIRECTORY include/session DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    install(DIRECTORY include/bchat DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         PATTERN *.h PATTERN *.hpp)
 
-    set(libsession_target_links)
-    foreach(tgt ${libsession_export_targets})
-        set(libsession_target_links "${libsession_target_links} -lsession-${tgt}")
+    set(libbchat_target_links)
+    foreach(tgt ${libbchat_export_targets})
+        set(libbchat_target_links "${libbchat_target_links} -lbchat-${tgt}")
     endforeach()
-    configure_file(libsession-util.pc.in libsession-util.pc @ONLY)
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libsession-util.pc
+    configure_file(libbchat-util.pc.in libbchat-util.pc @ONLY)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libbchat-util.pc
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
     )
 

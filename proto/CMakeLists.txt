@@ -1,5 +1,5 @@
 
-libsession_static_bundle(protobuf::libprotobuf-lite)
+libbchat_static_bundle(protobuf::libprotobuf-lite)
 
 
 add_library(protos
@@ -9,7 +9,7 @@ target_include_directories(protos PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(protos PUBLIC protobuf::libprotobuf-lite)
 set_target_properties(
     protos PROPERTIES
-    OUTPUT_NAME session-protos
+    OUTPUT_NAME bchat-protos
     SOVERSION ${LIBBCHAT_LIBVERSION})
 
 # -Wunused-parameter triggers in the protobuf dependency
@@ -20,16 +20,16 @@ else()
     target_compile_options(protos PUBLIC -Wno-error=unused-parameter)
 endif()
 
-libsession_static_bundle(protos)
+libbchat_static_bundle(protos)
 
-add_library(libsession::protos ALIAS protos)
+add_library(libbchat::protos ALIAS protos)
 export(
     TARGETS protos
-    NAMESPACE libsession::
-    FILE libsessionTargets.cmake
+    NAMESPACE libbchat::
+    FILE libbchatTargets.cmake
 )
-list(APPEND libsession_export_targets protos)
-set(libsession_export_targets "${libsession_export_targets}" PARENT_SCOPE)
+list(APPEND libbchat_export_targets protos)
+set(libbchat_export_targets "${libbchat_export_targets}" PARENT_SCOPE)
 
 
 add_custom_target(regen-protobuf

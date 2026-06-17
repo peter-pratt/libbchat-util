@@ -5,4 +5,6 @@
 /.vscode/
 .DS_STORE
 /beldex_test
+/compile_test
+/wget-log*
 /build.log

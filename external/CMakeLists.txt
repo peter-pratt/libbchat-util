@@ -60,7 +60,7 @@ macro(libsession_system_or_submodule BIGNAME smallname target pkgconf subdir)
       add_library(${target} ALIAS ${smallname})
     endif()
     if(BUILD_STATIC_DEPS AND STATIC_BUNDLE)
-      libsession_static_bundle(${smallname}::${smallname})
+      libbchat_static_bundle(${smallname}::${smallname})
     endif()
   endif()
 endmacro()
@@ -149,7 +149,7 @@ function(add_static_subdirectory dir)
 endfunction()
 
 add_static_subdirectory(libsodium-internal)
-libsession_static_bundle(libsodium::sodium-internal)
+libbchat_static_bundle(libsodium::sodium-internal)
 
 
 set(protobuf_VERBOSE ON CACHE BOOL "" FORCE)
@@ -183,10 +183,10 @@ target_link_libraries(libzstd_static_fixed_includes INTERFACE libzstd_static)
 add_library(libzstd::static ALIAS libzstd_static_fixed_includes)
 export(
     TARGETS libzstd_static_fixed_includes
-    NAMESPACE libsession::
+    NAMESPACE libbchat::
     FILE libsessionZstd.cmake
 )
-libsession_static_bundle(libzstd_static)
+libbchat_static_bundle(libzstd_static)
 
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
@@ -202,7 +202,7 @@ if(ENABLE_NETWORKING AND ENABLE_NETWORKING_SROUTER)
     add_library(sodium INTERFACE)
     target_link_libraries(sodium INTERFACE libsodium::sodium-internal)
     add_static_subdirectory(session-router EXCLUDE_FROM_ALL)
-    libsession_static_bundle(session-router::libsessionrouter)
+    libbchat_static_bundle(session-router::libsessionrouter)
 endif()
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
@@ -215,7 +215,7 @@ function(simdutf_subdir)
     add_subdirectory(simdutf)
 endfunction()
 simdutf_subdir()
-libsession_static_bundle(simdutf)
+libbchat_static_bundle(simdutf)
 
 # We need Howard Hinnant's header-only date library for now because the STL implementation of
 # std::chrono::parse() is spotty or broken on:

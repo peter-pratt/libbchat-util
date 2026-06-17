@@ -4,7 +4,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
   add_definitions(-DRELEASE_BUILD)
 endif()
 
-set(LIB_SESSION_UTESTS_SOURCES
+set(LIB_BCHAT_UTESTS_SOURCES
     test_attachment_encrypt.cpp
     test_blinding.cpp
     test_bt_merge.cpp
@@ -41,27 +41,27 @@ set(LIB_SESSION_UTESTS_SOURCES
 )
 
 if(ENABLE_NETWORKING)
-    list(APPEND LIB_SESSION_UTESTS_SOURCES test_network_swarm.cpp)
-    list(APPEND LIB_SESSION_UTESTS_SOURCES test_onionreq.cpp)
-    list(APPEND LIB_SESSION_UTESTS_SOURCES test_onion_request_router.cpp)
-    list(APPEND LIB_SESSION_UTESTS_SOURCES test_snode_pool.cpp)
+    list(APPEND LIB_BCHAT_UTESTS_SOURCES test_network_swarm.cpp)
+    list(APPEND LIB_BCHAT_UTESTS_SOURCES test_onionreq.cpp)
+    list(APPEND LIB_BCHAT_UTESTS_SOURCES test_onion_request_router.cpp)
+    list(APPEND LIB_BCHAT_UTESTS_SOURCES test_snode_pool.cpp)
 endif()
 
 add_library(test_libs INTERFACE)
 
 target_link_libraries(test_libs INTERFACE
-    libsession::config
+    libbchat::config
     libsodium::sodium-internal
     nlohmann_json::nlohmann_json
     oxen::logging)
 
 if (ENABLE_NETWORKING)
-    target_link_libraries(test_libs INTERFACE libsession::network)
+    target_link_libraries(test_libs INTERFACE libbchat::network)
 else()
     target_compile_definitions(test_libs INTERFACE DISABLE_NETWORKING)
 endif()
 
-add_executable(testAll main.cpp ${LIB_SESSION_UTESTS_SOURCES})
+add_executable(testAll main.cpp ${LIB_BCHAT_UTESTS_SOURCES})
 target_link_libraries(testAll PRIVATE
     test_libs
     Catch2::Catch2)
@@ -93,6 +93,6 @@ target_link_libraries(swarm-auth-test PRIVATE config)
 if(STATIC_BUNDLE)
     add_executable(static-bundle-test static_bundle.cpp)
     target_include_directories(static-bundle-test PUBLIC ../include)
-    target_link_libraries(static-bundle-test PRIVATE "${PROJECT_BINARY_DIR}/libsession-util.a" oxenc::oxenc quic)
-    add_dependencies(static-bundle-test session-util)
+    target_link_libraries(static-bundle-test PRIVATE "${PROJECT_BINARY_DIR}/libbchat-util.a" oxenc::oxenc quic)
+    add_dependencies(static-bundle-test bchat-util)
 endif()

@@ -20,29 +20,29 @@ endif()
 
 
 set(export_targets)
-macro(add_libsession_util_library name)
+macro(add_libbchat_util_library name)
     add_library(${name} ${ARGN})
 
     set_target_properties(
         ${name}
         PROPERTIES
-        OUTPUT_NAME session-${name}
+        OUTPUT_NAME bchat-${name}
         SOVERSION ${LIBBCHAT_LIBVERSION})
 
-    libsession_static_bundle(${name})
+    libbchat_static_bundle(${name})
 
     list(APPEND export_targets ${name})
 endmacro()
 
 
 
-add_libsession_util_library(util
+add_libbchat_util_library(util
     file.cpp
     logging.cpp
     util.cpp
 )
 
-add_libsession_util_library(crypto
+add_libbchat_util_library(crypto
     attachments.cpp
     blinding.cpp
     curve25519.cpp
@@ -58,7 +58,7 @@ add_libsession_util_library(crypto
     types.cpp
 )
 
-add_libsession_util_library(config
+add_libbchat_util_library(config
     bt_merge.cpp
     config.cpp
     config/base.cpp
@@ -95,13 +95,13 @@ target_link_libraries(crypto
     PRIVATE
     libsodium::sodium-internal
     nlohmann_json::nlohmann_json
-    libsession::protos
+    libbchat::protos
 )
 
 target_link_libraries(config
     PUBLIC
     crypto
-    libsession::protos
+    libbchat::protos
     PRIVATE
     libsodium::sodium-internal
 )
@@ -115,7 +115,7 @@ if(ENABLE_NETWORKING)
         add_library(libevent::core ALIAS libevent_core)
     endif()
 
-    add_libsession_util_library(network
+    add_libbchat_util_library(network
         onionreq/builder.cpp
         onionreq/hop_encryption.cpp
         onionreq/parser.cpp
@@ -175,8 +175,8 @@ if(WARNINGS_AS_ERRORS AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
     target_compile_options(crypto PUBLIC -Wno-error=stringop-overflow -Wno-error=stringop-overread)
 endif()
 
-if(LIBSESSION_UTIL_VERSIONTAG)
-    set(PROJECT_VERSION_TAG "${LIBSESSION_UTIL_VERSIONTAG}")
+if(LIBBCHAT_UTIL_VERSIONTAG)
+    set(PROJECT_VERSION_TAG "${LIBBCHAT_UTIL_VERSIONTAG}")
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/version.c.in" "${CMAKE_CURRENT_BINARY_DIR}/version.c")
 else()
     find_package(Git)
@@ -202,19 +202,19 @@ else()
     endif()
 endif()
 add_library(version STATIC version.c)
-libsession_static_bundle(version)
+libbchat_static_bundle(version)
 target_include_directories(version PRIVATE ../include)
 target_link_libraries(common INTERFACE version)
 
 
 foreach(tgt ${export_targets})
-    add_library("libsession::${tgt}" ALIAS "${tgt}")
+    add_library("libbchat::${tgt}" ALIAS "${tgt}")
 endforeach()
 export(
     TARGETS ${export_targets} common version
-    NAMESPACE libsession::
-    APPEND FILE libsessionTargets.cmake
+    NAMESPACE libbchat::
+    APPEND FILE libbchatTargets.cmake
 )
 
-list(APPEND libsession_export_targets ${export_targets})
-set(libsession_export_targets "${libsession_export_targets}" PARENT_SCOPE)
+list(APPEND libbchat_export_targets ${export_targets})
+set(libbchat_export_targets "${libbchat_export_targets}" PARENT_SCOPE)

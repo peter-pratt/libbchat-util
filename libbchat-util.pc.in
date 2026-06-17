@@ -3,11 +3,11 @@ exec_prefix=${prefix}
 libdir=@CMAKE_INSTALL_FULL_LIBDIR@
 includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 
-Name: libsession-util
-Description: Session utility libraries
+Name: libbchat-util
+Description: BChat utility libraries for Beldex network
 Version: @PROJECT_VERSION@
 
-Libs: -L${libdir} @libsession_target_links@
+Libs: -L${libdir} @libbchat_target_links@
 Libs.private: -lprotobuf-lite -lnettle
 Requires: liboxenc
 Requires.private: nettle protobuf-lite
