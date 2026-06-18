@@ -50,8 +50,8 @@ add_libbchat_util_library(crypto
     hash.cpp
     multi_encrypt.cpp
     random.cpp
-    session_encrypt.cpp
-    session_protocol.cpp
+    bchat_encrypt.cpp
+    bchat_protocol.cpp
     sodium_array.cpp
     xed25519.cpp
     pro_backend.cpp
@@ -123,14 +123,14 @@ if(ENABLE_NETWORKING)
         network/key_types.cpp
         network/network_config.cpp
         network/request_queue.cpp
-        network/service_node.cpp
-        network/session_network_internal.cpp
-        network/session_network_types.cpp
-        network/session_network.cpp
-        network/snode_pool.cpp
+        network/master_node.cpp
+        network/bchat_network_internal.cpp
+        network/bchat_network_types.cpp
+        network/bchat_network.cpp
+        network/mnode_pool.cpp
         network/swarm.cpp
-        network/backends/session_file_server.cpp
-        network/backends/session_open_group_server.cpp
+        network/backends/bchat_file_server.cpp
+        network/backends/bchat_open_group_server.cpp
         network/transport/quic_transport.cpp
         network/routing/direct_router.cpp
         network/routing/onion_request_router.cpp
@@ -151,7 +151,7 @@ if(ENABLE_NETWORKING)
     if(ENABLE_NETWORKING_SROUTER)
         target_sources(network
             PRIVATE
-            network/routing/session_router_router.cpp)
+            network/routing/bchat_router_router.cpp)
         target_link_libraries(network PUBLIC session-router::libsessionrouter)
     endif()
 
