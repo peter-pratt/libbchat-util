@@ -151,7 +151,7 @@ if(ENABLE_NETWORKING)
     if(ENABLE_NETWORKING_SROUTER)
         target_sources(network
             PRIVATE
-            network/routing/bchat_router_router.cpp)
+            network/routing/belnet_router.cpp)
         target_link_libraries(network PUBLIC session-router::libsessionrouter)
     endif()
 

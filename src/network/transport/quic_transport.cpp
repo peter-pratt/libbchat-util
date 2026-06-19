@@ -5,7 +5,7 @@
 #include <oxen/quic/gnutls_crypto.hpp>
 
 #include "session/ed25519.hpp"
-#include "session/network/session_network_types.hpp"
+#include "session/network/bchat_network_types.hpp"
 
 using namespace oxen;
 using namespace session;

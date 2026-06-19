@@ -1,4 +1,4 @@
-#include "session/network/backends/session_open_group_server.hpp"
+#include "session/network/backends/bchat_open_group_server.hpp"
 
 #include <fmt/ranges.h>
 #include <oxenc/base64.h>
@@ -6,9 +6,9 @@
 #include <oxen/log.hpp>
 #include <oxen/log/format.hpp>
 
-#include "../session_network_internal.hpp"
+#include "../bchat_network_internal.hpp"
 #include "session/network/backends/backend_util.hpp"
-#include "session/network/backends/session_open_group_server.h"
+#include "session/network/backends/bchat_open_group_server.h"
 
 using namespace oxen;
 using namespace std::literals;

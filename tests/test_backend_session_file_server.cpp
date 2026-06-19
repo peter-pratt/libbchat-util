@@ -1,7 +1,7 @@
 #include <fmt/format.h>
 
 #include <catch2/catch_test_macros.hpp>
-#include <session/network/backends/session_file_server.hpp>
+#include <session/network/backends/bchat_file_server.hpp>
 
 #include "utils.hpp"
 

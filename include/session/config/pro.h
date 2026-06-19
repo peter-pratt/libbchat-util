@@ -9,7 +9,7 @@ extern "C" {
 #include <stdint.h>
 
 #include "../export.h"
-#include "session/session_protocol.h"
+#include "session/bchat_protocol.h"
 
 typedef struct pro_pro_config pro_pro_config;
 struct pro_pro_config {

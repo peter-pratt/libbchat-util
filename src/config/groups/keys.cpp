@@ -22,7 +22,7 @@
 #include "session/config/groups/keys.h"
 #include "session/config/groups/members.hpp"
 #include "session/multi_encrypt.hpp"
-#include "session/session_encrypt.hpp"
+#include "session/bchat_encrypt.hpp"
 #include "session/xed25519.hpp"
 
 using namespace std::literals;

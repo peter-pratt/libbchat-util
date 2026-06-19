@@ -3,12 +3,12 @@ g++ -std=c++20 -O0 \
   -I include \
   -o beldex_test \
   beldex_test.cpp \
-  Build/src/libsession-network.a \
-  Build/src/libsession-util.a \
-  Build/src/libsession-crypto.a \
-  Build/src/libsession-config.a \
+  Build/src/libbchat-network.a \
+  Build/src/libbchat-util.a \
+  Build/src/libbchat-crypto.a \
+  Build/src/libbchat-config.a \
   Build/src/libversion.a \
-  Build/proto/libsession-protos.a \
+  Build/proto/libbchat-protos.a \
   Build/external/session-router/src/libsession-router.a \
   Build/external/session-router/src/libsession-router-core.a \
   Build/external/session-router/src/libsession-router-core-utils.a \

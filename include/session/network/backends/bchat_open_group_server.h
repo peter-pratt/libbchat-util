@@ -8,7 +8,7 @@ extern "C" {
 #include <stdint.h>
 
 #include "session/export.h"
-#include "session/network/session_network_types.h"
+#include "session/network/bchat_network_types.h"
 #include "session/platform.h"
 
 typedef struct open_group_server_parsed_download_url {

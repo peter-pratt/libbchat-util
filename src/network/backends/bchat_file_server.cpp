@@ -1,4 +1,4 @@
-#include "session/network/backends/session_file_server.hpp"
+#include "session/network/backends/bchat_file_server.hpp"
 
 #include <fmt/ranges.h>
 #include <oxenc/base64.h>
@@ -6,10 +6,10 @@
 #include <oxen/log.hpp>
 #include <oxen/log/format.hpp>
 
-#include "../session_network_internal.hpp"
+#include "../bchat_network_internal.hpp"
 #include "session/blinding.hpp"
 #include "session/network/backends/backend_util.hpp"
-#include "session/network/backends/session_file_server.h"
+#include "session/network/backends/bchat_file_server.h"
 #include "session/random.hpp"
 
 #if defined(__APPLE__) || !defined(__cpp_lib_chrono) || __cpp_lib_chrono < 201907L || \

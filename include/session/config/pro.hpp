@@ -2,7 +2,7 @@
 
 #include <session/config.hpp>
 #include <session/config/base.hpp>
-#include <session/session_protocol.hpp>
+#include <session/bchat_protocol.hpp>
 
 namespace session::config {
 

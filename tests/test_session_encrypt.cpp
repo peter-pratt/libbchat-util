@@ -1,9 +1,9 @@
-#include <session/session_encrypt.h>
+#include <session/bchat_encrypt.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <session/blinding.hpp>
-#include <session/session_encrypt.hpp>
+#include <session/bchat_encrypt.hpp>
 #include <session/util.hpp>
 
 #include "utils.hpp"

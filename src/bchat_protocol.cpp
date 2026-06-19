@@ -8,8 +8,8 @@
 
 #include <oxen/log.hpp>
 #include <session/pro_backend.hpp>
-#include <session/session_encrypt.hpp>
-#include <session/session_protocol.hpp>
+#include <session/bchat_encrypt.hpp>
+#include <session/bchat_protocol.hpp>
 #include <session/types.hpp>
 #include <session/util.hpp>
 

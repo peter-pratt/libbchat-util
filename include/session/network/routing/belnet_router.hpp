@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "session/network/backends/session_file_server.hpp"
+#include "session/network/backends/bchat_file_server.hpp"
 #include "session/network/request_queue.hpp"
 #include "session/network/routing/network_router.hpp"
 #include "session/network/snode_pool.hpp"

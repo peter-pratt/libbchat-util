@@ -1,6 +1,6 @@
 #pragma once
 
-#include <session/session_protocol.h>
+#include <session/bchat_protocol.h>
 #include <session/types.h>
 #include <stddef.h>
 #include <stdint.h>

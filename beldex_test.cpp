@@ -4,8 +4,8 @@
 #include <unistd.h>
 #include <stdint.h>
 
-#include "session/network/session_network.h"
-#include "session/network/session_network_types.h"
+#include "session/network/bchat_network.h"
+#include "session/network/bchat_network_types.h"
 
 // Global state for callback
 static volatile int nodes_received = -1;

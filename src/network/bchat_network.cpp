@@ -1,4 +1,4 @@
-#include "session/network/session_network.hpp"
+#include "session/network/bchat_network.hpp"
 
 #include <oxenc/base64.h>
 
@@ -12,15 +12,15 @@
 #include <vector>
 
 #include "session/blinding.hpp"
-#include "session/network/backends/session_file_server.hpp"
+#include "session/network/backends/bchat_file_server.hpp"
 #include "session/network/network_config.hpp"
 #include "session/network/network_opt.hpp"
 #include "session/network/request_queue.hpp"
 #include "session/network/routing/direct_router.hpp"
 #include "session/network/routing/onion_request_router.hpp"
-#include "session/network/routing/session_router_router.hpp"
-#include "session/network/session_network.h"
-#include "session/network/session_network_types.hpp"
+#include "session/network/routing/belnet_router.hpp"
+#include "session/network/bchat_network.h"
+#include "session/network/bchat_network_types.hpp"
 #include "session/network/transport/quic_transport.hpp"
 #include "session/random.hpp"
 

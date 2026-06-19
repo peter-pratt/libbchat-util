@@ -5,7 +5,7 @@
 #include <optional>
 #include <oxen/quic.hpp>
 
-#include "session/network/backends/session_file_server.hpp"
+#include "session/network/backends/bchat_file_server.hpp"
 #include "session/network/network_config.hpp"
 #include "session/network/routing/network_router.hpp"
 #include "session/network/snode_pool.hpp"

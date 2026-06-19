@@ -6,7 +6,7 @@
 #include <oxen/quic/loop.hpp>
 #include <oxen/quic/utils.hpp>
 
-#include "session/network/session_network_types.hpp"
+#include "session/network/bchat_network_types.hpp"
 #include "session/network/transport/network_transport.hpp"
 
 namespace session::network::detail {

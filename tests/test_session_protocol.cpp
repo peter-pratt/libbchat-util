@@ -5,8 +5,8 @@
 #include <session/blinding.hpp>
 #include <session/pro_backend.hpp>
 #include <session/random.hpp>
-#include <session/session_encrypt.hpp>
-#include <session/session_protocol.hpp>
+#include <session/bchat_encrypt.hpp>
+#include <session/bchat_protocol.hpp>
 
 #include "SessionProtos.pb.h"
 #include "utils.hpp"

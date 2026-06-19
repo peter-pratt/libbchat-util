@@ -8,7 +8,7 @@ extern "C" {
 
 #include "session/export.h"
 #include "session/log_level.h"
-#include "session/network/session_network_types.h"
+#include "session/network/bchat_network_types.h"
 #include "session/onionreq/builder.h"
 #include "session/platform.h"
 

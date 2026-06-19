@@ -5,7 +5,7 @@
 #include <string_view>
 #include <variant>
 
-#include "session/network/session_network_types.hpp"
+#include "session/network/bchat_network_types.hpp"
 
 namespace session::network {
 struct service_node;

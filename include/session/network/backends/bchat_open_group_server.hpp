@@ -1,7 +1,7 @@
 #pragma once
 
 #include "session/network/key_types.hpp"
-#include "session/network/session_network_types.hpp"
+#include "session/network/bchat_network_types.hpp"
 #include "session/platform.hpp"
 
 namespace session::network::config {

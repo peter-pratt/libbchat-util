@@ -3,7 +3,7 @@
 #include <oxenc/endian.h>
 
 #include "session/network/service_node.hpp"
-#include "session/network/session_network.hpp"
+#include "session/network/bchat_network.hpp"
 
 namespace session::network::swarm {
 

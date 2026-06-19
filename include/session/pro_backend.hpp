@@ -3,7 +3,7 @@
 #include <session/pro_backend.h>
 
 #include <chrono>
-#include <session/session_protocol.hpp>
+#include <session/bchat_protocol.hpp>
 #include <session/types.hpp>
 #include <span>
 #include <string>

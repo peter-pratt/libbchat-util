@@ -1,10 +1,10 @@
-#include "session/session_encrypt.hpp"
+#include "session/bchat_encrypt.hpp"
 
 #include <oxenc/base64.h>
 #include <oxenc/bt_producer.h>
 #include <oxenc/bt_serialize.h>
 #include <oxenc/hex.h>
-#include <session/session_encrypt.h>
+#include <session/bchat_encrypt.h>
 #include <sodium/crypto_aead_xchacha20poly1305.h>
 #include <sodium/crypto_box.h>
 #include <sodium/crypto_core_ed25519.h>

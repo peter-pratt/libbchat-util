@@ -7,7 +7,7 @@
 
 #include "session/network/key_types.hpp"
 #include "session/network/service_node.hpp"
-#include "session/network/session_network_types.h"
+#include "session/network/bchat_network_types.h"
 
 namespace session::network {
 

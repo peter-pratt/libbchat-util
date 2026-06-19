@@ -8,7 +8,7 @@
 #include <chrono>
 #include <nlohmann/json.hpp>
 #include <session/pro_backend.hpp>
-#include <session/session_encrypt.hpp>
+#include <session/bchat_encrypt.hpp>
 #include <session/sodium_array.hpp>
 #include <session/types.hpp>
 

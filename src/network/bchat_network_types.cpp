@@ -1,4 +1,4 @@
-#include "session/network/session_network_types.hpp"
+#include "session/network/bchat_network_types.hpp"
 
 #include <oxen/log.hpp>
 #include <oxen/log/format.hpp>

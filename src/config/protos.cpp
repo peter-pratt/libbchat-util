@@ -9,7 +9,7 @@
 
 #include "SessionProtos.pb.h"
 #include "WebSocketResources.pb.h"
-#include "session/session_encrypt.hpp"
+#include "session/bchat_encrypt.hpp"
 
 namespace session::config::protos {
 
