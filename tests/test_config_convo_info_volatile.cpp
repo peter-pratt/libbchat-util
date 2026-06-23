@@ -1,11 +1,11 @@
 #include <oxenc/hex.h>
-#include <session/config/convo_info_volatile.h>
+#include <bchat/config/convo_info_volatile.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
-#include <session/config/convo_info_volatile.hpp>
-#include <session/types.hpp>
+#include <bchat/config/convo_info_volatile.hpp>
+#include <bchat/types.hpp>
 #include <string_view>
 #include <variant>
 
@@ -28,7 +28,7 @@ TEST_CASE("Conversations", "[config][conversations]") {
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::ConvoInfoVolatile convos{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::ConvoInfoVolatile convos{std::span<const unsigned char>{seed}, std::nullopt};
 
     constexpr auto definitely_real_id =
             "055000000000000000000000000000000000000000000000000000000000000000"sv;
@@ -48,7 +48,7 @@ TEST_CASE("Conversations", "[config][conversations]") {
 
     auto c = convos.get_or_construct_1to1(definitely_real_id);
 
-    CHECK(c.session_id == definitely_real_id);
+    CHECK(c.bchat_id == definitely_real_id);
     CHECK(c.last_read == 0);
 
     CHECK_FALSE(convos.needs_push());
@@ -100,7 +100,7 @@ TEST_CASE("Conversations", "[config][conversations]") {
     CHECK_FALSE(convos.get_blinded_1to1(blinded_id));
 
     auto lb = convos.get_or_construct_blinded_1to1(legacy_blinded_id);
-    CHECK(lb.blinded_session_id == legacy_blinded_id);
+    CHECK(lb.blinded_bchat_id == legacy_blinded_id);
     CHECK(lb.last_read == 0);
     CHECK_FALSE(lb.unread);
 
@@ -109,7 +109,7 @@ TEST_CASE("Conversations", "[config][conversations]") {
     convos.set(lb);
 
     auto b = convos.get_or_construct_blinded_1to1(blinded_id);
-    CHECK(b.blinded_session_id == blinded_id);
+    CHECK(b.blinded_bchat_id == blinded_id);
     CHECK(b.last_read == 0);
     CHECK_FALSE(b.unread);
 
@@ -129,7 +129,7 @@ TEST_CASE("Conversations", "[config][conversations]") {
     // NB: Not going to check encrypted data and decryption here because that's general (not
     // specific to convos) and is covered already in the user profile tests.
 
-    session::config::ConvoInfoVolatile convos2{seed, convos.dump()};
+    bchat::config::ConvoInfoVolatile convos2{seed, convos.dump()};
     CHECK_FALSE(convos.needs_push());
     CHECK_FALSE(convos.needs_dump());
     CHECK(std::get<seqno_t>(convos.push()) == 1);
@@ -139,7 +139,7 @@ TEST_CASE("Conversations", "[config][conversations]") {
     auto x1 = convos2.get_1to1(definitely_real_id);
     REQUIRE(x1);
     CHECK(x1->last_read == now_ms);
-    CHECK(x1->session_id == definitely_real_id);
+    CHECK(x1->bchat_id == definitely_real_id);
     CHECK_FALSE(x1->unread);
 
     auto x2 = convos2.get_community("http://EXAMPLE.org:5678", "sudokuRoom");
@@ -156,14 +156,14 @@ TEST_CASE("Conversations", "[config][conversations]") {
 
     auto x4 = convos2.get_blinded_1to1(legacy_blinded_id);
     REQUIRE(x4);
-    CHECK(x4->blinded_session_id ==
+    CHECK(x4->blinded_bchat_id ==
           "150000000000000000000000000000000000101010111010000110100001210000");
     CHECK(x4->last_read == now_ms);
     CHECK(x4->unread);
 
     auto x5 = convos2.get_blinded_1to1(blinded_id);
     REQUIRE(x5);
-    CHECK(x5->blinded_session_id ==
+    CHECK(x5->blinded_bchat_id ==
           "255000000000000000000000000000000000101010111010000110100001210000");
     CHECK(x5->last_read == now_ms);
     CHECK(x5->unread);
@@ -198,11 +198,11 @@ TEST_CASE("Conversations", "[config][conversations]") {
     CHECK_FALSE(convos.needs_push());
     CHECK(std::get<seqno_t>(convos.push()) == seqno);
 
-    using session::config::convo::blinded_one_to_one;
-    using session::config::convo::community;
-    using session::config::convo::group;
-    using session::config::convo::legacy_group;
-    using session::config::convo::one_to_one;
+    using bchat::config::convo::blinded_one_to_one;
+    using bchat::config::convo::community;
+    using bchat::config::convo::group;
+    using bchat::config::convo::legacy_group;
+    using bchat::config::convo::one_to_one;
 
     std::vector<std::string> seen, expected;
     for (const auto& e :
@@ -228,7 +228,7 @@ TEST_CASE("Conversations", "[config][conversations]") {
         CHECK_FALSE(conv->empty());
         for (const auto& convo : *conv) {
             if (auto* c = std::get_if<one_to_one>(&convo))
-                seen.push_back("1-to-1: "s + c->session_id);
+                seen.push_back("1-to-1: "s + c->bchat_id);
             else if (auto* c = std::get_if<group>(&convo))
                 seen.push_back("gr: " + c->id);
             else if (auto* c = std::get_if<community>(&convo))
@@ -237,9 +237,9 @@ TEST_CASE("Conversations", "[config][conversations]") {
             else if (auto* c = std::get_if<legacy_group>(&convo))
                 seen.push_back("lgr: " + c->id);
             else if (auto* c = std::get_if<blinded_one_to_one>(&convo); c->legacy_blinding)
-                seen.push_back("lb: " + c->blinded_session_id);
+                seen.push_back("lb: " + c->blinded_bchat_id);
             else if (auto* c = std::get_if<blinded_one_to_one>(&convo); !c->legacy_blinding)
-                seen.push_back("b: " + c->blinded_session_id);
+                seen.push_back("b: " + c->blinded_bchat_id);
             else
                 seen.push_back("unknown convo type!");
         }
@@ -261,7 +261,7 @@ TEST_CASE("Conversations", "[config][conversations]") {
     // Check the single-type iterators:
     seen.clear();
     for (auto it = convos.begin_1to1(); it != convos.end(); ++it)
-        seen.push_back(it->session_id);
+        seen.push_back(it->bchat_id);
     CHECK(seen == std::vector<std::string>{
                           "051111111111111111111111111111111111111111111111111111111111111111",
                   });
@@ -282,7 +282,7 @@ TEST_CASE("Conversations", "[config][conversations]") {
 
     seen.clear();
     for (auto it = convos.begin_blinded_1to1(); it != convos.end(); ++it)
-        seen.emplace_back(it->blinded_session_id);
+        seen.emplace_back(it->blinded_bchat_id);
     CHECK(seen == std::vector<std::string>{
                           "150000000000000000000000000000000000101010111010000110100001210000",
                           "2512345ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -323,13 +323,13 @@ TEST_CASE("Conversations (C API)", "[config][conversations][c]") {
 
     CHECK_FALSE(convo_info_volatile_get_1to1(conf, &c, "05123456"));
     CHECK(conf->last_error ==
-          "Invalid session ID: expected 66 hex digits starting with 05; got 05123456"sv);
+          "Invalid bchat ID: expected 66 hex digits starting with 05; got 05123456"sv);
 
     CHECK(convo_info_volatile_size(conf) == 0);
 
     CHECK(convo_info_volatile_get_or_construct_1to1(conf, &c, definitely_real_id));
 
-    CHECK(c.session_id == std::string_view{definitely_real_id});
+    CHECK(c.bchat_id == std::string_view{definitely_real_id});
     CHECK(c.last_read == 0);
     CHECK_FALSE(c.unread);
 
@@ -422,7 +422,7 @@ TEST_CASE("Conversations (C API)", "[config][conversations][c]") {
 
     REQUIRE(convo_info_volatile_get_1to1(conf2, &c, definitely_real_id));
     CHECK(c.last_read == now_ms);
-    CHECK(c.session_id == std::string_view{definitely_real_id});
+    CHECK(c.bchat_id == std::string_view{definitely_real_id});
     CHECK_FALSE(c.unread);
 
     REQUIRE(convo_info_volatile_get_community(conf2, &og, "http://EXAMPLE.org:5678", "sudokuRoom"));
@@ -485,13 +485,13 @@ TEST_CASE("Conversations (C API)", "[config][conversations][c]") {
         convo_info_volatile_iterator* it = convo_info_volatile_iterator_new(conf);
         for (; !convo_info_volatile_iterator_done(it); convo_info_volatile_iterator_advance(it)) {
             if (convo_info_volatile_it_is_1to1(it, &c1)) {
-                seen.push_back("1-to-1: "s + c1.session_id);
+                seen.push_back("1-to-1: "s + c1.bchat_id);
             } else if (convo_info_volatile_it_is_community(it, &c2)) {
                 seen.push_back("comm: "s + c2.base_url + "/r/" + c2.room);
             } else if (convo_info_volatile_it_is_legacy_group(it, &c3)) {
                 seen.push_back("lgr: "s + c3.group_id);
             } else if (convo_info_volatile_it_is_blinded_1to1(it, &c4)) {
-                seen.push_back("b: "s + c4.blinded_session_id);
+                seen.push_back("b: "s + c4.blinded_bchat_id);
             }
         }
         convo_info_volatile_iterator_free(it);
@@ -532,7 +532,7 @@ TEST_CASE("Conversations (C API)", "[config][conversations][c]") {
     for (it = convo_info_volatile_iterator_new_1to1(conf); !convo_info_volatile_iterator_done(it);
          convo_info_volatile_iterator_advance(it)) {
         REQUIRE(convo_info_volatile_it_is_1to1(it, &ci));
-        seen.push_back(ci.session_id);
+        seen.push_back(ci.bchat_id);
     }
     convo_info_volatile_iterator_free(it);
     CHECK(seen == std::vector<std::string>{{
@@ -571,7 +571,7 @@ TEST_CASE("Conversations (C API)", "[config][conversations][c]") {
          !convo_info_volatile_iterator_done(it);
          convo_info_volatile_iterator_advance(it)) {
         REQUIRE(convo_info_volatile_it_is_blinded_1to1(it, &bi));
-        seen.emplace_back(bi.blinded_session_id);
+        seen.emplace_back(bi.blinded_bchat_id);
     }
     convo_info_volatile_iterator_free(it);
     CHECK(seen == std::vector<std::string>{
@@ -596,7 +596,7 @@ TEST_CASE("Conversation pruning", "[config][conversations][pruning]") {
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::ConvoInfoVolatile convos{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::ConvoInfoVolatile convos{std::span<const unsigned char>{seed}, std::nullopt};
 
     auto some_pubkey = [](unsigned char x) -> std::vector<unsigned char> {
         std::vector<unsigned char> s =
@@ -604,7 +604,7 @@ TEST_CASE("Conversation pruning", "[config][conversations][pruning]") {
         s[31] = x;
         return s;
     };
-    auto some_session_id = [&](unsigned char x) -> std::string {
+    auto some_bchat_id = [&](unsigned char x) -> std::string {
         auto pk = some_pubkey(x);
         return "05" + oxenc::to_hex(pk.begin(), pk.end());
     };
@@ -617,7 +617,7 @@ TEST_CASE("Conversation pruning", "[config][conversations][pruning]") {
 
     for (int i = 0; i <= 65; i++) {
         if (i % 3 == 0) {
-            auto c = convos.get_or_construct_1to1(some_session_id(i));
+            auto c = convos.get_or_construct_1to1(some_bchat_id(i));
             c.last_read = unix_timestamp(i);
             if (i % 5 == 0)
                 c.unread = true;
@@ -626,14 +626,14 @@ TEST_CASE("Conversation pruning", "[config][conversations][pruning]") {
                 c.pro_expiry_unix_ts = std::chrono::sys_time<std::chrono::milliseconds>{
                         std::chrono::milliseconds{unix_timestamp(i)}};
 
-                session::array_uc32 hash{};
+                bchat::array_uc32 hash{};
                 std::fill(hash.begin(), hash.end(), static_cast<uint8_t>(i % 256));
                 c.pro_gen_index_hash = hash;
             }
 
             convos.set(c);
         } else if (i % 3 == 1) {
-            auto c = convos.get_or_construct_legacy_group(some_session_id(i));
+            auto c = convos.get_or_construct_legacy_group(some_bchat_id(i));
             c.last_read = unix_timestamp(i);
             if (i % 5 == 0)
                 c.unread = true;
@@ -669,13 +669,13 @@ TEST_CASE("Conversation pruning", "[config][conversations][pruning]") {
     // internals like this!)
 
     // These ones wouldn't be stored by the normal `set()` interface, but won't get pruned either:
-    convos.data["1"][oxenc::from_hex(some_session_id(80))]["r"] = unix_timestamp(33);
-    convos.data["1"][oxenc::from_hex(some_session_id(81))]["r"] = unix_timestamp(40);
-    convos.data["1"][oxenc::from_hex(some_session_id(82))]["r"] = unix_timestamp(44);
+    convos.data["1"][oxenc::from_hex(some_bchat_id(80))]["r"] = unix_timestamp(33);
+    convos.data["1"][oxenc::from_hex(some_bchat_id(81))]["r"] = unix_timestamp(40);
+    convos.data["1"][oxenc::from_hex(some_bchat_id(82))]["r"] = unix_timestamp(44);
     // These ones should get pruned as soon as we push:
-    convos.data["1"][oxenc::from_hex(some_session_id(83))]["r"] = unix_timestamp(45);
-    convos.data["1"][oxenc::from_hex(some_session_id(84))]["r"] = unix_timestamp(46);
-    convos.data["1"][oxenc::from_hex(some_session_id(85))]["r"] = unix_timestamp(1000);
+    convos.data["1"][oxenc::from_hex(some_bchat_id(83))]["r"] = unix_timestamp(45);
+    convos.data["1"][oxenc::from_hex(some_bchat_id(84))]["r"] = unix_timestamp(46);
+    convos.data["1"][oxenc::from_hex(some_bchat_id(85))]["r"] = unix_timestamp(1000);
 
     // 6 additional 1-to-1s got added unconditionally
     CHECK(convos.size_1to1() == 21);
@@ -836,7 +836,7 @@ TEST_CASE("Conversation pro data", "[config][conversations][pro]") {
                           .count();
     c.pro_expiry_unix_ts_ms = 10000;
 
-    session::array_uc32 hash{};
+    bchat::array_uc32 hash{};
     std::fill(hash.begin(), hash.end(), static_cast<uint8_t>(3));
     std::memcpy(c.pro_gen_index_hash.data, hash.data(), hash.size());
     c.has_pro_gen_index_hash = true;

@@ -2,8 +2,8 @@
 
 set -e
 
-if ! [ -f LICENSE ] || ! [ -d include/session ]; then
-    echo "You need to run this as ./utils/ios.sh from the top-level libsession-util project directory" >&2
+if ! [ -f LICENSE ] || ! [ -d include/bchat ]; then
+    echo "You need to run this as ./utils/ios.sh from the top-level libbchat-util project directory" >&2
     exit 1
 fi
 
@@ -32,7 +32,7 @@ SHOULD_ACHIVE=${5:-true}                 # Parameter 5 is a flag indicating whet
 if [ -z "${TARGET_TEMP_DIR}" ]; then
     BUILD_DIR="./build-ios"
 elif [ "${#ARCHS[@]}" = 1 ]; then
-    BUILD_DIR="${TARGET_TEMP_DIR}/../libSession-util"
+    BUILD_DIR="${TARGET_TEMP_DIR}/../libBChat-util"
 fi
 
 # Can't default an array in the same way as above
@@ -47,7 +47,7 @@ projdir="$PWD"
 UNIQUE_NAME=""
 
 if [ $SHOULD_ACHIVE = true ]; then
-    UNIQUE_NAME="${1:-libsession-util-ios-TAG}"
+    UNIQUE_NAME="${1:-libbchat-util-ios-TAG}"
 
     if [[ "$UNIQUE_NAME" =~ TAG ]]; then
         if [ -n "$DRONE_TAG" ]; then
@@ -123,7 +123,7 @@ if [ $SHOULD_ACHIVE = true ]; then
     FINAL_SHOULD_ACHIVE="SHOULD_ACHIVE"
 fi
 
-if [ "$CONFIGURATION" == "Debug" ] || [ "$CONFIGURATION" == "Debug_Compile_LibSession" ]; then
+if [ "$CONFIGURATION" == "Debug" ] || [ "$CONFIGURATION" == "Debug_Compile_LibBChat" ]; then
     submodule_check=OFF
     build_type="Debug"
 fi
@@ -153,7 +153,7 @@ fi
 
 # Strip debug info from bundled dependency object files (consumers don't need it
 # and it causes dsymutil warnings when the original build machine's paths are unavailable)
-for f in ${BUILD_DIR}/{sim,ios}/libsession-util.a; do
+for f in ${BUILD_DIR}/{sim,ios}/libbchat-util.a; do
     if [ -f "$f" ]; then
         strip -S "$f"
     fi
@@ -165,12 +165,12 @@ if [ "${SHOULD_MERGE_STATIC_LIBS}" == "SHOULD_MERGE_STATIC_LIBS" ]; then
     if [ "${#TARGET_SIM_ARCHS[@]}" -eq "1" ] && [ -e "${sim_files[0]}" ]; then
         # Single device build
         mkdir -p "${BUILD_DIR}/sim"
-        rm -rf "${BUILD_DIR}/sim/libsession-util.a"
-        cp "${BUILD_DIR}/${TARGET_SIM_ARCHS[0]}/libsession-util.a" "${BUILD_DIR}/sim/libsession-util.a"
+        rm -rf "${BUILD_DIR}/sim/libbchat-util.a"
+        cp "${BUILD_DIR}/${TARGET_SIM_ARCHS[0]}/libbchat-util.a" "${BUILD_DIR}/sim/libbchat-util.a"
     elif [ "${#TARGET_SIM_ARCHS[@]}" -gt "1" ] && [ -e "${sim_files[0]}" ]; then
         # Combine multiple device builds into a multi-arch lib
         mkdir -p "${BUILD_DIR}/sim"
-        lipo -create "${BUILD_DIR}"/sim-*/libsession-util.a -output "${BUILD_DIR}/sim/libsession-util.a"
+        lipo -create "${BUILD_DIR}"/sim-*/libbchat-util.a -output "${BUILD_DIR}/sim/libbchat-util.a"
     else
         echo "No sim build static libs found"
     fi
@@ -180,12 +180,12 @@ if [ "${SHOULD_MERGE_STATIC_LIBS}" == "SHOULD_MERGE_STATIC_LIBS" ]; then
     if [ "${#TARGET_DEVICE_ARCHS[@]}" -eq "1" ] && [ -e "${ios_files[0]}" ]; then
         # Single device build
         mkdir -p "${BUILD_DIR}/ios"
-        rm -rf "${BUILD_DIR}/ios/libsession-util.a"
-        cp "${BUILD_DIR}/${TARGET_DEVICE_ARCHS[0]}/libsession-util.a" "${BUILD_DIR}/ios/libsession-util.a"
+        rm -rf "${BUILD_DIR}/ios/libbchat-util.a"
+        cp "${BUILD_DIR}/${TARGET_DEVICE_ARCHS[0]}/libbchat-util.a" "${BUILD_DIR}/ios/libbchat-util.a"
     elif [ "${#TARGET_DEVICE_ARCHS[@]}" -gt "1" ] && [ -e "${ios_files[0]}" ]; then
         # Combine multiple device builds into a multi-arch lib
         mkdir -p "${BUILD_DIR}/ios"
-        lipo -create "${BUILD_DIR}"/ios-*/libsession-util.a -output "${BUILD_DIR}/ios/libsession-util.a"
+        lipo -create "${BUILD_DIR}"/ios-*/libbchat-util.a -output "${BUILD_DIR}/ios/libbchat-util.a"
     else
         echo "No ios build static libs found"
     fi
@@ -193,27 +193,27 @@ fi
 
 if [ "${SHOULD_CREATE_FRAMEWORK}" == "SHOULD_CREATE_FRAMEWORK" ]; then
     # Create a '.xcframework' so XCode can deal with the different architectures
-    rm -rf "${OUTPUT_DIR}/libsession-util.xcframework"
+    rm -rf "${OUTPUT_DIR}/libbchat-util.xcframework"
     sim_files=( "${BUILD_DIR}/sim-"* )
     ios_files=( "${BUILD_DIR}/ios-"* )
 
     if [ "${#TARGET_SIM_ARCHS}" -gt "0" ] && [ -e "${sim_files[0]}" ] && [ "${#TARGET_DEVICE_ARCHS}" -gt "0" ] && [ -e "${ios_files[0]}" ]; then
         xcodebuild -create-xcframework \
-            -library "${BUILD_DIR}/ios/libsession-util.a" \
+            -library "${BUILD_DIR}/ios/libbchat-util.a" \
             -headers "include" \
-            -library "${BUILD_DIR}/sim/libsession-util.a" \
+            -library "${BUILD_DIR}/sim/libbchat-util.a" \
             -headers "include" \
-            -output "${OUTPUT_DIR}/libsession-util.xcframework"
+            -output "${OUTPUT_DIR}/libbchat-util.xcframework"
     elif [ "${#TARGET_DEVICE_ARCHS}" -gt "0" ] && [ -e "${ios_files[0]}" ]; then
         xcodebuild -create-xcframework \
-            -library "${BUILD_DIR}/ios/libsession-util.a" \
+            -library "${BUILD_DIR}/ios/libbchat-util.a" \
             -headers "include" \
-            -output "${OUTPUT_DIR}/libsession-util.xcframework"
+            -output "${OUTPUT_DIR}/libbchat-util.xcframework"
     elif [ -e "${sim_files[0]}" ]; then
         xcodebuild -create-xcframework \
-            -library "${BUILD_DIR}/sim/libsession-util.a" \
+            -library "${BUILD_DIR}/sim/libbchat-util.a" \
             -headers "include" \
-            -output "${OUTPUT_DIR}/libsession-util.xcframework"
+            -output "${OUTPUT_DIR}/libbchat-util.xcframework"
     else
         echo "No static libraries to turn into framework"
         exit 1
@@ -221,16 +221,16 @@ if [ "${SHOULD_CREATE_FRAMEWORK}" == "SHOULD_CREATE_FRAMEWORK" ]; then
 
     # The 'module.modulemap' is needed for XCode to be able to find the headers
     modmap="${OUTPUT_DIR}/module.modulemap"
-    echo "module SessionUtil {" >"$modmap"
+    echo "module BChatUtil {" >"$modmap"
     echo "  module capi {" >>"$modmap"
-    for x in $(cd include && find session -name '*.h'); do
+    for x in $(cd include && find bchat -name '*.h'); do
         echo "    header \"$x\"" >>"$modmap"
     done
     echo -e "    export *\n  }" >>"$modmap"
     echo "}" >>"$modmap"
 
     # Need to add the module.modulemap into each architecture directory in the xcframework
-    for dir in "${OUTPUT_DIR}/libsession-util.xcframework"/*/; do
+    for dir in "${OUTPUT_DIR}/libbchat-util.xcframework"/*/; do
         cp "${modmap}" "${dir}/Headers/module.modulemap"
     done
 
@@ -240,19 +240,19 @@ if [ "${SHOULD_CREATE_FRAMEWORK}" == "SHOULD_CREATE_FRAMEWORK" ]; then
         (cd "${OUTPUT_DIR}/.." && tar cvJf "${UNIQUE_NAME}.tar.xz" "${UNIQUE_NAME}")
     fi
         
-    echo "Packaged everything up at ${OUTPUT_DIR}/libsession-util.xcframework"
+    echo "Packaged everything up at ${OUTPUT_DIR}/libbchat-util.xcframework"
 else
     # Copy the static libraries to the output
-    rm -rf "${OUTPUT_DIR}/libsession-util-sim.a"
-    rm -rf "${OUTPUT_DIR}/libsession-util-dev.a"
+    rm -rf "${OUTPUT_DIR}/libbchat-util-sim.a"
+    rm -rf "${OUTPUT_DIR}/libbchat-util-dev.a"
 
-    if [ -f "${BUILD_DIR}/sim/libsession-util.a" ]; then
-        cp "${BUILD_DIR}/sim/libsession-util.a" "${OUTPUT_DIR}/libsession-util-sim.a"
+    if [ -f "${BUILD_DIR}/sim/libbchat-util.a" ]; then
+        cp "${BUILD_DIR}/sim/libbchat-util.a" "${OUTPUT_DIR}/libbchat-util-sim.a"
     fi
 
-    if [ -f "${BUILD_DIR}/ios/libsession-util.a" ]; then
-        cp "${BUILD_DIR}/ios/libsession-util.a" "${OUTPUT_DIR}/libsession-util-dev.a"
+    if [ -f "${BUILD_DIR}/ios/libbchat-util.a" ]; then
+        cp "${BUILD_DIR}/ios/libbchat-util.a" "${OUTPUT_DIR}/libbchat-util-dev.a"
     fi
 
-    echo "Packaged everything up at ${OUTPUT_DIR}/libsession-util-{sim|dev}.a"
+    echo "Packaged everything up at ${OUTPUT_DIR}/libbchat-util-{sim|dev}.a"
 fi

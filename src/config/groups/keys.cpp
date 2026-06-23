@@ -1,4 +1,4 @@
-#include "session/config/groups/keys.hpp"
+#include "bchat/config/groups/keys.hpp"
 
 #include <oxenc/base64.h>
 #include <oxenc/hex.h>
@@ -18,16 +18,16 @@
 #include <unordered_set>
 
 #include "../internal.hpp"
-#include "session/config/groups/info.hpp"
-#include "session/config/groups/keys.h"
-#include "session/config/groups/members.hpp"
-#include "session/multi_encrypt.hpp"
-#include "session/bchat_encrypt.hpp"
-#include "session/xed25519.hpp"
+#include "bchat/config/groups/info.hpp"
+#include "bchat/config/groups/keys.h"
+#include "bchat/config/groups/members.hpp"
+#include "bchat/multi_encrypt.hpp"
+#include "bchat/bchat_encrypt.hpp"
+#include "bchat/xed25519.hpp"
 
 using namespace std::literals;
 
-namespace session::config::groups {
+namespace bchat::config::groups {
 
 static auto sys_time_from_ms(int64_t milliseconds_since_epoch) {
     return std::chrono::system_clock::time_point{milliseconds_since_epoch * 1ms};
@@ -240,11 +240,11 @@ namespace {
         return xpk;
     }
 
-    constexpr auto seed_hash_key = "SessionGroupKeySeed"sv;
-    const std::span<const unsigned char> enc_key_hash_key = to_span("SessionGroupKeyGen");
-    constexpr auto enc_key_admin_hash_key = "SessionGroupKeyAdminKey"sv;
-    constexpr auto enc_key_member_hash_key = "SessionGroupKeyMemberKey"sv;
-    const std::span<const unsigned char> junk_seed_hash_key = to_span("SessionGroupJunkMembers");
+    constexpr auto seed_hash_key = "BChatGroupKeySeed"sv;
+    const std::span<const unsigned char> enc_key_hash_key = to_span("BChatGroupKeyGen");
+    constexpr auto enc_key_admin_hash_key = "BChatGroupKeyAdminKey"sv;
+    constexpr auto enc_key_member_hash_key = "BChatGroupKeyMemberKey"sv;
+    const std::span<const unsigned char> junk_seed_hash_key = to_span("BChatGroupJunkMembers");
 
 }  // namespace
 
@@ -254,7 +254,7 @@ std::span<const unsigned char> Keys::rekey(Info& info, Members& members) {
                 "Unable to issue a new group encryption key without the main group keys"};
 
     // For members we calculate the outer encryption key as H(aB || A || B).  But because we only
-    // have `B` (the session id) as an x25519 pubkey, we do this in x25519 space, which means we
+    // have `B` (the bchat id) as an x25519 pubkey, we do this in x25519 space, which means we
     // have to use the x25519 conversion of a/A rather than the group's ed25519 pubkey.
     auto group_xpk = compute_xpk(_sign_pk->data());
 
@@ -270,12 +270,12 @@ std::span<const unsigned char> Keys::rekey(Info& info, Members& members) {
     // H1(member0 || member1 || ... || memberN || generation || H2(group_secret_key))
     //
     // where:
-    // - H1(.) = 56-byte BLAKE2b keyed hash with key "SessionGroupKeyGen"
-    // - memberI is each members full session ID, expressed in hex (66 chars), in sorted order (note
+    // - H1(.) = 56-byte BLAKE2b keyed hash with key "BChatGroupKeyGen"
+    // - memberI is each members full bchat ID, expressed in hex (66 chars), in sorted order (note
     //   that this includes *all* members, not only non-admins).
     // - generation is the new generation value, expressed as a base 10 string (e.g. "123")
     // - H2(.) = 32-byte BLAKE2b keyed hash of the sodium group secret key seed (just the 32 byte,
-    //           not the full 64 byte with the pubkey in the second half), key "SessionGroupKeySeed"
+    //           not the full 64 byte with the pubkey in the second half), key "BChatGroupKeySeed"
     //
     // And then from this 56-byte hash we use the first 32 bytes as the new group key and the last
     // 24 bytes as the encryption nonce.
@@ -285,7 +285,7 @@ std::span<const unsigned char> Keys::rekey(Info& info, Members& members) {
     //
     // To encrypt this we have one key encrypted for all admins, plus one encryption per non-admin
     // member.  For admins we encrypt using a 32-byte blake2b keyed hash of the group secret key
-    // seed, just like H2, but with key "SessionGroupKeyAdminKey".
+    // seed, just like H2, but with key "BChatGroupKeyAdminKey".
 
     std::array<unsigned char, 32> h2 = seed_hash(seed_hash_key);
 
@@ -297,7 +297,7 @@ std::span<const unsigned char> Keys::rekey(Info& info, Members& members) {
             &st, enc_key_hash_key.data(), enc_key_hash_key.size(), h1.size());
     for (const auto& m : members)
         crypto_generichash_blake2b_update(
-                &st, to_unsigned(m.session_id.data()), m.session_id.size());
+                &st, to_unsigned(m.bchat_id.data()), m.bchat_id.size());
 
     auto gen = keys_.empty() ? 0 : keys_.back().generation + 1;
     auto gen_str = std::to_string(gen);
@@ -347,7 +347,7 @@ std::span<const unsigned char> Keys::rekey(Info& info, Members& members) {
         member_xpk_raw.reserve(members.size());
         member_xpks.reserve(members.size());
         for (const auto& m : members) {
-            member_xpk_raw.push_back(session_id_pk(m.session_id));
+            member_xpk_raw.push_back(bchat_id_pk(m.bchat_id));
             member_xpks.emplace_back(member_xpk_raw.back().data(), member_xpk_raw.back().size());
         }
 
@@ -428,7 +428,7 @@ std::vector<unsigned char> Keys::key_supplement(const std::vector<std::string>& 
                 "Unable to create supplemental keys: this object has no keys at all"};
 
     // For members we calculate the outer encryption key as H(aB || A || B).  But because we only
-    // have `B` (the session id) as an x25519 pubkey, we do this in x25519 space, which means we
+    // have `B` (the bchat id) as an x25519 pubkey, we do this in x25519 space, which means we
     // have to use the x25519 conversion of a/A rather than the group's ed25519 pubkey.
     auto group_xpk = compute_xpk(_sign_pk->data());
 
@@ -444,12 +444,12 @@ std::vector<unsigned char> Keys::key_supplement(const std::vector<std::string>& 
     // H1(member0 || member1 || ... || memberN || keysdata || H2(group_secret_key))
     //
     // where:
-    // - H1(.) = 24-byte BLAKE2b keyed hash with key "SessionGroupKeyGen"
-    // - memberI is the full session ID of each member included in this key update, expressed in hex
+    // - H1(.) = 24-byte BLAKE2b keyed hash with key "BChatGroupKeyGen"
+    // - memberI is the full bchat ID of each member included in this key update, expressed in hex
     //   (66 chars), in sorted order.
     // - keysdata is the unencrypted inner value that we are encrypting for each supplemental member
     // - H2(.) = 32-byte BLAKE2b keyed hash of the sodium group secret key seed (just the 32 byte,
-    //           not the full 64 byte with the pubkey in the second half), key "SessionGroupKeySeed"
+    //           not the full 64 byte with the pubkey in the second half), key "BChatGroupKeySeed"
 
     std::string supp_keys;
     {
@@ -498,7 +498,7 @@ std::vector<unsigned char> Keys::key_supplement(const std::vector<std::string>& 
         member_xpk_raw.reserve(sids.size());
         member_xpks.reserve(sids.size());
         for (const auto& sid : sids) {
-            member_xpk_raw.push_back(session_id_pk(sid));
+            member_xpk_raw.push_back(bchat_id_pk(sid));
             member_xpks.emplace_back(member_xpk_raw.back().data(), member_xpk_raw.back().size());
         }
 
@@ -518,7 +518,7 @@ std::vector<unsigned char> Keys::key_supplement(const std::vector<std::string>& 
 
         if (member_count == 0)
             throw std::runtime_error{
-                    "Unable to construct supplemental messages: invalid session ids given"};
+                    "Unable to construct supplemental messages: invalid bchat ids given"};
     }
 
     d.append("G", keys_.back().generation);
@@ -531,19 +531,19 @@ std::vector<unsigned char> Keys::key_supplement(const std::vector<std::string>& 
     return to_vector(d.view());
 }
 
-// Blinding factor for subaccounts: H(sessionid || groupid) mod L, where H is 64-byte blake2b, using
+// Blinding factor for subaccounts: H(bchatid || groupid) mod L, where H is 64-byte blake2b, using
 // a hash key derived from the group's seed.
 std::array<unsigned char, 32> Keys::subaccount_blind_factor(
-        const std::array<unsigned char, 32>& session_xpk) const {
+        const std::array<unsigned char, 32>& bchat_xpk) const {
 
-    auto mask = seed_hash("SessionGroupSubaccountMask");
+    auto mask = seed_hash("BChatGroupSubaccountMask");
     static_assert(mask.size() == crypto_generichash_blake2b_KEYBYTES);
 
     std::array<unsigned char, 64> h;
     crypto_generichash_blake2b_state st;
     crypto_generichash_blake2b_init(&st, mask.data(), mask.size(), h.size());
     crypto_generichash_blake2b_update(&st, to_unsigned("\x05"), 1);
-    crypto_generichash_blake2b_update(&st, session_xpk.data(), session_xpk.size());
+    crypto_generichash_blake2b_update(&st, bchat_xpk.data(), bchat_xpk.size());
     crypto_generichash_blake2b_update(&st, to_unsigned("\x03"), 1);
     crypto_generichash_blake2b_update(&st, _sign_pk->data(), _sign_pk->size());
     crypto_generichash_blake2b_final(&st, h.data(), h.size());
@@ -568,29 +568,29 @@ namespace {
 }  // namespace
 
 std::vector<unsigned char> Keys::swarm_make_subaccount(
-        std::string_view session_id, bool write, bool del) const {
+        std::string_view bchat_id, bool write, bool del) const {
     if (!admin())
         throw std::logic_error{"Cannot make subaccount signature: admin keys required"};
 
-    // This gets a wee bit complicated because we only have a session_id, but we really need an
+    // This gets a wee bit complicated because we only have a bchat_id, but we really need an
     // Ed25519 pubkey.  So we do the signal-style XEd25519 thing here where we start with the
     // positive alternative behind their x25519 pubkey and work from there.  This means,
     // unfortunately, that making a signature needs to muck around since this is the proper public
     // only half the time.
 
     // Terminology/variables (a/A indicates private/public keys)
-    // - s/S are the Ed25519 underlying Session keys (neither is observed in this context)
+    // - s/S are the Ed25519 underlying BChat keys (neither is observed in this context)
     // - x/X are the X25519 conversions of s/S (x, similarly, is not observed, but X is: it's in the
-    //   session_id).
+    //   bchat_id).
     // - T = |S|, i.e. the positive of the two alternatives we get from inverting the Ed -> X
     //   pubkey.
     // - c/C is the group's Ed25519
-    // - k is the blinding factor, which is: H(\x05...[sessionid]\x03...[groupid], key=M) mod L,
+    // - k is the blinding factor, which is: H(\x05...[bchatid]\x03...[groupid], key=M) mod L,
     //   where: H is 64-byte blake2b; M is `subaccount_blind_factor` (see above).
     // - p is the account network prefix (03)
     // - f are the flag bits, determined by `write` and `del` arguments
 
-    auto X = session_id_pk(session_id);
+    auto X = bchat_id_pk(bchat_id);
     auto& c = _sign_sk;
 
     auto k = subaccount_blind_factor(X);
@@ -602,7 +602,7 @@ std::vector<unsigned char> Keys::swarm_make_subaccount(
     std::array<unsigned char, 32> kT;
 
     if (0 != crypto_scalarmult_ed25519_noclamp(kT.data(), k.data(), T.data()))
-        throw std::runtime_error{"scalarmult failed: perhaps an invalid session id?"};
+        throw std::runtime_error{"scalarmult failed: perhaps an invalid bchat id?"};
 
     std::vector<unsigned char> out;
     out.resize(4 + 32 + 64);
@@ -623,13 +623,13 @@ std::vector<unsigned char> Keys::swarm_make_subaccount(
 }
 
 std::vector<unsigned char> Keys::swarm_subaccount_token(
-        std::string_view session_id, bool write, bool del) const {
+        std::string_view bchat_id, bool write, bool del) const {
     if (!admin())
         throw std::logic_error{"Cannot make subaccount signature: admin keys required"};
 
     // Similar to the above, but we only care about getting flags || kT
 
-    auto X = session_id_pk(session_id);
+    auto X = bchat_id_pk(bchat_id);
     auto k = subaccount_blind_factor(X);
 
     // T = |S|
@@ -642,7 +642,7 @@ std::vector<unsigned char> Keys::swarm_subaccount_token(
     out[2] = 0;                         // reserved 1
     out[3] = 0;                         // reserved 2
     if (0 != crypto_scalarmult_ed25519_noclamp(&out[4], k.data(), T.data()))
-        throw std::runtime_error{"scalarmult failed: perhaps an invalid session id?"};
+        throw std::runtime_error{"scalarmult failed: perhaps an invalid bchat id?"};
     return out;
 }
 
@@ -674,7 +674,7 @@ Keys::swarm_auth Keys::swarm_subaccount_sign(
     bool neg = T[31] & 0x80;
     T[31] &= 0x7f;
     if (0 != crypto_scalarmult_ed25519_noclamp(to_unsigned(token.data() + 4), k.data(), T.data()))
-        throw std::runtime_error{"scalarmult failed: perhaps an invalid session id or seed?"};
+        throw std::runtime_error{"scalarmult failed: perhaps an invalid bchat id or seed?"};
 
     // token is now set: flags || kT
     std::span<const unsigned char> kT{to_unsigned(token.data() + 4), 32};
@@ -786,7 +786,7 @@ bool Keys::swarm_verify_subaccount(
         std::span<const unsigned char> sign_val,
         bool write,
         bool del) {
-    auto group_pk = session_id_pk(group_id, "03");
+    auto group_pk = bchat_id_pk(group_id, "03");
 
     if (sign_val.size() != 100)
         return false;
@@ -816,7 +816,7 @@ bool Keys::swarm_verify_subaccount(
     // signature for
     std::array<unsigned char, 32> kT;
     if (0 != crypto_scalarmult_ed25519_noclamp(kT.data(), k.data(), T.data()))
-        throw std::runtime_error{"scalarmult failed: perhaps an invalid session id or seed?"};
+        throw std::runtime_error{"scalarmult failed: perhaps an invalid bchat id or seed?"};
 
     std::array<unsigned char, 36> to_verify;
     std::memcpy(&to_verify[0], sign_val.data(), 4);  // prefix, flags, 2x future use bytes
@@ -1237,15 +1237,15 @@ std::pair<std::string, std::vector<unsigned char>> Keys::decrypt_message(
                 keys_.size() + (pending_key() ? 1 : 0))};
 
     std::pair<std::string, std::vector<unsigned char>> result;
-    result.first = std::move(decrypt.session_id);
+    result.first = std::move(decrypt.bchat_id);
     result.second = std::move(decrypt.plaintext);
     return result;
 }
 
-}  // namespace session::config::groups
+}  // namespace bchat::config::groups
 
-using namespace session;
-using namespace session::config;
+using namespace bchat;
+using namespace bchat::config;
 
 namespace {
 groups::Keys& unbox(config_group_keys* conf) {
@@ -1293,7 +1293,7 @@ Ret wrap_exceptions(config_group_keys* conf, Call&& f, Ret error_return) {
 }
 }  // namespace
 
-LIBSESSION_C_API int groups_keys_init(
+LIBBCHAT_C_API int groups_keys_init(
         config_group_keys** conf,
         const unsigned char* user_ed25519_secretkey,
         const unsigned char* group_ed25519_pubkey,
@@ -1328,35 +1328,35 @@ LIBSESSION_C_API int groups_keys_init(
                 msg.resize(255);
             std::memcpy(error, msg.c_str(), msg.size() + 1);
         }
-        return SESSION_ERR_INVALID_DUMP;
+        return BCHAT_ERR_INVALID_DUMP;
     }
 
     c_conf->last_error = nullptr;
     *conf = c_conf.release();
-    return SESSION_ERR_NONE;
+    return BCHAT_ERR_NONE;
 }
 
-LIBSESSION_C_API void groups_keys_free(config_group_keys* conf) {
+LIBBCHAT_C_API void groups_keys_free(config_group_keys* conf) {
     delete static_cast<groups::Keys*>(conf->internals);
     delete conf;
 }
 
-LIBSESSION_EXPORT int16_t groups_keys_storage_namespace(const config_group_keys* conf) {
+LIBBCHAT_EXPORT int16_t groups_keys_storage_namespace(const config_group_keys* conf) {
     return static_cast<int16_t>(unbox(conf).storage_namespace());
 }
 
-LIBSESSION_C_API size_t groups_keys_size(const config_group_keys* conf) {
+LIBBCHAT_C_API size_t groups_keys_size(const config_group_keys* conf) {
     return unbox(conf).size();
 }
 
-LIBSESSION_C_API const unsigned char* groups_keys_get_key(const config_group_keys* conf, size_t N) {
+LIBBCHAT_C_API const unsigned char* groups_keys_get_key(const config_group_keys* conf, size_t N) {
     auto keys = unbox(conf).group_keys();
     if (N >= keys.size())
         return nullptr;
     return keys[N].data();
 }
 
-LIBSESSION_C_API size_t groups_keys_get_keys(
+LIBBCHAT_C_API size_t groups_keys_get_keys(
         const config_group_keys* conf, size_t offset, span_u8* dest, size_t dest_size) {
     size_t result = 0;
     if (dest) {
@@ -1372,7 +1372,7 @@ LIBSESSION_C_API size_t groups_keys_get_keys(
     return result;
 }
 
-LIBSESSION_C_API const span_u8 groups_keys_group_enc_key(const config_group_keys* conf) {
+LIBBCHAT_C_API const span_u8 groups_keys_group_enc_key(const config_group_keys* conf) {
     span_u8 result = {};
     try {
         std::span<const uint8_t> key = unbox(conf).group_enc_key();
@@ -1384,11 +1384,11 @@ LIBSESSION_C_API const span_u8 groups_keys_group_enc_key(const config_group_keys
     return result;
 }
 
-LIBSESSION_C_API bool groups_keys_is_admin(const config_group_keys* conf) {
+LIBBCHAT_C_API bool groups_keys_is_admin(const config_group_keys* conf) {
     return unbox(conf).admin();
 }
 
-LIBSESSION_C_API bool groups_keys_load_admin_key(
+LIBBCHAT_C_API bool groups_keys_load_admin_key(
         config_group_keys* conf,
         const unsigned char* secret,
         config_object* info,
@@ -1405,7 +1405,7 @@ LIBSESSION_C_API bool groups_keys_load_admin_key(
             false);
 }
 
-LIBSESSION_C_API bool groups_keys_rekey(
+LIBBCHAT_C_API bool groups_keys_rekey(
         config_group_keys* conf,
         config_object* info,
         config_object* members,
@@ -1428,7 +1428,7 @@ LIBSESSION_C_API bool groups_keys_rekey(
             false);
 }
 
-LIBSESSION_C_API bool groups_keys_pending_config(
+LIBBCHAT_C_API bool groups_keys_pending_config(
         const config_group_keys* conf, const unsigned char** out, size_t* outlen) {
     assert(out && outlen);
     if (auto pending = unbox(conf).pending_config()) {
@@ -1439,7 +1439,7 @@ LIBSESSION_C_API bool groups_keys_pending_config(
     return false;
 }
 
-LIBSESSION_C_API bool groups_keys_load_message(
+LIBBCHAT_C_API bool groups_keys_load_message(
         config_group_keys* conf,
         const char* msg_hash,
         const unsigned char* data,
@@ -1462,19 +1462,19 @@ LIBSESSION_C_API bool groups_keys_load_message(
             false);
 }
 
-LIBSESSION_C_API config_string_list* groups_keys_active_hashes(const config_group_keys* conf) {
+LIBBCHAT_C_API config_string_list* groups_keys_active_hashes(const config_group_keys* conf) {
     return make_string_list(unbox(conf).active_hashes());
 }
 
-LIBSESSION_C_API bool groups_keys_needs_rekey(const config_group_keys* conf) {
+LIBBCHAT_C_API bool groups_keys_needs_rekey(const config_group_keys* conf) {
     return unbox(conf).needs_rekey();
 }
 
-LIBSESSION_C_API bool groups_keys_needs_dump(const config_group_keys* conf) {
+LIBBCHAT_C_API bool groups_keys_needs_dump(const config_group_keys* conf) {
     return unbox(conf).needs_dump();
 }
 
-LIBSESSION_C_API void groups_keys_dump(
+LIBBCHAT_C_API void groups_keys_dump(
         config_group_keys* conf, unsigned char** out, size_t* outlen) {
     assert(out && outlen);
     auto dump = unbox(conf).dump();
@@ -1483,7 +1483,7 @@ LIBSESSION_C_API void groups_keys_dump(
     *outlen = dump.size();
 }
 
-LIBSESSION_C_API void groups_keys_encrypt_message(
+LIBBCHAT_C_API void groups_keys_encrypt_message(
         const config_group_keys* conf,
         const unsigned char* plaintext_in,
         size_t plaintext_len,
@@ -1504,11 +1504,11 @@ LIBSESSION_C_API void groups_keys_encrypt_message(
     }
 }
 
-LIBSESSION_C_API bool groups_keys_decrypt_message(
+LIBBCHAT_C_API bool groups_keys_decrypt_message(
         config_group_keys* conf,
         const unsigned char* ciphertext_in,
         size_t ciphertext_len,
-        char* session_id,
+        char* bchat_id,
         unsigned char** plaintext_out,
         size_t* plaintext_len) {
     assert(ciphertext_in && plaintext_out && plaintext_len);
@@ -1518,7 +1518,7 @@ LIBSESSION_C_API bool groups_keys_decrypt_message(
             [&] {
                 auto [sid, plaintext] = unbox(conf).decrypt_message(
                         std::span<const unsigned char>{ciphertext_in, ciphertext_len});
-                std::memcpy(session_id, sid.c_str(), sid.size() + 1);
+                std::memcpy(bchat_id, sid.c_str(), sid.size() + 1);
                 *plaintext_out = static_cast<unsigned char*>(std::malloc(plaintext.size()));
                 std::memcpy(*plaintext_out, plaintext.data(), plaintext.size());
                 *plaintext_len = plaintext.size();
@@ -1527,7 +1527,7 @@ LIBSESSION_C_API bool groups_keys_decrypt_message(
             false);
 }
 
-LIBSESSION_C_API bool groups_keys_key_supplement(
+LIBBCHAT_C_API bool groups_keys_key_supplement(
         config_group_keys* conf,
         const char* const* sids,
         size_t sids_len,
@@ -1535,14 +1535,14 @@ LIBSESSION_C_API bool groups_keys_key_supplement(
         size_t* message_len) {
     assert(sids && message && message_len);
 
-    std::vector<std::string> session_ids;
+    std::vector<std::string> bchat_ids;
     for (size_t i = 0; i < sids_len; i++)
-        session_ids.emplace_back(sids[i]);
+        bchat_ids.emplace_back(sids[i]);
 
     return wrap_exceptions(
             conf,
             [&] {
-                auto msg = unbox(conf).key_supplement(session_ids);
+                auto msg = unbox(conf).key_supplement(bchat_ids);
                 *message = static_cast<unsigned char*>(malloc(msg.size()));
                 *message_len = msg.size();
                 std::memcpy(*message, msg.data(), msg.size());
@@ -1551,13 +1551,13 @@ LIBSESSION_C_API bool groups_keys_key_supplement(
             false);
 }
 
-LIBSESSION_EXPORT int groups_keys_current_generation(config_group_keys* conf) {
+LIBBCHAT_EXPORT int groups_keys_current_generation(config_group_keys* conf) {
     return unbox(conf).current_generation();
 }
 
-LIBSESSION_C_API bool groups_keys_swarm_make_subaccount_flags(
+LIBBCHAT_C_API bool groups_keys_swarm_make_subaccount_flags(
         config_group_keys* conf,
-        const char* session_id,
+        const char* bchat_id,
         bool write,
         bool del,
         unsigned char* sign_value) {
@@ -1565,7 +1565,7 @@ LIBSESSION_C_API bool groups_keys_swarm_make_subaccount_flags(
     return wrap_exceptions(
             conf,
             [&] {
-                auto val = unbox(conf).swarm_make_subaccount(session_id, write, del);
+                auto val = unbox(conf).swarm_make_subaccount(bchat_id, write, del);
                 assert(val.size() == 100);
                 std::memcpy(sign_value, val.data(), val.size());
                 return true;
@@ -1573,21 +1573,21 @@ LIBSESSION_C_API bool groups_keys_swarm_make_subaccount_flags(
             false);
 }
 
-LIBSESSION_C_API bool groups_keys_swarm_make_subaccount(
-        config_group_keys* conf, const char* session_id, unsigned char* sign_value) {
-    return groups_keys_swarm_make_subaccount_flags(conf, session_id, true, false, sign_value);
+LIBBCHAT_C_API bool groups_keys_swarm_make_subaccount(
+        config_group_keys* conf, const char* bchat_id, unsigned char* sign_value) {
+    return groups_keys_swarm_make_subaccount_flags(conf, bchat_id, true, false, sign_value);
 }
 
-LIBSESSION_C_API bool groups_keys_swarm_verify_subaccount_flags(
+LIBBCHAT_C_API bool groups_keys_swarm_verify_subaccount_flags(
         const char* group_id,
-        const unsigned char* session_ed25519_secretkey,
+        const unsigned char* bchat_ed25519_secretkey,
         const unsigned char* signing_value,
         bool write,
         bool del) {
     try {
         return groups::Keys::swarm_verify_subaccount(
                 group_id,
-                std::span<const unsigned char>{session_ed25519_secretkey, 64},
+                std::span<const unsigned char>{bchat_ed25519_secretkey, 64},
                 std::span<const unsigned char>{signing_value, 100},
                 write,
                 del);
@@ -1596,21 +1596,21 @@ LIBSESSION_C_API bool groups_keys_swarm_verify_subaccount_flags(
     }
 }
 
-LIBSESSION_C_API bool groups_keys_swarm_verify_subaccount(
+LIBBCHAT_C_API bool groups_keys_swarm_verify_subaccount(
         const char* group_id,
-        const unsigned char* session_ed25519_secretkey,
+        const unsigned char* bchat_ed25519_secretkey,
         const unsigned char* signing_value) {
     try {
         return groups::Keys::swarm_verify_subaccount(
                 group_id,
-                std::span<const unsigned char>{session_ed25519_secretkey, 64},
+                std::span<const unsigned char>{bchat_ed25519_secretkey, 64},
                 std::span<const unsigned char>{signing_value, 100});
     } catch (...) {
         return false;
     }
 }
 
-LIBSESSION_C_API bool groups_keys_swarm_subaccount_sign(
+LIBBCHAT_C_API bool groups_keys_swarm_subaccount_sign(
         config_group_keys* conf,
         const unsigned char* msg,
         size_t msg_len,
@@ -1640,7 +1640,7 @@ LIBSESSION_C_API bool groups_keys_swarm_subaccount_sign(
             false);
 }
 
-LIBSESSION_C_API bool groups_keys_swarm_subaccount_sign_binary(
+LIBBCHAT_C_API bool groups_keys_swarm_subaccount_sign_binary(
         config_group_keys* conf,
         const unsigned char* msg,
         size_t msg_len,
@@ -1668,16 +1668,16 @@ LIBSESSION_C_API bool groups_keys_swarm_subaccount_sign_binary(
             false);
 }
 
-LIBSESSION_C_API bool groups_keys_swarm_subaccount_token_flags(
+LIBBCHAT_C_API bool groups_keys_swarm_subaccount_token_flags(
         config_group_keys* conf,
-        const char* session_id,
+        const char* bchat_id,
         bool write,
         bool del,
         unsigned char* token) {
     return wrap_exceptions(
             conf,
             [&] {
-                auto tok = unbox(conf).swarm_subaccount_token(session_id, write, del);
+                auto tok = unbox(conf).swarm_subaccount_token(bchat_id, write, del);
                 assert(tok.size() == 36);
                 std::memcpy(token, tok.data(), 36);
                 return true;
@@ -1685,7 +1685,7 @@ LIBSESSION_C_API bool groups_keys_swarm_subaccount_token_flags(
             false);
 }
 
-LIBSESSION_C_API bool groups_keys_swarm_subaccount_token(
-        config_group_keys* conf, const char* session_id, unsigned char* token) {
-    return groups_keys_swarm_subaccount_token_flags(conf, session_id, true, false, token);
+LIBBCHAT_C_API bool groups_keys_swarm_subaccount_token(
+        config_group_keys* conf, const char* bchat_id, unsigned char* token) {
+    return groups_keys_swarm_subaccount_token_flags(conf, bchat_id, true, false, token);
 }

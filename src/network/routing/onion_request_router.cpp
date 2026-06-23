@@ -1,4 +1,4 @@
-#include "session/network/routing/onion_request_router.hpp"
+#include "bchat/network/routing/onion_request_router.hpp"
 
 #include <event2/event.h>
 #include <fmt/ranges.h>
@@ -9,20 +9,20 @@
 #include <oxen/log.hpp>
 #include <oxen/log/format.hpp>
 
-#include "session/file.hpp"
-#include "session/hash.hpp"
-#include "session/network/network_opt.hpp"
-#include "session/onionreq/builder.hpp"
-#include "session/onionreq/response_parser.hpp"
-#include "session/random.hpp"
+#include "bchat/file.hpp"
+#include "bchat/hash.hpp"
+#include "bchat/network/network_opt.hpp"
+#include "bchat/onionreq/builder.hpp"
+#include "bchat/onionreq/response_parser.hpp"
+#include "bchat/random.hpp"
 
 using namespace oxen;
-using namespace session;
-using namespace session::network;
+using namespace bchat;
+using namespace bchat::network;
 using namespace std::literals;
 using namespace oxen::log::literals;
 
-namespace session::network {
+namespace bchat::network {
 
 namespace fs = std::filesystem;
 
@@ -37,14 +37,14 @@ namespace {
     enum class ErrorType {
         IntermediateNodeUnreachable,  // 502, node in path
         DestinationUnreachable,       // 502, destination node
-        SnodeNotReady,                // 503, specific snode
+        MnodeNotReady,                // 503, specific mnode
         EdgeNotReady,                 // 503, edge node
         PathTimedOut,                 // 504
         InvalidHopResponse,           // 500
         UnparseableData,              // 502 from decrypted payload
         DestinationNotReady,          // 503 from decrypted payload
         ClockOutOfSync,               // 406/425
-        SnodeNotInSwarm               // 421
+        MnodeNotInSwarm               // 421
     };
 
     struct ErrorBehaviour {
@@ -108,8 +108,8 @@ namespace {
 
             ErrorBehaviour{
                     .code = 503,
-                    .body_pattern = "Snode not ready: "sv,
-                    .error_type = ErrorType::SnodeNotReady,
+                    .body_pattern = "Mnode not ready: "sv,
+                    .error_type = ErrorType::MnodeNotReady,
                     .penalize_extracted_node = true,
                     .extract_pubkey = true},
 
@@ -143,7 +143,7 @@ namespace {
                     .code = 406, .body_pattern = ""sv, .error_type = ErrorType::ClockOutOfSync},
 
             ErrorBehaviour{
-                    .code = 421, .body_pattern = ""sv, .error_type = ErrorType::SnodeNotInSwarm},
+                    .code = 421, .body_pattern = ""sv, .error_type = ErrorType::MnodeNotInSwarm},
     };
 
     std::optional<std::pair<ErrorBehaviour, std::optional<std::string_view>>> parse_error_response(
@@ -231,14 +231,14 @@ namespace {
         return RequestCategory::standard_small;  // Should not be reached
     }
 
-    std::vector<service_node> extract_nodes(
+    std::vector<master_node> extract_nodes(
             const std::unordered_map<PathCategory, std::vector<OnionPath>>& paths,
             const std::unordered_map<
                     std::string,
                     std::pair<
-                            std::vector<service_node>,
+                            std::vector<master_node>,
                             std::optional<std::chrono::system_clock::time_point>>>& pending_paths) {
-        std::vector<service_node> all_used_nodes;
+        std::vector<master_node> all_used_nodes;
 
         for (const auto& [pt, path_list] : paths)
             for (const auto& p : path_list)
@@ -260,7 +260,7 @@ std::string OnionPath::to_string() const {
             nodes.begin(),
             nodes.end(),
             std::back_inserter(node_descriptions),
-            [](const service_node& node) { return node.to_string(); });
+            [](const master_node& node) { return node.to_string(); });
 
     return "{}"_format(fmt::join(node_descriptions, ", "));
 }
@@ -270,9 +270,9 @@ cached_edge_node cached_edge_node::from_disk(std::string_view str) {
     if (parts.size() < 7)
         throw std::invalid_argument("Invalid cached edge node serialisation: {}"_format(str));
 
-    // Parse the service_node (first 6 parts)
+    // Parse the master_node (first 6 parts)
     auto value = fmt::format("{}", fmt::join(std::span(parts.begin(), parts.begin() + 6), "|"));
-    auto node = service_node::from_disk(value);
+    auto node = master_node::from_disk(value);
 
     // Parse timestamp if present, otherwise use current time
     std::chrono::system_clock::time_point cached_at;
@@ -289,12 +289,12 @@ OnionRequestRouter::OnionRequestRouter(
         config::OnionRequestRouter config,
         std::shared_ptr<oxen::quic::Loop> loop,
         std::shared_ptr<oxen::quic::Loop> disk_loop,
-        std::weak_ptr<SnodePool> snode_pool,
+        std::weak_ptr<MnodePool> mnode_pool,
         std::weak_ptr<ITransport> transport) :
         _config{std::move(config)},
         _loop{loop},
         _disk_loop{disk_loop},
-        _snode_pool{snode_pool},
+        _mnode_pool{mnode_pool},
         _transport{transport} {
     log::trace(cat, "Initializing.");
 
@@ -313,7 +313,7 @@ OnionRequestRouter::OnionRequestRouter(
                 for (const auto& node : _config.seed_nodes)
                     node.to_disk(std::back_inserter(seed_node_data));
 
-                auto hash_bytes = session::hash::hash(32, session::to_span(seed_node_data));
+                auto hash_bytes = bchat::hash::hash(32, bchat::to_span(seed_node_data));
                 cache_file_name = "edge_nodes_devnet_" + oxenc::to_hex(hash_bytes);
                 break;
         }
@@ -323,14 +323,14 @@ OnionRequestRouter::OnionRequestRouter(
     }
 
     _loop->call_soon([this] {
-        auto snode_pool = _snode_pool.lock();
-        if (!snode_pool) {
-            log::critical(cat, "SnodePool was destroyed, cannot setup router.");
+        auto mnode_pool = _mnode_pool.lock();
+        if (!mnode_pool) {
+            log::critical(cat, "MnodePool was destroyed, cannot setup router.");
             return;
         }
 
-        if (snode_pool->size() == 0)
-            snode_pool->refresh_if_needed({}, [weak_self = weak_from_this()] {
+        if (mnode_pool->size() == 0)
+            mnode_pool->refresh_if_needed({}, [weak_self = weak_from_this()] {
                 if (auto self = weak_self.lock())
                     self->_loop->call([weak_self] {
                         if (auto self = weak_self.lock())
@@ -543,7 +543,7 @@ std::vector<PathInfo> OnionRequestRouter::get_active_paths() {
     });
 }
 
-std::vector<service_node> OnionRequestRouter::get_all_used_nodes() {
+std::vector<master_node> OnionRequestRouter::get_all_used_nodes() {
     return _loop->call_get([this] { return extract_nodes(_paths, _pending_paths); });
 }
 
@@ -1075,9 +1075,9 @@ void OnionRequestRouter::_download_internal(DownloadRequest request) {
 void OnionRequestRouter::_build_path(
         PathCategory category,
         std::optional<std::string> initiating_req_id,
-        const std::vector<service_node>& nodes_to_exclude_,
+        const std::vector<master_node>& nodes_to_exclude_,
         std::optional<std::string> original_path_id,
-        std::optional<service_node> specific_edge_node,
+        std::optional<master_node> specific_edge_node,
         std::optional<std::chrono::system_clock::time_point> edge_node_first_connection_at) {
     if (_suspended) {
         log::info(cat, "Ignoring build_path call as network is suspended.");
@@ -1131,25 +1131,25 @@ void OnionRequestRouter::_build_path(
     nodes_to_exclude.insert(
             nodes_to_exclude.end(), nodes_to_exclude_.begin(), nodes_to_exclude_.end());
 
-    auto snode_pool = _snode_pool.lock();
-    if (!snode_pool) {
-        log::critical(cat, "SnodePool was destroyed, cannot build path.");
+    auto mnode_pool = _mnode_pool.lock();
+    if (!mnode_pool) {
+        log::critical(cat, "MnodePool was destroyed, cannot build path.");
         return;
     }
 
     // Get enough nodes for the path (use the specified edge-node if provided)
-    auto path_nodes = snode_pool->get_unused_nodes(
+    auto path_nodes = mnode_pool->get_unused_nodes(
             (specific_edge_node.has_value() ? _config.path_length - 1 : _config.path_length),
             nodes_to_exclude);
 
     if (specific_edge_node)
         path_nodes.insert(path_nodes.begin(), *specific_edge_node);
 
-    // If we don't have enough nodes to build a path then we should try to refresh the snode pool
+    // If we don't have enough nodes to build a path then we should try to refresh the mnode pool
     if (path_nodes.size() < _config.path_length) {
         log::warning(
                 cat,
-                "[Request {} Path {}]: Failed to get enough nodes from SnodePool (need {}, got "
+                "[Request {} Path {}]: Failed to get enough nodes from MnodePool (need {}, got "
                 "{}), queueing retry after pool refresh.",
                 req_id_log,
                 path_id,
@@ -1157,7 +1157,7 @@ void OnionRequestRouter::_build_path(
                 path_nodes.size());
         _in_progress_path_builds[category]--;
 
-        snode_pool->refresh_if_needed(
+        mnode_pool->refresh_if_needed(
                 nodes_to_exclude,
                 [weak_self = weak_from_this(),
                  this,
@@ -1170,7 +1170,7 @@ void OnionRequestRouter::_build_path(
 
                     log::info(
                             cat,
-                            "[Request {}]: SnodePool refresh complete, retrying path build.",
+                            "[Request {}]: MnodePool refresh complete, retrying path build.",
                             initiating_req_id.value_or("internal"));
                     _build_path(category, initiating_req_id, nodes_to_exclude);
                 });
@@ -1247,8 +1247,8 @@ void OnionRequestRouter::_on_edge_connectivity_response(
 
         // The "handshake timeout" error already records a node failure, so don't record another
         if (error_code && *error_code != static_cast<uint64_t>(NGTCP2_ERR_HANDSHAKE_TIMEOUT))
-            if (auto snode_pool = _snode_pool.lock())
-                snode_pool->record_node_failure(edge_node);
+            if (auto mnode_pool = _mnode_pool.lock())
+                mnode_pool->record_node_failure(edge_node);
 
         int& retries = _path_build_retries[path_id];
         retries++;
@@ -1452,7 +1452,7 @@ OnionPath* OnionRequestRouter::_find_valid_path(const Request& request) {
     std::vector<OnionPath*> suitable_paths;
     suitable_paths.reserve(candidate_paths.size());
 
-    auto target_node = std::get_if<service_node>(&request.destination);
+    auto target_node = std::get_if<master_node>(&request.destination);
 
     // We want to allow explicit path selection for client-side automated tests so if a
     // `desired_path_index` has been specified then use it
@@ -1522,13 +1522,13 @@ void OnionRequestRouter::_send_on_path(
     log::trace(cat, "[Request {}]: Sending on path {}", request.request_id, path.id);
 
     std::vector<unsigned char> encrypted_blob;
-    std::shared_ptr<session::onionreq::ResponseParser> parser;
+    std::shared_ptr<bchat::onionreq::ResponseParser> parser;
 
     try {
         auto builder =
-                session::onionreq::Builder(request.destination, request.endpoint, path.nodes);
+                bchat::onionreq::Builder(request.destination, request.endpoint, path.nodes);
         encrypted_blob = builder.generate_onion_blob(request.body);
-        parser = std::make_shared<session::onionreq::ResponseParser>(builder);
+        parser = std::make_shared<bchat::onionreq::ResponseParser>(builder);
     } catch (const std::exception& e) {
         log::warning(
                 cat,
@@ -1625,7 +1625,7 @@ void OnionRequestRouter::_handle_transport_response(
         network_response_callback_t callback) {
     auto final_success = success;
     auto final_status_code = status_code;
-    auto destination_snode = std::get_if<service_node>(&original_request.destination);
+    auto destination_mnode = std::get_if<master_node>(&original_request.destination);
     std::unordered_set<ed25519_pubkey> penalized_nodes;
 
     if (decrypted_body)
@@ -1639,7 +1639,7 @@ void OnionRequestRouter::_handle_transport_response(
         auto parsed_error = parse_error_response(
                 final_status_code,
                 decrypted_body,
-                (destination_snode ? std::optional{destination_snode->view_remote_key()}
+                (destination_mnode ? std::optional{destination_mnode->view_remote_key()}
                                    : std::nullopt));
 
         if (parsed_error) {
@@ -1653,12 +1653,12 @@ void OnionRequestRouter::_handle_transport_response(
                     path_id);
 
             // Apply penalties based on the pattern
-            auto snode_pool = _snode_pool.lock();
+            auto mnode_pool = _mnode_pool.lock();
 
-            if (pattern.penalize_extracted_node && extracted_pubkey && snode_pool) {
+            if (pattern.penalize_extracted_node && extracted_pubkey && mnode_pool) {
                 try {
                     auto pubkey = ed25519_pubkey::from_hex(*extracted_pubkey);
-                    snode_pool->record_node_failure(pubkey, pattern.force_remove_node);
+                    mnode_pool->record_node_failure(pubkey, pattern.force_remove_node);
                     penalized_nodes.insert(pubkey);
                     log::debug(
                             cat,
@@ -1674,9 +1674,9 @@ void OnionRequestRouter::_handle_transport_response(
                 }
             }
 
-            if (pattern.penalize_destination && destination_snode && snode_pool) {
-                auto dest_key = ed25519_pubkey::from_bytes(destination_snode->view_remote_key());
-                snode_pool->record_node_failure(*destination_snode, pattern.force_remove_node);
+            if (pattern.penalize_destination && destination_mnode && mnode_pool) {
+                auto dest_key = ed25519_pubkey::from_bytes(destination_mnode->view_remote_key());
+                mnode_pool->record_node_failure(*destination_mnode, pattern.force_remove_node);
                 penalized_nodes.insert(dest_key);
                 log::debug(
                         cat,
@@ -1687,7 +1687,7 @@ void OnionRequestRouter::_handle_transport_response(
 
             // Generally this shouldn't happen (as we would have failed to establish a QUIC
             // connection), but may as well keep it just to be safe
-            if (pattern.penalize_edge && snode_pool) {
+            if (pattern.penalize_edge && mnode_pool) {
                 auto& active_paths = _paths[to_path_category(original_request.category)];
                 auto path_it = std::find_if(
                         active_paths.begin(), active_paths.end(), [&path_id](const auto& p) {
@@ -1697,7 +1697,7 @@ void OnionRequestRouter::_handle_transport_response(
                 if (path_it != active_paths.end() && !path_it->nodes.empty()) {
                     const auto& edge_node = path_it->nodes.front();
                     auto edge_key = ed25519_pubkey::from_bytes(edge_node.view_remote_key());
-                    snode_pool->record_node_failure(edge_node, pattern.force_remove_node);
+                    mnode_pool->record_node_failure(edge_node, pattern.force_remove_node);
                     penalized_nodes.insert(edge_key);
                     log::debug(
                             cat,
@@ -1707,11 +1707,11 @@ void OnionRequestRouter::_handle_transport_response(
                 }
             }
 
-            // Now that we have applied snode penalties, check if any node in any path has hit the
+            // Now that we have applied mnode penalties, check if any node in any path has hit the
             // threshold and try to repair the path if needed (we need to check all paths because
             // it's possible the failed node was a "destination" node which just happens to be in
             // a different path from the one this request was sent along)
-            if (snode_pool) {
+            if (mnode_pool) {
                 for (auto& [path_cat, paths] : _paths) {
                     for (auto& path : paths) {
                         std::vector<ed25519_pubkey> nodes_to_repair;
@@ -1719,7 +1719,7 @@ void OnionRequestRouter::_handle_transport_response(
                         for (const auto& node : path.nodes) {
                             auto node_key = ed25519_pubkey::from_bytes(node.view_remote_key());
 
-                            if (snode_pool->node_strike_count(node_key) >=
+                            if (mnode_pool->node_strike_count(node_key) >=
                                 _config.node_strike_threshold)
                                 nodes_to_repair.push_back(node_key);
                         }
@@ -1884,8 +1884,8 @@ void OnionRequestRouter::_handle_path_failure(
     if (path.strike_count >= _config.path_strike_threshold) {
         log::warning(cat, "[Path {}]: Path has exceeded its strike threshold.", path.id);
 
-        // Tell the SnodePool that all nodes on this path are now suspect
-        if (auto snode_pool = _snode_pool.lock())
+        // Tell the MnodePool that all nodes on this path are now suspect
+        if (auto mnode_pool = _mnode_pool.lock())
             for (const auto& node : path.nodes) {
                 auto node_key = ed25519_pubkey::from_bytes(node.view_remote_key());
 
@@ -1899,7 +1899,7 @@ void OnionRequestRouter::_handle_path_failure(
                     continue;
                 }
 
-                snode_pool->record_node_failure(node);
+                mnode_pool->record_node_failure(node);
                 log::debug(
                         cat,
                         "[Path {}]: Penalized path node {} due to path failure.",
@@ -1992,11 +1992,11 @@ void OnionRequestRouter::_try_repair_path(
                 path.id,
                 bad_node_pubkey.hex());
 
-        auto snode_pool = _snode_pool.lock();
-        if (!snode_pool) {
+        auto mnode_pool = _mnode_pool.lock();
+        if (!mnode_pool) {
             log::critical(
                     cat,
-                    "[Path {}]: Cannot repair path as SnodePool was destroyed, dropping instead.",
+                    "[Path {}]: Cannot repair path as MnodePool was destroyed, dropping instead.",
                     path.id);
             path.strike_count = _config.path_strike_threshold;
             return;
@@ -2004,7 +2004,7 @@ void OnionRequestRouter::_try_repair_path(
 
         // The bad node should have already been penalised at this point
         auto used_nodes = extract_nodes(_paths, _pending_paths);
-        auto replacements = snode_pool->get_unused_nodes(1, used_nodes);
+        auto replacements = mnode_pool->get_unused_nodes(1, used_nodes);
 
         // If we found a replacement node then swap out the bad one if we have a replacement node,
         // if we don't then we need to drop the path (and rely on path rebuilding to give us a full
@@ -2117,12 +2117,12 @@ void OnionRequestRouter::_rotate_path(const std::string& path_id, PathCategory c
     path.rotation_in_progress = true;
 
     const std::string new_path_id = random::unique_id("RP");
-    service_node edge_node = path.nodes.front();
+    master_node edge_node = path.nodes.front();
     auto nodes_to_exclude = extract_nodes(_paths, _pending_paths);
 
-    auto snode_pool = _snode_pool.lock();
-    if (!snode_pool) {
-        log::critical(cat, "SnodePool was destroyed, cannot rotate path.");
+    auto mnode_pool = _mnode_pool.lock();
+    if (!mnode_pool) {
+        log::critical(cat, "MnodePool was destroyed, cannot rotate path.");
         return;
     }
 
@@ -2131,20 +2131,20 @@ void OnionRequestRouter::_rotate_path(const std::string& path_id, PathCategory c
     // edge node)
     auto now = std::chrono::system_clock::now();
     auto rotate_at = (std::chrono::steady_clock::now() + _config.path_rotation_frequency);
-    std::vector<service_node> rotated_path_nodes;
+    std::vector<master_node> rotated_path_nodes;
 
     if (now > path.edge_first_connected_at + _config.edge_node_cache_duration)
-        rotated_path_nodes = snode_pool->get_unused_nodes(_config.path_length, nodes_to_exclude);
+        rotated_path_nodes = mnode_pool->get_unused_nodes(_config.path_length, nodes_to_exclude);
     else {
         rotated_path_nodes =
-                snode_pool->get_unused_nodes(_config.path_length - 1, nodes_to_exclude);
+                mnode_pool->get_unused_nodes(_config.path_length - 1, nodes_to_exclude);
         rotated_path_nodes.insert(rotated_path_nodes.begin(), edge_node);
     }
 
     // Also need a 'destination' to varify path reachability
     nodes_to_exclude.insert(
             nodes_to_exclude.end(), rotated_path_nodes.begin(), rotated_path_nodes.end());
-    auto target_node = snode_pool->get_unused_nodes(1, nodes_to_exclude);
+    auto target_node = mnode_pool->get_unused_nodes(1, nodes_to_exclude);
 
     if (rotated_path_nodes.size() < _config.path_length || target_node.empty()) {
         log::warning(
@@ -2278,4 +2278,4 @@ void OnionRequestRouter::_on_rotation_verification_response(
     _update_status();
 }
 
-}  // namespace session::network
+}  // namespace bchat::network

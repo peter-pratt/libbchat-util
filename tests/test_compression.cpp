@@ -1,7 +1,7 @@
 
 #include <oxenc/hex.h>
-#include <session/config/encrypt.h>
-#include <session/config/user_profile.h>
+#include <bchat/config/encrypt.h>
+#include <bchat/config/user_profile.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <catch2/catch_test_macros.hpp>
@@ -9,7 +9,7 @@
 
 #include "utils.hpp"
 
-namespace session::config {
+namespace bchat::config {
 void compress_message(std::vector<unsigned char>& msg, int level);
 }
 
@@ -22,14 +22,14 @@ TEST_CASE("compression", "[config][compression]") {
     CHECK(data.size() == 81);
 
     auto d = data;
-    session::config::compress_message(d, 1);
+    bchat::config::compress_message(d, 1);
 
     CHECK(d[0] == 'z');
     CHECK(d.size() == 18);
     CHECK(to_hex(d) == "7a28b52ffd205145000010aaaa01008c022c");
 
     d = data;
-    session::config::compress_message(d, 5);
+    bchat::config::compress_message(d, 5);
     CHECK(d[0] == 'z');
     CHECK(d.size() == 17);
     CHECK(to_hex(d) == "7a28b52ffd20513d000008aa01000dea84");
@@ -37,7 +37,7 @@ TEST_CASE("compression", "[config][compression]") {
     // This message (from the user profile test case) doesn't compress any better than plaintext
     // with zstd compression, so the compress_message call shouldn't change it.
     // clang-format off
-    data = session::to_vector(
+    data = bchat::to_vector(
         "d"
           "1:#" "i1e"
           "1:&" "d"
@@ -49,7 +49,7 @@ TEST_CASE("compression", "[config][compression]") {
             "l"
               "i0e"
               "32:" +
-                session::to_string("ea173b57beca8af18c3519a7bbf69c3e7a05d1c049fa9558341d8ebb48b0c965"_hexbytes) +
+                bchat::to_string("ea173b57beca8af18c3519a7bbf69c3e7a05d1c049fa9558341d8ebb48b0c965"_hexbytes) +
               "de"
             "e"
           "e"
@@ -61,7 +61,7 @@ TEST_CASE("compression", "[config][compression]") {
         "e");
     //
     // If we add some more repetition in it, though, it will:
-    auto data2 = session::to_vector(
+    auto data2 = bchat::to_vector(
         "d"
           "1:#" "i1e"
           "1:&" "d"
@@ -73,7 +73,7 @@ TEST_CASE("compression", "[config][compression]") {
             "l"
               "i0e"
               "32:" +
-                session::to_string("ea173b57beca8af18c3519a7bbf69c3e7a05d1c049fa9558341d8ebb48b0c965"_hexbytes) +
+                bchat::to_string("ea173b57beca8af18c3519a7bbf69c3e7a05d1c049fa9558341d8ebb48b0c965"_hexbytes) +
               "de"
             "e"
           "e"
@@ -90,7 +90,7 @@ TEST_CASE("compression", "[config][compression]") {
 
     // Doesn't compress, so shouldn't change:
     CHECK(d.size() == 142);
-    session::config::compress_message(d, 1);
+    bchat::config::compress_message(d, 1);
     CHECK(d[0] == 'd');
     CHECK(d.size() == 142);
     CHECK(reinterpret_cast<intptr_t>(d.data()) == dptr);
@@ -99,7 +99,7 @@ TEST_CASE("compression", "[config][compression]") {
     // we change the version of external/zstd, but should be constant otherwise for any given
     // version of zstd).
     d = data2;
-    session::config::compress_message(d, 1);
+    bchat::config::compress_message(d, 1);
     CHECK(d[0] == 'z');
     CHECK(d.size() == 161);
     CHECK(d.size() < data2.size());
@@ -110,7 +110,7 @@ TEST_CASE("compression", "[config][compression]") {
           "3a3d64313a6e303a313a70303a313a71303a656505003587f2d5e1c02836af9aa13401");
 
     d = data2;
-    session::config::compress_message(d, 5);
+    bchat::config::compress_message(d, 5);
     CHECK(d[0] == 'z');
     CHECK(d.size() == 156);
     CHECK(d.size() < data2.size());
@@ -121,7 +121,7 @@ TEST_CASE("compression", "[config][compression]") {
           "313a7071303a65650800a8d0880966a9827e19e0572706a3d8bc6a86d204");
 
     d = data2;
-    session::config::compress_message(d, 19);
+    bchat::config::compress_message(d, 19);
     CHECK(d[0] == 'z');
     CHECK(d.size() == 157);  // Yeah, it actually gets *bigger* with supposedly "higher" compression
     CHECK(d.size() < data2.size());

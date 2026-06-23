@@ -148,7 +148,7 @@ if(ENABLE_NETWORKING)
         libevent::core
     )
 
-    if(ENABLE_NETWORKING_SROUTER)
+    if(ENABLE_NETWORKING_BELNET_ROUTER)
         target_sources(network
             PRIVATE
             network/routing/belnet_router.cpp)

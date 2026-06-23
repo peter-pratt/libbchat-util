@@ -1,4 +1,4 @@
-#include "session/network/backends/bchat_file_server.hpp"
+#include "bchat/network/backends/bchat_file_server.hpp"
 
 #include <fmt/ranges.h>
 #include <oxenc/base64.h>
@@ -7,10 +7,10 @@
 #include <oxen/log/format.hpp>
 
 #include "../bchat_network_internal.hpp"
-#include "session/blinding.hpp"
-#include "session/network/backends/backend_util.hpp"
-#include "session/network/backends/bchat_file_server.h"
-#include "session/random.hpp"
+#include "bchat/blinding.hpp"
+#include "bchat/network/backends/backend_util.hpp"
+#include "bchat/network/backends/bchat_file_server.h"
+#include "bchat/random.hpp"
 
 #if defined(__APPLE__) || !defined(__cpp_lib_chrono) || __cpp_lib_chrono < 201907L || \
         (defined(_LIBCPP_VERSION) && _LIBCPP_VERSION < 190000)
@@ -24,7 +24,7 @@ using namespace oxen;
 using namespace std::literals;
 using namespace oxen::log::literals;
 
-namespace session::network::file_server {
+namespace bchat::network::file_server {
 
 const config::FileServer DEFAULT_CONFIG = {
         .scheme = "http",
@@ -310,8 +310,8 @@ Request get_client_version(
 
     switch (platform) {
         case Platform::android: endpoint = "/bchat_version?platform=android"; break;
-        case Platform::desktop: endpoint = "/session_version?platform=desktop"; break;
-        case Platform::ios: endpoint = "/session_version?platform=ios"; break;
+        case Platform::desktop: endpoint = "/bchat_version?platform=desktop"; break;
+        case Platform::ios: endpoint = "/bchat_version?platform=ios"; break;
     }
 
     // Generate the auth signature
@@ -348,14 +348,14 @@ Request get_client_version(
             overall_timeout};
 }
 
-}  // namespace session::network::file_server
+}  // namespace bchat::network::file_server
 
 extern "C" {
 
-using namespace session;
-using namespace session::network;
+using namespace bchat;
+using namespace bchat::network;
 
-LIBSESSION_C_API bool session_file_server_parse_download_url(
+LIBBCHAT_C_API bool bchat_file_server_parse_download_url(
         const char* url, file_server_parsed_download_url* out) {
     auto info = file_server::parse_download_url(url);
     if (!info)
@@ -375,7 +375,7 @@ LIBSESSION_C_API bool session_file_server_parse_download_url(
     return true;
 }
 
-LIBSESSION_C_API bool session_file_server_generate_download_url(
+LIBBCHAT_C_API bool bchat_file_server_generate_download_url(
         const char* file_id,
         const char* scheme,
         const char* host,
@@ -403,7 +403,7 @@ LIBSESSION_C_API bool session_file_server_generate_download_url(
     return true;
 }
 
-LIBSESSION_C_API session_request_params* session_file_server_get_client_version(
+LIBBCHAT_C_API bchat_request_params* bchat_file_server_get_client_version(
         CLIENT_PLATFORM platform,
         const unsigned char* ed25519_secret, /* 64 bytes */
         int64_t request_timeout_ms,
@@ -417,7 +417,7 @@ LIBSESSION_C_API session_request_params* session_file_server_get_client_version(
                          ? std::optional{std::chrono::milliseconds{overall_timeout_ms}}
                          : std::nullopt));
 
-        return session::network::detail::convert_cpp_request_to_c(req);
+        return bchat::network::detail::convert_cpp_request_to_c(req);
     } catch (...) {
         return nullptr;
     }

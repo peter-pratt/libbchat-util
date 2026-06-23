@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Make libsession-util amalgam builds.
+# Make libbchat-util amalgam builds.
 #
 # Requires at least two arguments:
 # - first arg is the build dir
@@ -10,8 +10,8 @@
 # - extra arguments are passed to the cmake invocation.
 #
 
-if ! [ -f LICENSE ] || ! [ -d include/session ]; then
-    echo "You need to run this as ./utils/static-bundle.sh from the top-level libsession-util project directory" >&2
+if ! [ -f LICENSE ] || ! [ -d include/bchat ]; then
+    echo "You need to run this as ./utils/static-bundle.sh from the top-level libbchat-util project directory" >&2
     exit 1
 fi
 
@@ -71,15 +71,15 @@ cmake -G 'Unix Makefiles' \
     "$@" \
     "$projdir"
 
-make -j${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)} VERBOSE=1 session-util
+make -j${JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)} VERBOSE=1 bchat-util
 
 if [ -z "$archive" ]; then
     exit 0
 fi
 
 mkdir -p "$pkg"/{lib,include}
-cp -v libsession-util.a "$pkg"/lib
-cp -rv "$projdir"/include/session "$pkg"/include
+cp -v libbchat-util.a "$pkg"/lib
+cp -rv "$projdir"/include/bchat "$pkg"/include
 
 if [ -z "$zip" ]; then
     tar cvJf "$archive" "$pkg"

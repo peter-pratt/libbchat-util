@@ -1,4 +1,4 @@
-#include "session/network/service_node.hpp"
+#include "bchat/network/master_node.hpp"
 
 #include <fmt/ranges.h>
 
@@ -9,25 +9,25 @@
 using namespace oxen;
 using namespace oxen::log::literals;
 
-namespace session::network {
+namespace bchat::network {
 
-session::network::x25519_pubkey service_node::swarm_pubkey() const {
-    return session::network::compute_x25519_pubkey(remote_pubkey);
+bchat::network::x25519_pubkey master_node::swarm_pubkey() const {
+    return bchat::network::compute_x25519_pubkey(remote_pubkey);
 }
 
-std::string service_node::to_string() const {
+std::string master_node::to_string() const {
     return remote_pubkey.hex();
 }
 
-std::string service_node::to_https_string() const {
+std::string master_node::to_https_string() const {
     return "{}:{}"_format(host(), https_port);
 }
 
-std::string service_node::to_omq_string() const {
+std::string master_node::to_omq_string() const {
     return "{}:{}"_format(host(), omq_port);
 }
 
-service_node service_node::from(const network_service_node& node) {
+master_node master_node::from(const network_master_node& node) {
     return {ed25519_pubkey::from_hex(node.ed25519_pubkey_hex),
             oxen::quic::ipv4{std::span<const uint8_t, 4>(node.ip, 4)},
             node.https_port,
@@ -37,7 +37,7 @@ service_node service_node::from(const network_service_node& node) {
             node.requested_unlock_height};
 }
 
-void service_node::into(network_service_node& n) const {
+void master_node::into(network_master_node& n) const {
     auto ed25519_pubkey_hex = remote_pubkey.hex();
     strncpy(n.ed25519_pubkey_hex, ed25519_pubkey_hex.c_str(), 64);
     n.ed25519_pubkey_hex[64] = '\0';  // Ensure null termination
@@ -52,11 +52,11 @@ void service_node::into(network_service_node& n) const {
     n.requested_unlock_height = requested_unlock_height;
 }
 
-service_node service_node::from_json(nlohmann::json json) {
+master_node master_node::from_json(nlohmann::json json) {
     auto pk_ed = json["pubkey_ed25519"].get<std::string_view>();
     if (pk_ed.size() != 64 || !oxenc::is_hex(pk_ed))
         throw std::invalid_argument{
-                "Invalid service node json: pubkey_ed25519 is not a valid, hex pubkey"};
+                "Invalid master node json: pubkey_ed25519 is not a valid, hex pubkey"};
 
     std::vector<unsigned char> pubkey;
     pubkey.reserve(32);
@@ -79,7 +79,7 @@ service_node service_node::from_json(nlohmann::json json) {
             }
         } else {
             auto json_version = json["storage_server_version"].get<std::string>();
-            auto split_version = session::split(json_version, ".");
+            auto split_version = bchat::split(json_version, ".");
 
             for (size_t i = 0; i < 3 && i < split_version.size(); ++i) {
                 int value;
@@ -138,20 +138,20 @@ service_node service_node::from_json(nlohmann::json json) {
             requested_unlock_height};
 }
 
-service_node service_node::from_disk(std::string_view str) {
+master_node master_node::from_disk(std::string_view str) {
     // Format is "{ed_pubkey}|{ip}|{https_port}|{omq_port}|{version}|{swarm_id}"
     auto parts = split(str, "|");
     if (parts.size() != 6)
-        throw std::invalid_argument("Invalid service node serialisation: {}"_format(str));
+        throw std::invalid_argument("Invalid master node serialisation: {}"_format(str));
     if (parts[0].size() != 64 || !oxenc::is_hex(parts[0]))
         throw std::invalid_argument{
-                "Invalid service node serialisation: pubkey is not hex or has wrong size"};
+                "Invalid master node serialisation: pubkey is not hex or has wrong size"};
 
     uint16_t https_port, omq_port;
     if (!quic::parse_int(parts[2], https_port))
-        throw std::invalid_argument{"Invalid service node serialization: invalid https_port"};
+        throw std::invalid_argument{"Invalid master node serialization: invalid https_port"};
     if (!quic::parse_int(parts[3], omq_port))
-        throw std::invalid_argument{"Invalid service node serialization: invalid omq_port"};
+        throw std::invalid_argument{"Invalid master node serialization: invalid omq_port"};
 
     auto version_parts = split(parts[4], ".");
     std::array<uint16_t, 3> version_array{0, 0, 0};
@@ -163,7 +163,7 @@ service_node service_node::from_disk(std::string_view str) {
     }
 
     if (version_array == std::array<uint16_t, 3>{0, 0, 0})
-        throw std::invalid_argument{"Invalid service node serialization: invalid version"};
+        throw std::invalid_argument{"Invalid master node serialization: invalid version"};
 
     swarm_id_t swarm_id = INVALID_SWARM_ID;
     quic::parse_int(parts[5], swarm_id);
@@ -176,9 +176,9 @@ service_node service_node::from_disk(std::string_view str) {
             swarm_id};
 }
 
-std::pair<std::vector<service_node>, int> service_node::process_snode_cache_bin(
+std::pair<std::vector<master_node>, int> master_node::process_mnode_cache_bin(
         std::vector<std::byte> cache_bin) {
-    constexpr size_t SNODE_SIZE = 51;
+    constexpr size_t MNODE_SIZE = 51;
     constexpr size_t PK_SIZE = 32;
     constexpr size_t SWARM_ID_SIZE = 8;
     constexpr size_t IP_SIZE = 4;
@@ -189,17 +189,17 @@ std::pair<std::vector<service_node>, int> service_node::process_snode_cache_bin(
     // Sanity check field sizes
     static_assert(
             PK_SIZE + SWARM_ID_SIZE + IP_SIZE + HTTPS_PORT_SIZE + OMQ_PORT_SIZE + VERSION_SIZE ==
-                    SNODE_SIZE,
-            "Field sizes do not sum to snode size");
+                    MNODE_SIZE,
+            "Field sizes do not sum to mnode size");
 
-    if (cache_bin.size() % SNODE_SIZE != 0)
+    if (cache_bin.size() % MNODE_SIZE != 0)
         throw std::runtime_error{
-                "Snode cache size is not a multiple of snode size ({})."_format(SNODE_SIZE)};
+                "Mnode cache size is not a multiple of mnode size ({})."_format(MNODE_SIZE)};
 
     // Parse the binary
     int failed_nodes = 0;
-    std::vector<service_node> nodes;
-    nodes.reserve(cache_bin.size() / SNODE_SIZE);
+    std::vector<master_node> nodes;
+    nodes.reserve(cache_bin.size() / MNODE_SIZE);
 
     const std::byte* current_ptr = cache_bin.data();
     const std::byte* const end_ptr = cache_bin.data() + cache_bin.size();
@@ -268,10 +268,10 @@ std::pair<std::vector<service_node>, int> service_node::process_snode_cache_bin(
         }
 
         // Move the ptr to the start of the next node
-        current_ptr += SNODE_SIZE;
+        current_ptr += MNODE_SIZE;
     }
 
     return {nodes, failed_nodes};
 }
 
-}  // namespace session::network
+}  // namespace bchat::network

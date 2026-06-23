@@ -1,4 +1,4 @@
-#include "session/network/request_queue.hpp"
+#include "bchat/network/request_queue.hpp"
 
 #include <event2/event.h>
 #include <fmt/ranges.h>
@@ -11,7 +11,7 @@
 using namespace oxen;
 using namespace oxen::log::literals;
 
-namespace session::network::detail {
+namespace bchat::network::detail {
 
 namespace {
     auto cat = oxen::log::Cat("request_queue");
@@ -173,4 +173,4 @@ void RequestQueue::update_timeout() {
     event_add(_timeout.get(), &exp_interval);
 }
 
-}  // namespace session::network::detail
+}  // namespace bchat::network::detail

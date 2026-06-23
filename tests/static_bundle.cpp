@@ -2,11 +2,11 @@
 // against the combined static bundle (when using cmake ... -DSTATIC_BUILD=ON)
 
 #include <random>
-#include <session/config/groups/keys.hpp>
+#include <bchat/config/groups/keys.hpp>
 
 int main() {
     if (std::mt19937_64{}() == 123) {
-        auto& k = *reinterpret_cast<session::config::groups::Keys*>(12345);
+        auto& k = *reinterpret_cast<bchat::config::groups::Keys*>(12345);
         k.encrypt_message(std::span<const unsigned char>{});
     }
 }

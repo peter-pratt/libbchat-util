@@ -1,4 +1,4 @@
-#include "session/config/groups/info.hpp"
+#include "bchat/config/groups/info.hpp"
 
 #include <oxenc/hex.h>
 #include <sodium/crypto_generichash_blake2b.h>
@@ -6,15 +6,15 @@
 #include <variant>
 
 #include "../internal.hpp"
-#include "session/config/error.h"
-#include "session/config/groups/info.h"
-#include "session/export.h"
-#include "session/types.hpp"
-#include "session/util.hpp"
+#include "bchat/config/error.h"
+#include "bchat/config/groups/info.h"
+#include "bchat/export.h"
+#include "bchat/types.hpp"
+#include "bchat/util.hpp"
 
 using namespace std::literals;
 
-namespace session::config::groups {
+namespace bchat::config::groups {
 
 Info::Info(
         std::span<const unsigned char> ed25519_pubkey,
@@ -125,16 +125,16 @@ bool Info::is_destroyed() const {
     return false;
 }
 
-}  // namespace session::config::groups
+}  // namespace bchat::config::groups
 
-using namespace session;
-using namespace session::config;
+using namespace bchat;
+using namespace bchat::config;
 
-LIBSESSION_C_API const size_t GROUP_INFO_NAME_MAX_LENGTH = groups::Info::NAME_MAX_LENGTH;
-LIBSESSION_C_API const size_t GROUP_INFO_DESCRIPTION_MAX_LENGTH =
+LIBBCHAT_C_API const size_t GROUP_INFO_NAME_MAX_LENGTH = groups::Info::NAME_MAX_LENGTH;
+LIBBCHAT_C_API const size_t GROUP_INFO_DESCRIPTION_MAX_LENGTH =
         groups::Info::DESCRIPTION_MAX_LENGTH;
 
-LIBSESSION_C_API int groups_info_init(
+LIBBCHAT_C_API int groups_info_init(
         config_object** conf,
         const unsigned char* ed25519_pubkey,
         const unsigned char* ed25519_secretkey,
@@ -156,7 +156,7 @@ LIBSESSION_C_API int groups_info_init(
 /// Outputs:
 /// - `char*` -- Pointer to the currently-set name as a null-terminated string, or NULL if there is
 /// no name
-LIBSESSION_C_API const char* groups_info_get_name(const config_object* conf) {
+LIBBCHAT_C_API const char* groups_info_get_name(const config_object* conf) {
     if (auto s = unbox<groups::Info>(conf)->get_name())
         return s->data();
     return nullptr;
@@ -173,14 +173,14 @@ LIBSESSION_C_API const char* groups_info_get_name(const config_object* conf) {
 ///
 /// Outputs:
 /// - `int` -- Returns 0 on success, non-zero on error
-LIBSESSION_C_API int groups_info_set_name(config_object* conf, const char* name) {
+LIBBCHAT_C_API int groups_info_set_name(config_object* conf, const char* name) {
     return wrap_exceptions(
             conf,
             [&] {
                 unbox<groups::Info>(conf)->set_name(name);
                 return 0;
             },
-            static_cast<int>(SESSION_ERR_BAD_VALUE));
+            static_cast<int>(BCHAT_ERR_BAD_VALUE));
 }
 
 /// API: groups_info/groups_info_get_description
@@ -195,7 +195,7 @@ LIBSESSION_C_API int groups_info_set_name(config_object* conf, const char* name)
 /// Outputs:
 /// - `char*` -- Pointer to the currently-set description as a null-terminated string, or NULL
 /// if there is no description
-LIBSESSION_C_API const char* groups_info_get_description(const config_object* conf) {
+LIBBCHAT_C_API const char* groups_info_get_description(const config_object* conf) {
     if (auto s = unbox<groups::Info>(conf)->get_description())
         return s->data();
     return nullptr;
@@ -212,14 +212,14 @@ LIBSESSION_C_API const char* groups_info_get_description(const config_object* co
 ///
 /// Outputs:
 /// - `int` -- Returns 0 on success, non-zero on error
-LIBSESSION_C_API int groups_info_set_description(config_object* conf, const char* description) {
+LIBBCHAT_C_API int groups_info_set_description(config_object* conf, const char* description) {
     return wrap_exceptions(
             conf,
             [&] {
                 unbox<groups::Info>(conf)->set_description(description);
                 return 0;
             },
-            static_cast<int>(SESSION_ERR_BAD_VALUE));
+            static_cast<int>(BCHAT_ERR_BAD_VALUE));
 }
 
 /// API: groups_info/groups_info_get_pic
@@ -234,7 +234,7 @@ LIBSESSION_C_API int groups_info_set_description(config_object* conf, const char
 /// Outputs:
 /// - `user_profile_pic` -- Pointer to the currently-set profile pic (despite the "user_profile" in
 ///   the struct name, this is the group's profile pic).
-LIBSESSION_C_API user_profile_pic groups_info_get_pic(const config_object* conf) {
+LIBBCHAT_C_API user_profile_pic groups_info_get_pic(const config_object* conf) {
     user_profile_pic p;
     if (auto pic = unbox<groups::Info>(conf)->get_profile_pic(); pic) {
         copy_c_str(p.url, pic.url);
@@ -255,7 +255,7 @@ LIBSESSION_C_API user_profile_pic groups_info_get_pic(const config_object* conf)
 ///
 /// Outputs:
 /// - `int` -- Returns 0 on success, non-zero on error
-LIBSESSION_C_API int groups_info_set_pic(config_object* conf, user_profile_pic pic) {
+LIBBCHAT_C_API int groups_info_set_pic(config_object* conf, user_profile_pic pic) {
     std::string_view url{pic.url};
     std::span<const unsigned char> key;
     if (!url.empty())
@@ -267,7 +267,7 @@ LIBSESSION_C_API int groups_info_set_pic(config_object* conf, user_profile_pic p
                 unbox<groups::Info>(conf)->set_profile_pic(url, key);
                 return 0;
             },
-            static_cast<int>(SESSION_ERR_BAD_VALUE));
+            static_cast<int>(BCHAT_ERR_BAD_VALUE));
 }
 
 /// API: groups_info/groups_info_get_expiry_timer
@@ -279,7 +279,7 @@ LIBSESSION_C_API int groups_info_set_pic(config_object* conf, user_profile_pic p
 ///
 /// Outputs:
 /// - `int` -- Returns the expiry timer in seconds. Returns 0 if not set
-LIBSESSION_C_API int groups_info_get_expiry_timer(const config_object* conf) {
+LIBBCHAT_C_API int groups_info_get_expiry_timer(const config_object* conf) {
     if (auto t = unbox<groups::Info>(conf)->get_expiry_timer(); t && *t > 0s)
         return t->count();
     return 0;
@@ -293,7 +293,7 @@ LIBSESSION_C_API int groups_info_get_expiry_timer(const config_object* conf) {
 /// Inputs:
 /// - `conf` -- [in] Pointer to the config object
 /// - `expiry` -- [in] Integer of the expiry timer in seconds
-LIBSESSION_C_API void groups_info_set_expiry_timer(config_object* conf, int expiry) {
+LIBBCHAT_C_API void groups_info_set_expiry_timer(config_object* conf, int expiry) {
     unbox<groups::Info>(conf)->set_expiry_timer(std::max(0, expiry) * 1s);
 }
 
@@ -306,7 +306,7 @@ LIBSESSION_C_API void groups_info_set_expiry_timer(config_object* conf, int expi
 ///
 /// Outputs:
 /// - `int64_t` -- Unix timestamp when the group was created (if set by an admin).
-LIBSESSION_C_API int64_t groups_info_get_created(const config_object* conf) {
+LIBBCHAT_C_API int64_t groups_info_get_created(const config_object* conf) {
     return unbox<groups::Info>(conf)->get_created().value_or(0);
 }
 
@@ -318,7 +318,7 @@ LIBSESSION_C_API int64_t groups_info_get_created(const config_object* conf) {
 /// Inputs:
 /// - `conf` -- [in] Pointer to the config object
 /// - `ts` -- [in] the unix timestamp, or 0 to clear a current value.
-LIBSESSION_C_API void groups_info_set_created(config_object* conf, int64_t ts) {
+LIBBCHAT_C_API void groups_info_set_created(config_object* conf, int64_t ts) {
     unbox<groups::Info>(conf)->set_created(std::max<int64_t>(0, ts));
 }
 
@@ -332,7 +332,7 @@ LIBSESSION_C_API void groups_info_set_created(config_object* conf, int64_t ts) {
 ///
 /// Outputs:
 /// - `int64_t` -- Unix timestamp before which messages should be deleted.  Returns 0 if not set.
-LIBSESSION_C_API int64_t groups_info_get_delete_before(const config_object* conf) {
+LIBBCHAT_C_API int64_t groups_info_get_delete_before(const config_object* conf) {
     return unbox<groups::Info>(conf)->get_delete_before().value_or(0);
 }
 
@@ -344,7 +344,7 @@ LIBSESSION_C_API int64_t groups_info_get_delete_before(const config_object* conf
 /// Inputs:
 /// - `conf` -- [in] Pointer to the config object
 /// - `ts` -- [in] the unix timestamp, or 0 to clear a current value.
-LIBSESSION_C_API void groups_info_set_delete_before(config_object* conf, int64_t ts) {
+LIBBCHAT_C_API void groups_info_set_delete_before(config_object* conf, int64_t ts) {
     unbox<groups::Info>(conf)->set_delete_before(std::max<int64_t>(0, ts));
 }
 
@@ -358,7 +358,7 @@ LIBSESSION_C_API void groups_info_set_delete_before(config_object* conf, int64_t
 ///
 /// Outputs:
 /// - `int64_t` -- Unix timestamp before which messages should be deleted.  Returns 0 if not set.
-LIBSESSION_C_API int64_t groups_info_get_attach_delete_before(const config_object* conf) {
+LIBBCHAT_C_API int64_t groups_info_get_attach_delete_before(const config_object* conf) {
     return unbox<groups::Info>(conf)->get_delete_attach_before().value_or(0);
 }
 
@@ -370,7 +370,7 @@ LIBSESSION_C_API int64_t groups_info_get_attach_delete_before(const config_objec
 /// Inputs:
 /// - `conf` -- [in] Pointer to the config object
 /// - `ts` -- [in] the unix timestamp, or 0 to clear a current value.
-LIBSESSION_C_API void groups_info_set_attach_delete_before(config_object* conf, int64_t ts) {
+LIBBCHAT_C_API void groups_info_set_attach_delete_before(config_object* conf, int64_t ts) {
     unbox<groups::Info>(conf)->set_delete_attach_before(std::max<int64_t>(0, ts));
 }
 
@@ -384,7 +384,7 @@ LIBSESSION_C_API void groups_info_set_attach_delete_before(config_object* conf, 
 ///
 /// Outputs:
 /// - `true` if the group has been nuked, `false` otherwise.
-LIBSESSION_C_API bool groups_info_is_destroyed(const config_object* conf) {
+LIBBCHAT_C_API bool groups_info_is_destroyed(const config_object* conf) {
     return unbox<groups::Info>(conf)->is_destroyed();
 }
 
@@ -394,6 +394,6 @@ LIBSESSION_C_API bool groups_info_is_destroyed(const config_object* conf) {
 ///
 /// Inputs:
 /// - `conf` -- [in] Pointer to the config object
-LIBSESSION_C_API void groups_info_destroy_group(config_object* conf) {
+LIBBCHAT_C_API void groups_info_destroy_group(config_object* conf) {
     unbox<groups::Info>(conf)->destroy_group();
 }

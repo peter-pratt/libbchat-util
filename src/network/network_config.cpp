@@ -1,4 +1,4 @@
-#include "session/network/network_config.hpp"
+#include "bchat/network/network_config.hpp"
 
 #include <any>
 #include <oxen/log.hpp>
@@ -7,7 +7,7 @@
 using namespace oxen;
 using namespace oxen::log::literals;
 
-namespace session::network::config {
+namespace bchat::network::config {
 
 inline auto cat = oxen::log::Cat("network");
 
@@ -40,9 +40,9 @@ Config::Config(const std::vector<std::any>& opts) {
         HANDLE_TYPE(opt::num_nodes_to_check_for_network_offset);
         HANDLE_TYPE(opt::min_resume_clock_resync_interval);
 
-        // Snode pool options
+        // Mnode pool options
         HANDLE_TYPE(opt::cache_directory);
-        HANDLE_TYPE(opt::fallback_snode_pool_path);
+        HANDLE_TYPE(opt::fallback_mnode_pool_path);
         HANDLE_TYPE(opt::cache_expiration);
         HANDLE_TYPE(opt::cache_min_lifetime);
         HANDLE_TYPE(opt::cache_min_size);
@@ -104,8 +104,8 @@ void Config::handle_config_opt(opt::router router_) {
             log::debug(cat, "Network config set to route requests using Onion Requests");
             break;
 
-        case opt::router::Type::session_router:
-            log::debug(cat, "Network config set to route requests using Session Router");
+        case opt::router::Type::belnet_router:
+            log::debug(cat, "Network config set to route requests using BChat Router");
             break;
 
         case opt::router::Type::direct:
@@ -208,7 +208,7 @@ void Config::handle_config_opt(opt::min_resume_clock_resync_interval mrcri) {
             mrcri.duration.count());
 }
 
-// MARK: Snode Pool Options
+// MARK: Mnode Pool Options
 
 void Config::handle_config_opt(opt::cache_directory dir) {
     cache_directory = std::move(dir.path);
@@ -217,21 +217,21 @@ void Config::handle_config_opt(opt::cache_directory dir) {
         log::debug(cat, "Network config using cache dir {}", cache_directory->string());
 }
 
-void Config::handle_config_opt(opt::fallback_snode_pool_path fspp) {
-    fallback_snode_pool_path = std::move(fspp.path);
+void Config::handle_config_opt(opt::fallback_mnode_pool_path fspp) {
+    fallback_mnode_pool_path = std::move(fspp.path);
 
-    if (fallback_snode_pool_path)
+    if (fallback_mnode_pool_path)
         log::debug(
                 cat,
-                "Network config using fallback snode pool path {}",
-                fallback_snode_pool_path->string());
+                "Network config using fallback mnode pool path {}",
+                fallback_mnode_pool_path->string());
 }
 
 void Config::handle_config_opt(opt::cache_expiration ce) {
     cache_expiration = ce.duration;
     log::debug(
             cat,
-            "Network config snode pool cache expiration set to {} minutes",
+            "Network config mnode pool cache expiration set to {} minutes",
             ce.duration.count());
 }
 
@@ -239,13 +239,13 @@ void Config::handle_config_opt(opt::cache_min_lifetime mcl) {
     cache_min_lifetime = mcl.duration;
     log::debug(
             cat,
-            "Network config snode pool minimum cache lifetime set to {}ms",
+            "Network config mnode pool minimum cache lifetime set to {}ms",
             mcl.duration.count());
 }
 
 void Config::handle_config_opt(opt::cache_min_size mcs) {
     cache_min_size = mcs.size;
-    log::debug(cat, "Network config min snode pool cache size set to {}", mcs.size);
+    log::debug(cat, "Network config min mnode pool cache size set to {}", mcs.size);
 }
 
 void Config::handle_config_opt(opt::cache_min_swarm_size mss) {
@@ -257,7 +257,7 @@ void Config::handle_config_opt(opt::cache_num_nodes_to_use_for_refresh nnr) {
     cache_num_nodes_to_use_for_refresh = nnr.count;
     log::debug(
             cat,
-            "Network config number of cached nodes to be used for refreshing the snode pool cache "
+            "Network config number of cached nodes to be used for refreshing the mnode pool cache "
             "set to {}{}",
             nnr.count,
             (nnr.count > 0 ? "" : ", refreshes will always use a random seed node"));
@@ -268,14 +268,14 @@ void Config::handle_config_opt(opt::cache_min_num_refresh_presence_to_include_no
     log::debug(
             cat,
             "Network config minimum number of refresh responses a node needs to be present in to "
-            "be included in the snode pool cache set to {}{}",
+            "be included in the mnode pool cache set to {}{}",
             mnrp.count,
             (mnrp.count > 1 ? "" : ", nodes will always be included"));
 }
 
 void Config::handle_config_opt(opt::cache_node_strike_threshold nst) {
     cache_node_strike_threshold = nst.count;
-    log::debug(cat, "Network config snode pool node strike threshold set to {}", nst.count);
+    log::debug(cat, "Network config mnode pool node strike threshold set to {}", nst.count);
 }
 
 // MARK: Quic Transport Options
@@ -343,4 +343,4 @@ void Config::handle_config_opt(opt::onionreq_edge_node_cache_duration encd) {
             encd.duration.count());
 }
 
-}  // namespace session::network::config
+}  // namespace bchat::network::config

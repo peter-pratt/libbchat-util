@@ -1,13 +1,13 @@
 #include <oxenc/hex.h>
-#include <session/config/encrypt.h>
-#include <session/config/user_profile.h>
+#include <bchat/config/encrypt.h>
+#include <bchat/config/user_profile.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
-#include <session/config/base.hpp>
-#include <session/config/user_profile.hpp>
-#include <session/util.hpp>
+#include <bchat/config/base.hpp>
+#include <bchat/config/user_profile.hpp>
+#include <bchat/util.hpp>
 #include <string_view>
 
 #include "utils.hpp"
@@ -18,33 +18,33 @@ namespace {
 struct UserProfileTester {
     static std::chrono::sys_seconds get_profile_updated_value(config_object* conf) {
         return std::chrono::sys_seconds{std::chrono::seconds{
-                session::config::unbox<session::config::UserProfile>(conf)->data["t"].integer_or(
+                bchat::config::unbox<bchat::config::UserProfile>(conf)->data["t"].integer_or(
                         0)}};
     }
 
     static void set_profile_updated(config_object* conf, std::chrono::sys_seconds value) {
-        session::config::unbox<session::config::UserProfile>(conf)->data["t"] =
+        bchat::config::unbox<bchat::config::UserProfile>(conf)->data["t"] =
                 static_cast<int>(value.time_since_epoch().count());
     }
 
     static void set_profile_updated(
-            session::config::UserProfile& profile, std::chrono::sys_seconds value) {
+            bchat::config::UserProfile& profile, std::chrono::sys_seconds value) {
         profile.data["t"] = static_cast<int>(value.time_since_epoch().count());
     }
 
     static std::chrono::sys_seconds get_reupload_profile_updated_value(config_object* conf) {
         return std::chrono::sys_seconds{std::chrono::seconds{
-                session::config::unbox<session::config::UserProfile>(conf)->data["T"].integer_or(
+                bchat::config::unbox<bchat::config::UserProfile>(conf)->data["T"].integer_or(
                         0)}};
     }
 
     static void set_reupload_profile_updated(config_object* conf, std::chrono::sys_seconds value) {
-        session::config::unbox<session::config::UserProfile>(conf)->data["T"] =
+        bchat::config::unbox<bchat::config::UserProfile>(conf)->data["T"] =
                 static_cast<int>(value.time_since_epoch().count());
     }
 
     static uint64_t get_raw_profile_updated_value(config_object* conf) {
-        return session::config::unbox<session::config::UserProfile>(conf)->data["t"].integer_or(0);
+        return bchat::config::unbox<bchat::config::UserProfile>(conf)->data["t"].integer_or(0);
     }
 };
 }  // namespace
@@ -66,7 +66,7 @@ TEST_CASE("UserProfile", "[config][user_profile]") {
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::UserProfile profile{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::UserProfile profile{std::span<const unsigned char>{seed}, std::nullopt};
 
     CHECK_THROWS(
             profile.set_name("123456789012345678901234567890123456789012345678901234567890123456789"
@@ -171,9 +171,9 @@ TEST_CASE("user profile C API", "[config][user_profile][c]") {
 
     pic = user_profile_get_pic(conf);
     REQUIRE(pic.url != ""s);
-    REQUIRE(pic.key != session::to_vector("").data());
+    REQUIRE(pic.key != bchat::to_vector("").data());
     CHECK(pic.url == "http://example.org/omg-pic-123.bmp"sv);
-    CHECK(session::to_vector(std::span<const unsigned char>{pic.key, 32}) ==
+    CHECK(bchat::to_vector(std::span<const unsigned char>{pic.key, 32}) ==
           "secret78901234567890123456789012"_bytes);
 
     CHECK(user_profile_get_nts_priority(conf) == 9);
@@ -192,7 +192,7 @@ TEST_CASE("user profile C API", "[config][user_profile][c]") {
 
     // The data to be actually pushed, expanded like this to make it somewhat human-readable:
     // clang-format off
-    auto exp_push1_decrypted = session::to_vector(
+    auto exp_push1_decrypted = bchat::to_vector(
         "d"
           "1:#" "i1e"
           "1:&" "d"
@@ -203,7 +203,7 @@ TEST_CASE("user profile C API", "[config][user_profile][c]") {
             "1:t" "i123e"
           "e"
           "1:<" "l"
-            "l" "i0e" "32:" + session::to_string(exp_hash0) + "de" "e"
+            "l" "i0e" "32:" + bchat::to_string(exp_hash0) + "de" "e"
           "e"
           "1:=" "d"
             "1:+" "0:"
@@ -251,7 +251,7 @@ TEST_CASE("user profile C API", "[config][user_profile][c]") {
           "1:)" "le"
           "1:*" "de"
           "1:+" "de"
-        "e"_format(exp_push1_decrypted.size(), session::to_string(exp_push1_decrypted))));
+        "e"_format(exp_push1_decrypted.size(), bchat::to_string(exp_push1_decrypted))));
     // clang-format on
     free(dump1);  // done with the dump; don't leak!
 
@@ -274,14 +274,14 @@ TEST_CASE("user profile C API", "[config][user_profile][c]") {
           "1:)" "le"
           "1:*" "de"
           "1:+" "de"
-        "e"_format(exp_push1_decrypted.size(), session::to_string(exp_push1_decrypted))));
+        "e"_format(exp_push1_decrypted.size(), bchat::to_string(exp_push1_decrypted))));
     // clang-format on
     free(dump1);
 
     CHECK_FALSE(config_needs_dump(conf));
 
     // Now we're going to set up a second, competing config object (in the real world this would be
-    // another Session client somewhere).
+    // another BChat client somewhere).
 
     // Start with an empty config, as above:
     config_object* conf2;
@@ -456,9 +456,9 @@ TEST_CASE("user profile C API", "[config][user_profile][c]") {
     // Check the current pic
     pic = user_profile_get_pic(conf);
     REQUIRE(pic.url != ""s);
-    REQUIRE(pic.key != session::to_vector("").data());
+    REQUIRE(pic.key != bchat::to_vector("").data());
     CHECK(pic.url == "http://new.example.com/pic"sv);
-    CHECK(session::to_vector(std::span<const unsigned char>{pic.key, 32}) ==
+    CHECK(bchat::to_vector(std::span<const unsigned char>{pic.key, 32}) ==
           "qwert\0yuio1234567890123456789012"_bytes);
 
     // Reupload the "current" pic and confirm it gets returned
@@ -468,9 +468,9 @@ TEST_CASE("user profile C API", "[config][user_profile][c]") {
 
     pic = user_profile_get_pic(conf);
     REQUIRE(pic.url != ""s);
-    REQUIRE(pic.key != session::to_vector("").data());
+    REQUIRE(pic.key != bchat::to_vector("").data());
     CHECK(pic.url == "testUrl"sv);
-    CHECK(session::to_vector(std::span<const unsigned char>{pic.key, 32}) ==
+    CHECK(bchat::to_vector(std::span<const unsigned char>{pic.key, 32}) ==
           "secret78901234567890123456789000"_bytes);
 
     // Upload a "new" pic and it now gets returned
@@ -479,9 +479,9 @@ TEST_CASE("user profile C API", "[config][user_profile][c]") {
     CHECK(0 == user_profile_set_pic(conf, p));
     pic = user_profile_get_pic(conf);
     REQUIRE(pic.url != ""s);
-    REQUIRE(pic.key != session::to_vector("").data());
+    REQUIRE(pic.key != bchat::to_vector("").data());
     CHECK(pic.url == "testNewUrl"sv);
-    CHECK(session::to_vector(std::span<const unsigned char>{pic.key, 32}) ==
+    CHECK(bchat::to_vector(std::span<const unsigned char>{pic.key, 32}) ==
           "secret78901234567890123456789111"_bytes);
 
     // Ensure the timestamp for the last modified pic gets updated correctly when the name gets set
@@ -540,7 +540,7 @@ TEST_CASE("user profile timestamp update bug", "[config][user_profile]") {
 
     const auto seed = "0123456789abcdef0123456789abcdef00000000000000000000000000000000"_hexbytes;
 
-    session::config::UserProfile profile{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::UserProfile profile{std::span<const unsigned char>{seed}, std::nullopt};
 
     // Initially the code would update `profile_updated` even if the data hadn't changed, this test
     // verifies that no longer happens
@@ -566,52 +566,52 @@ TEST_CASE("UserProfile Pro Storage", "[config][user_profile][pro]") {
 
     const auto seed = "0123456789abcdef0123456789abcdef00000000000000000000000000000000"_hexbytes;
 
-    session::config::UserProfile profile{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::UserProfile profile{std::span<const unsigned char>{seed}, std::nullopt};
 
     // Ensure the bitset is being updated correctly
     CHECK(profile.get_profile_bitset().data == 0);
 
     profile.set_pro_badge(true);
-    CHECK(profile.get_profile_bitset().is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
+    CHECK(profile.get_profile_bitset().is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
 
     profile.set_pro_badge(false);
     CHECK(profile.get_profile_bitset().data == 0);
 
     profile.set_animated_avatar(true);
     CHECK(profile.get_profile_bitset().is_set(
-            SESSION_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
+            BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
 
     profile.set_animated_avatar(false);
     CHECK(profile.get_profile_bitset().data == 0);
 
     profile.set_pro_badge(true);
     profile.set_animated_avatar(true);
-    CHECK(profile.get_profile_bitset().is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
+    CHECK(profile.get_profile_bitset().is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
     CHECK(profile.get_profile_bitset().is_set(
-            SESSION_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
+            BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
 
     profile.set_animated_avatar(false);
-    CHECK(profile.get_profile_bitset().is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
+    CHECK(profile.get_profile_bitset().is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
     CHECK_FALSE(profile.get_profile_bitset().is_set(
-            SESSION_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
+            BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
 
     {
-        session::config::UserProfile profile2{std::span<const unsigned char>{seed}, profile.dump()};
+        bchat::config::UserProfile profile2{std::span<const unsigned char>{seed}, profile.dump()};
         CHECK(profile2.get_profile_bitset().is_set(
-                SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
+                BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
         CHECK_FALSE(profile2.get_profile_bitset().is_set(
-                SESSION_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
+                BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
     }
 
     // Ensure the pro config is being stored correctly
     std::array<uint8_t, crypto_sign_ed25519_PUBLICKEYBYTES> rotating_pk, signing_pk;
-    session::cleared_uc64 rotating_sk, signing_sk;
+    bchat::cleared_uc64 rotating_sk, signing_sk;
     {
         crypto_sign_ed25519_keypair(rotating_pk.data(), rotating_sk.data());
         crypto_sign_ed25519_keypair(signing_pk.data(), signing_sk.data());
     }
 
-    session::config::ProConfig pro_cpp = {};
+    bchat::config::ProConfig pro_cpp = {};
     pro_pro_config pro = {};
     {
         // CPP
@@ -641,7 +641,7 @@ TEST_CASE("UserProfile Pro Storage", "[config][user_profile][pro]") {
     CHECK(profile.get_profile_updated().time_since_epoch().count() != 123);
 
     {
-        session::config::UserProfile profile2{std::span<const unsigned char>{seed}, profile.dump()};
+        bchat::config::UserProfile profile2{std::span<const unsigned char>{seed}, profile.dump()};
         CHECK(profile.get_pro_config() == pro_cpp);
     }
 

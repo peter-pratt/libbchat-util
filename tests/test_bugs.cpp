@@ -2,11 +2,11 @@
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <catch2/catch_test_macros.hpp>
-#include <session/config/contacts.hpp>
+#include <bchat/config/contacts.hpp>
 
 #include "utils.hpp"
 
-using namespace session::config;
+using namespace bchat::config;
 
 TEST_CASE("Dirty/Mutable test case", "[config][dirty]") {
 
@@ -25,14 +25,14 @@ TEST_CASE("Dirty/Mutable test case", "[config][dirty]") {
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::Contacts c1{session::to_span(seed), std::nullopt};
+    bchat::config::Contacts c1{bchat::to_span(seed), std::nullopt};
     c1.set_name("050000000000000000000000000000000000000000000000000000000000000000", "alfonso");
     auto [seqno, data, obsolete] = c1.push();
     CHECK(obsolete == std::vector<std::string>{});
     c1.confirm_pushed(seqno, {"fakehash1"});
 
-    session::config::Contacts c2{session::to_span(seed), c1.dump()};
-    session::config::Contacts c3{session::to_span(seed), c1.dump()};
+    bchat::config::Contacts c2{bchat::to_span(seed), c1.dump()};
+    bchat::config::Contacts c3{bchat::to_span(seed), c1.dump()};
 
     CHECK_FALSE(c2.needs_dump());
     CHECK_FALSE(c2.needs_push());
@@ -92,7 +92,7 @@ TEST_CASE("Merge existing config into clean state", "[config][merge_existing]") 
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::Contacts c1{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::Contacts c1{std::span<const unsigned char>{seed}, std::nullopt};
     c1.set_name("050000000000000000000000000000000000000000000000000000000000000000", "alfonso");
     auto [seqno, data, obsolete] = c1.push();
     CHECK(obsolete == std::vector<std::string>{});
@@ -102,7 +102,7 @@ TEST_CASE("Merge existing config into clean state", "[config][merge_existing]") 
     CHECK(!c1.needs_push());
 
     auto r = c1.merge(std::vector<std::pair<std::string, std::span<const unsigned char>>>{
-            {{"fakehash1"s, session::to_span(data[0])}}});
+            {{"fakehash1"s, bchat::to_span(data[0])}}});
     CHECK(as_set(r) == make_set("fakehash1"s));
 
     auto old_hashes = c1.old_hashes();
@@ -129,13 +129,13 @@ TEST_CASE("Merge config matching local changse", "[config][merge_matching_dirty]
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::Contacts c1{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::Contacts c1{std::span<const unsigned char>{seed}, std::nullopt};
     c1.set_name("050000000000000000000000000000000000000000000000000000000000000000", "alfonso");
     auto [seqno, data, obsolete] = c1.push();
     CHECK(obsolete == std::vector<std::string>{});
     c1.confirm_pushed(seqno, {"fakehash1"s});
 
-    session::config::Contacts c2{std::span<const unsigned char>{seed}, c1.dump()};
+    bchat::config::Contacts c2{std::span<const unsigned char>{seed}, c1.dump()};
 
     CHECK_FALSE(c2.needs_dump());
     CHECK_FALSE(c2.needs_push());
@@ -152,7 +152,7 @@ TEST_CASE("Merge config matching local changse", "[config][merge_matching_dirty]
 
     CHECK(c1.is_dirty());  // already dirty before the merge
     auto r = c1.merge(std::vector<std::pair<std::string, std::span<const unsigned char>>>{
-            {{"fakehash2"s, session::to_span(data2[0])}}});
+            {{"fakehash2"s, bchat::to_span(data2[0])}}});
     CHECK(r == std::unordered_set{{"fakehash2"s}});
     CHECK(c1.needs_dump());
 
@@ -172,7 +172,7 @@ TEST_CASE("Merge config matching local changse", "[config][merge_matching_dirty]
 
     CHECK(c1.is_dirty());  // already dirty before the merge
     auto r2 = c1.merge(std::vector<std::pair<std::string, std::span<const unsigned char>>>{
-            {{"fakehash3", session::to_span(data3[0])}}});
+            {{"fakehash3", bchat::to_span(data3[0])}}});
     CHECK(r2 == std::unordered_set{{"fakehash3"s}});
     CHECK(c1.needs_dump());
 
@@ -204,7 +204,7 @@ TEST_CASE("Merge config matching local changse", "[config][merge_matching_dirty]
     auto size_before_merge = c1.size();  // retrieve size before trying to merge
     CHECK(c1.is_dirty());                // already dirty before the merge
     auto r4 = c1.merge(std::vector<std::pair<std::string, std::span<const unsigned char>>>{
-            {{"fakehash21", session::to_span(data4[0])}}});
+            {{"fakehash21", bchat::to_span(data4[0])}}});
     CHECK(r4 == std::unordered_set{{"fakehash21"s}});
     CHECK(c1.needs_dump());
 

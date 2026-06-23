@@ -1,13 +1,13 @@
-#include "session/network/swarm.hpp"
+#include "bchat/network/swarm.hpp"
 
 #include <oxenc/endian.h>
 
-#include "session/network/service_node.hpp"
-#include "session/network/bchat_network.hpp"
+#include "bchat/network/master_node.hpp"
+#include "bchat/network/bchat_network.hpp"
 
-namespace session::network::swarm {
+namespace bchat::network::swarm {
 
-swarm_id_t pubkey_to_swarm_space(const session::network::x25519_pubkey& pk) {
+swarm_id_t pubkey_to_swarm_space(const bchat::network::x25519_pubkey& pk) {
     swarm_id_t res = 0;
     for (size_t i = 0; i < 4; i++) {
         swarm_id_t buf;
@@ -19,10 +19,10 @@ swarm_id_t pubkey_to_swarm_space(const session::network::x25519_pubkey& pk) {
     return res;
 }
 
-std::vector<std::pair<swarm_id_t, std::vector<service_node>>> generate_swarms(
-        const std::vector<service_node> nodes) {
-    std::vector<std::pair<swarm_id_t, std::vector<service_node>>> result;
-    std::unordered_map<uint64_t, std::vector<service_node>> _grouped_nodes;
+std::vector<std::pair<swarm_id_t, std::vector<master_node>>> generate_swarms(
+        const std::vector<master_node> nodes) {
+    std::vector<std::pair<swarm_id_t, std::vector<master_node>>> result;
+    std::unordered_map<uint64_t, std::vector<master_node>> _grouped_nodes;
 
     for (const auto& node : nodes)
         _grouped_nodes[node.swarm_id].push_back(node);
@@ -36,9 +36,9 @@ std::vector<std::pair<swarm_id_t, std::vector<service_node>>> generate_swarms(
     return result;
 }
 
-std::pair<swarm_id_t, std::vector<service_node>> get_swarm(
-        const session::network::x25519_pubkey swarm_pubkey,
-        const std::vector<std::pair<swarm_id_t, std::vector<service_node>>> all_swarms) {
+std::pair<swarm_id_t, std::vector<master_node>> get_swarm(
+        const bchat::network::x25519_pubkey swarm_pubkey,
+        const std::vector<std::pair<swarm_id_t, std::vector<master_node>>> all_swarms) {
     // If there is only a single swarm then return it
     if (all_swarms.size() == 1)
         return all_swarms.front();
@@ -67,4 +67,4 @@ std::pair<swarm_id_t, std::vector<service_node>> get_swarm(
     return *swarm;
 }
 
-}  // namespace session::network::swarm
+}  // namespace bchat::network::swarm

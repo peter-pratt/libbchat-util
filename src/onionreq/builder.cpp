@@ -1,4 +1,4 @@
-#include "session/onionreq/builder.hpp"
+#include "bchat/onionreq/builder.hpp"
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -21,24 +21,24 @@
 #include <oxen/log/format.hpp>
 #include <oxen/quic/address.hpp>
 
-#include "session/export.h"
-#include "session/network/key_types.hpp"
-#include "session/network/service_node.hpp"
-#include "session/network/bchat_network_types.hpp"
-#include "session/onionreq/builder.h"
-#include "session/onionreq/hop_encryption.hpp"
-#include "session/util.hpp"
-#include "session/xed25519.hpp"
+#include "bchat/export.h"
+#include "bchat/network/key_types.hpp"
+#include "bchat/network/master_node.hpp"
+#include "bchat/network/bchat_network_types.hpp"
+#include "bchat/onionreq/builder.h"
+#include "bchat/onionreq/hop_encryption.hpp"
+#include "bchat/util.hpp"
+#include "bchat/xed25519.hpp"
 
 using namespace std::literals;
 using namespace oxen::log::literals;
-using namespace session::network;
+using namespace bchat::network;
 
-namespace session::onionreq {
+namespace bchat::onionreq {
 
 namespace detail {
-    session::network::x25519_pubkey pubkey_for_destination(network_destination destination) {
-        if (auto* dest = std::get_if<network::service_node>(&destination))
+    bchat::network::x25519_pubkey pubkey_for_destination(network_destination destination) {
+        if (auto* dest = std::get_if<network::master_node>(&destination))
             return network::compute_x25519_pubkey(dest->remote_pubkey);
 
         if (auto* dest = std::get_if<ServerDestination>(&destination))
@@ -69,7 +69,7 @@ EncryptType parse_enc_type(std::string_view enc_type) {
 Builder Builder::make(
         const network_destination& destination,
         const std::string& endpoint,
-        const std::vector<network::service_node>& nodes,
+        const std::vector<network::master_node>& nodes,
         const EncryptType enc_type_) {
     return Builder{destination, endpoint, nodes, enc_type_};
 }
@@ -77,7 +77,7 @@ Builder Builder::make(
 Builder::Builder(
         const network_destination& destination,
         const std::string& endpoint,
-        const std::vector<network::service_node>& nodes,
+        const std::vector<network::master_node>& nodes,
         const EncryptType enc_type_) :
         endpoint_{endpoint},
         enc_type{enc_type_},
@@ -97,7 +97,7 @@ void Builder::add_hop(std::span<const unsigned char> remote_key) {
 void Builder::set_destination(network_destination destination) {
     ed25519_public_key_.reset();
 
-    if (auto* dest = std::get_if<session::network::service_node>(&destination)) {
+    if (auto* dest = std::get_if<bchat::network::master_node>(&destination)) {
         is_v4_request = false;
         ed25519_public_key_.emplace(network::ed25519_pubkey::from_bytes(dest->remote_pubkey));
     } else if (auto* dest = std::get_if<ServerDestination>(&destination)) {
@@ -129,7 +129,7 @@ std::vector<unsigned char> Builder::generate_onion_blob(
 std::vector<unsigned char> Builder::_generate_payload(
         std::optional<std::vector<unsigned char>> body) const {
     // If we don't have the data required for a server request, then assume it's targeting a
-    // service node which has a different structure (`method` is the endpoint and the body is
+    // master node which has a different structure (`method` is the endpoint and the body is
     // `params`)
     if (!host_ || !protocol_ || !method_ || !destination_x25519_public_key_) {
         nlohmann::json params_json;
@@ -171,7 +171,7 @@ std::vector<unsigned char> Builder::_generate_payload(
 
     // If we were given a body, add it to the payload
     if (body && !body->empty())
-        payload.emplace_back(session::to_string(*body));
+        payload.emplace_back(bchat::to_string(*body));
 
     auto result = oxenc::bt_serialize(payload);
     return to_vector(result);
@@ -227,7 +227,7 @@ std::vector<unsigned char> Builder::build(std::vector<unsigned char> payload) {
         HopEncryption e{a, A, false};
 
         // The data we send to the destination differs depending on whether the destination is a
-        // server or a service node
+        // server or a master node
         if (host_ && protocol_ && destination_x25519_public_key_) {
             final_route = {
                     {"host", *host_},
@@ -309,48 +309,48 @@ std::vector<unsigned char> Builder::build(std::vector<unsigned char> payload) {
 
     return result;
 }
-}  // namespace session::onionreq
+}  // namespace bchat::onionreq
 
 namespace {
 
-session::onionreq::Builder& unbox(onion_request_builder_object* builder) {
+bchat::onionreq::Builder& unbox(onion_request_builder_object* builder) {
     assert(builder && builder->internals);
-    return *static_cast<session::onionreq::Builder*>(builder->internals);
+    return *static_cast<bchat::onionreq::Builder*>(builder->internals);
 }
 
 }  // namespace
 
 extern "C" {
 
-LIBSESSION_C_API void onion_request_builder_init(onion_request_builder_object** builder) {
+LIBBCHAT_C_API void onion_request_builder_init(onion_request_builder_object** builder) {
     auto c_builder = std::make_unique<onion_request_builder_object>();
-    c_builder->internals = new session::onionreq::Builder{};
+    c_builder->internals = new bchat::onionreq::Builder{};
     *builder = c_builder.release();
 }
 
-LIBSESSION_C_API void onion_request_builder_free(onion_request_builder_object* builder) {
-    delete static_cast<session::onionreq::Builder*>(builder->internals);
+LIBBCHAT_C_API void onion_request_builder_free(onion_request_builder_object* builder) {
+    delete static_cast<bchat::onionreq::Builder*>(builder->internals);
     delete builder;
 }
 
-LIBSESSION_C_API void onion_request_builder_set_enc_type(
+LIBBCHAT_C_API void onion_request_builder_set_enc_type(
         onion_request_builder_object* builder, ENCRYPT_TYPE enc_type) {
     assert(builder);
 
     switch (enc_type) {
         case ENCRYPT_TYPE::ENCRYPT_TYPE_AES_GCM:
-            unbox(builder).set_enc_type(session::onionreq::EncryptType::aes_gcm);
+            unbox(builder).set_enc_type(bchat::onionreq::EncryptType::aes_gcm);
             break;
 
         case ENCRYPT_TYPE::ENCRYPT_TYPE_X_CHA_CHA_20:
-            unbox(builder).set_enc_type(session::onionreq::EncryptType::xchacha20);
+            unbox(builder).set_enc_type(bchat::onionreq::EncryptType::xchacha20);
             break;
 
         default: throw std::runtime_error{"Invalid encryption type"};
     }
 }
 
-LIBSESSION_C_API void onion_request_builder_set_snode_destination(
+LIBBCHAT_C_API void onion_request_builder_set_mnode_destination(
         onion_request_builder_object* builder,
         const uint8_t ip[4],
         const uint16_t quic_port,
@@ -361,16 +361,16 @@ LIBSESSION_C_API void onion_request_builder_set_snode_destination(
     pubkey.reserve(32);
     oxenc::from_hex(ed25519_pubkey, ed25519_pubkey + 64, std::back_inserter(pubkey));
 
-    unbox(builder).set_destination(session::network::service_node{
-            session::network::ed25519_pubkey::from_bytes(pubkey),
+    unbox(builder).set_destination(bchat::network::master_node{
+            bchat::network::ed25519_pubkey::from_bytes(pubkey),
             oxen::quic::ipv4{std::span<const uint8_t, 4>(ip, 4)},
             0,
             quic_port,
             {0, 0, 0},
-            session::network::INVALID_SWARM_ID});
+            bchat::network::INVALID_SWARM_ID});
 }
 
-LIBSESSION_C_API void onion_request_builder_set_server_destination(
+LIBBCHAT_C_API void onion_request_builder_set_server_destination(
         onion_request_builder_object* builder,
         const char* protocol,
         const char* host,
@@ -379,27 +379,27 @@ LIBSESSION_C_API void onion_request_builder_set_server_destination(
         const char* x25519_pubkey) {
     assert(builder && protocol && host && protocol && x25519_pubkey);
 
-    unbox(builder).set_destination(session::network::ServerDestination{
+    unbox(builder).set_destination(bchat::network::ServerDestination{
             protocol,
             host,
-            session::network::x25519_pubkey::from_hex({x25519_pubkey, 64}),
+            bchat::network::x25519_pubkey::from_hex({x25519_pubkey, 64}),
             port,
             std::nullopt,
             method});
 }
 
-LIBSESSION_C_API void onion_request_builder_add_hop(
+LIBBCHAT_C_API void onion_request_builder_add_hop(
         onion_request_builder_object* builder,
         const char* ed25519_pubkey,
         const char* x25519_pubkey) {
     assert(builder && ed25519_pubkey && x25519_pubkey);
 
     unbox(builder).add_hop(
-            {session::network::ed25519_pubkey::from_hex({ed25519_pubkey, 64}),
-             session::network::x25519_pubkey::from_hex({x25519_pubkey, 64})});
+            {bchat::network::ed25519_pubkey::from_hex({ed25519_pubkey, 64}),
+             bchat::network::x25519_pubkey::from_hex({x25519_pubkey, 64})});
 }
 
-LIBSESSION_C_API bool onion_request_builder_build(
+LIBBCHAT_C_API bool onion_request_builder_build(
         onion_request_builder_object* builder,
         const unsigned char* payload_in,
         size_t payload_in_len,

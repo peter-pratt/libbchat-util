@@ -1,8 +1,8 @@
 #pragma once
 
-#include "session/network/bchat_network_types.h"
-#include "session/network/bchat_network_types.hpp"
+#include "bchat/network/bchat_network_types.h"
+#include "bchat/network/bchat_network_types.hpp"
 
-namespace session::network::detail {
-session_request_params* convert_cpp_request_to_c(const session::network::Request& req);
+namespace bchat::network::detail {
+bchat_request_params* convert_cpp_request_to_c(const bchat::network::Request& req);
 }

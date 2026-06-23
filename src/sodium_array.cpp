@@ -1,8 +1,8 @@
 #include <sodium/utils.h>
 
-#include <session/sodium_array.hpp>
+#include <bchat/sodium_array.hpp>
 
-namespace session {
+namespace bchat {
 
 void* sodium_buffer_allocate(size_t length) {
     if (auto* p = sodium_malloc(length))
@@ -20,4 +20,4 @@ void sodium_zero_buffer(void* ptr, size_t size) {
         sodium_memzero(ptr, size);
 }
 
-}  // namespace session
+}  // namespace bchat

@@ -1,22 +1,22 @@
 #include <oxenc/hex.h>
-#include <session/config/user_groups.h>
+#include <bchat/config/user_groups.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <iostream>
-#include <session/config/user_groups.hpp>
+#include <bchat/config/user_groups.hpp>
 #include <string_view>
 #include <variant>
 
-#include "session/config/notify.hpp"
+#include "bchat/config/notify.hpp"
 #include "utils.hpp"
 
 static constexpr int64_t created_ts = 1680064059;
 
 TEST_CASE("Open Group URLs", "[config][community_urls]") {
 
-    using namespace session::config;
+    using namespace bchat::config;
     auto [base1, room1, pk1] = community::parse_full_url(
             "https://example.com/"
             "SomeRoom?public_key=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
@@ -94,7 +94,7 @@ TEST_CASE("User Groups", "[config][groups]") {
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::UserGroups groups{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::UserGroups groups{std::span<const unsigned char>{seed}, std::nullopt};
 
     constexpr auto definitely_real_id =
             "055000000000000000000000000000000000000000000000000000000000000000"sv;
@@ -110,7 +110,7 @@ TEST_CASE("User Groups", "[config][groups]") {
 
     auto c = groups.get_or_construct_legacy_group(definitely_real_id);
 
-    CHECK(c.session_id == definitely_real_id);
+    CHECK(c.bchat_id == definitely_real_id);
     CHECK(c.disappearing_timer == 0min);
     CHECK(c.enc_pubkey.empty());
     CHECK(c.enc_seckey.empty());
@@ -118,7 +118,7 @@ TEST_CASE("User Groups", "[config][groups]") {
     CHECK(c.name == "");
     CHECK(c.members().empty());
     CHECK(c.joined_at == 0);
-    CHECK(c.notifications == session::config::notify_mode::defaulted);
+    CHECK(c.notifications == bchat::config::notify_mode::defaulted);
     CHECK(c.mute_until == 0);
 
     CHECK_FALSE(groups.needs_push());
@@ -137,7 +137,7 @@ TEST_CASE("User Groups", "[config][groups]") {
     c.name = "Englishmen";
     c.disappearing_timer = 60min;
     c.joined_at = created_ts * 1000;  // milliseconds
-    c.notifications = session::config::notify_mode::mentions_only;
+    c.notifications = bchat::config::notify_mode::mentions_only;
     c.mute_until = now + 3600;
     CHECK(c.insert(users[0], false));
     CHECK(c.insert(users[1], true));
@@ -164,7 +164,7 @@ TEST_CASE("User Groups", "[config][groups]") {
     std::array<unsigned char, 64> lg_sk;
     crypto_sign_ed25519_seed_keypair(
             lg_pk.data(), lg_sk.data(), reinterpret_cast<const unsigned char*>(lgroup_seed.data()));
-    // Note: this isn't exactly what Session actually does here for legacy groups (rather it
+    // Note: this isn't exactly what BChat actually does here for legacy groups (rather it
     // uses X25519 keys) but for this test the distinction doesn't matter.
     c.enc_pubkey.assign(lg_pk.data(), lg_pk.data() + lg_pk.size());
     c.enc_seckey.assign(lg_sk.data(), lg_sk.data() + 32);
@@ -211,7 +211,7 @@ TEST_CASE("User Groups", "[config][groups]") {
     CHECK(groups.needs_dump());
     CHECK_FALSE(groups.needs_push());
 
-    session::config::UserGroups g2{seed, groups.dump()};
+    bchat::config::UserGroups g2{seed, groups.dump()};
     CHECK_FALSE(groups.needs_push());
     CHECK_FALSE(groups.needs_dump());
     std::tie(seqno, to_push, obs) = groups.push();
@@ -239,12 +239,12 @@ TEST_CASE("User Groups", "[config][groups]") {
     CHECK(to_hex(c1.enc_pubkey) == oxenc::to_hex(lg_pk.begin(), lg_pk.end()));
     CHECK(to_hex(c1.enc_seckey) == oxenc::to_hex(lg_sk.begin(), lg_sk.begin() + 32));
     CHECK(c1.disappearing_timer == 60min);
-    CHECK(c1.session_id == definitely_real_id);
+    CHECK(c1.bchat_id == definitely_real_id);
     CHECK(c1.priority == 3);
     CHECK(c1.members() == expected_members);
     CHECK(c1.name == "Englishmen");
     CHECK(c1.joined_at == created_ts);
-    CHECK(c1.notifications == session::config::notify_mode::mentions_only);
+    CHECK(c1.notifications == bchat::config::notify_mode::mentions_only);
     CHECK(c1.mute_until == now + 3600);
 
     CHECK_FALSE(g2.needs_push());
@@ -256,13 +256,13 @@ TEST_CASE("User Groups", "[config][groups]") {
     for (auto* g : {&groups, &g2}) {
         std::vector<std::string> seen;
         for (const auto& group : *g) {
-            if (auto* lg = std::get_if<session::config::legacy_group_info>(&group)) {
+            if (auto* lg = std::get_if<bchat::config::legacy_group_info>(&group)) {
                 auto [admins, members] = lg->counts();
                 seen.push_back(
                         "legacy: {}, {} admins, {} members"_format(lg->name, admins, members));
-            } else if (auto* og = std::get_if<session::config::community_info>(&group)) {
+            } else if (auto* og = std::get_if<bchat::config::community_info>(&group)) {
                 seen.push_back("community: " + og->base_url() + "/r/" + og->room());
-            } else if (auto* g = std::get_if<session::config::group_info>(&group)) {
+            } else if (auto* g = std::get_if<bchat::config::group_info>(&group)) {
                 seen.push_back("group: " + g->id);
             } else {
                 seen.push_back("unknown");
@@ -401,13 +401,13 @@ TEST_CASE("User Groups", "[config][groups]") {
     for (auto* g : {&groups, &g2}) {
         std::vector<std::string> seen;
         for (const auto& group : *g) {
-            if (auto* lg = std::get_if<session::config::legacy_group_info>(&group)) {
+            if (auto* lg = std::get_if<bchat::config::legacy_group_info>(&group)) {
                 auto [admins, members] = lg->counts();
                 seen.push_back(
                         "legacy: {}, {} admins, {} members"_format(lg->name, admins, members));
-            } else if (auto* og = std::get_if<session::config::community_info>(&group)) {
+            } else if (auto* og = std::get_if<bchat::config::community_info>(&group)) {
                 seen.push_back("community: " + og->base_url() + "/r/" + og->room());
-            } else if (auto* g = std::get_if<session::config::group_info>(&group)) {
+            } else if (auto* g = std::get_if<bchat::config::group_info>(&group)) {
                 seen.push_back("group: " + g->id);
             } else {
                 seen.push_back("unknown");
@@ -442,7 +442,7 @@ TEST_CASE("User Groups -- (non-legacy) groups", "[config][groups][new]") {
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::UserGroups groups{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::UserGroups groups{std::span<const unsigned char>{seed}, std::nullopt};
 
     constexpr auto definitely_real_id =
             "035000000000000000000000000000000000000000000000000000000000000000"sv;
@@ -458,10 +458,10 @@ TEST_CASE("User Groups -- (non-legacy) groups", "[config][groups][new]") {
     CHECK(c.id == definitely_real_id);
     CHECK(c.priority == 0);
     CHECK(c.joined_at == 0);
-    CHECK(c.notifications == session::config::notify_mode::defaulted);
+    CHECK(c.notifications == bchat::config::notify_mode::defaulted);
     CHECK(c.mute_until == 0);
 
-    c.secretkey = session::to_vector(ed_sk);  // This *isn't* the right secret key for the group, so
+    c.secretkey = bchat::to_vector(ed_sk);  // This *isn't* the right secret key for the group, so
                                               // won't propagate, and so auth data will:
     c.auth_data =
             "01020304050000000000000000000000000000000000000000000000000000000000000000000000000000"
@@ -478,7 +478,7 @@ TEST_CASE("User Groups -- (non-legacy) groups", "[config][groups][new]") {
 
     auto d1 = groups.dump();
 
-    session::config::UserGroups g2{std::span<const unsigned char>{seed}, d1};
+    bchat::config::UserGroups g2{std::span<const unsigned char>{seed}, d1};
 
     auto c2 = g2.get_group(definitely_real_id);
     REQUIRE(c2.has_value());
@@ -486,14 +486,14 @@ TEST_CASE("User Groups -- (non-legacy) groups", "[config][groups][new]") {
     CHECK(c2->id == definitely_real_id);
     CHECK(c2->priority == 0);
     CHECK(c2->joined_at == 0);
-    CHECK(c2->notifications == session::config::notify_mode::defaulted);
+    CHECK(c2->notifications == bchat::config::notify_mode::defaulted);
     CHECK(c2->mute_until == 0);
     CHECK_FALSE(c2->invited);
     CHECK(c2->name == "");
 
     c2->priority = 123;
     c2->joined_at = (int64_t)1'234'567'890 * 1'000;
-    c2->notifications = session::config::notify_mode::mentions_only;
+    c2->notifications = bchat::config::notify_mode::mentions_only;
     c2->mute_until = (int64_t)456'789'012 * 1'000'000;
     c2->invited = true;
     c2->name = "Magic Special Room";
@@ -502,7 +502,7 @@ TEST_CASE("User Groups -- (non-legacy) groups", "[config][groups][new]") {
 
     auto c2b = g2.get_or_construct_group("03" + oxenc::to_hex(ed_pk.begin(), ed_pk.end()));
     c2b.secretkey =
-            session::to_vector(ed_sk);  // This one does match the group ID, so should propagate
+            bchat::to_vector(ed_sk);  // This one does match the group ID, so should propagate
     c2b.auth_data =                     // should get ignored, since we have a valid secret key set:
             "01020304050000000000000000000000000000000000000000000000000000000000000000000000000000"
             "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
@@ -527,7 +527,7 @@ TEST_CASE("User Groups -- (non-legacy) groups", "[config][groups][new]") {
     CHECK(c3->id == definitely_real_id);
     CHECK(c3->priority == 123);
     CHECK(c3->joined_at == 1234567890);
-    CHECK(c3->notifications == session::config::notify_mode::mentions_only);
+    CHECK(c3->notifications == bchat::config::notify_mode::mentions_only);
     CHECK(c3->mute_until == 456789012);
     CHECK(c3->invited);
     CHECK(c3->name == "Magic Special Room");
@@ -639,11 +639,11 @@ TEST_CASE("User Groups members C API", "[config][groups][c]") {
             {users[0], false}, {users[1], false}, {users[2], true}};
     std::map<std::string, bool> found_members;
 
-    const char* session_id;
+    const char* bchat_id;
     bool admin;
     ugroups_legacy_members_iterator* it = ugroups_legacy_members_begin(group);
-    while (ugroups_legacy_members_next(it, &session_id, &admin)) {
-        found_members[session_id] = admin;
+    while (ugroups_legacy_members_next(it, &bchat_id, &admin)) {
+        found_members[bchat_id] = admin;
     }
     ugroups_legacy_members_free(it);
     CHECK(found_members == expected_members);
@@ -662,8 +662,8 @@ TEST_CASE("User Groups members C API", "[config][groups][c]") {
     it = ugroups_legacy_members_begin(group);
     members = 0;
     admins = 0;
-    while (ugroups_legacy_members_next(it, &session_id, &admin)) {
-        if (session_id == users[1]) {
+    while (ugroups_legacy_members_next(it, &bchat_id, &admin)) {
+        if (bchat_id == users[1]) {
             ugroups_legacy_members_erase(it);
             // Adding while iterating is allowed (if you add ones that come after the current point,
             // you'll iterate into them; if they come before you won't).
@@ -687,7 +687,7 @@ TEST_CASE("User Groups members C API", "[config][groups][c]") {
     // Non-freeing, so we can keep using `group`; this is less common:
     user_groups_set_legacy_group(conf, group);
 
-    group->session_id[2] = 'e';
+    group->bchat_id[2] = 'e';
     // The "normal" way to set a group when you're done with it (also properly frees `group`).
     user_groups_set_free_legacy_group(conf, group);
 
@@ -719,7 +719,7 @@ TEST_CASE("User Groups members C API", "[config][groups][c]") {
     REQUIRE(keys);
     REQUIRE(key_len == 1);
 
-    session::config::UserGroups c2{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::UserGroups c2{std::span<const unsigned char>{seed}, std::nullopt};
 
     REQUIRE(to_push->n_configs == 1);
     std::vector<std::pair<std::string, std::span<const unsigned char>>> to_merge;
@@ -750,7 +750,7 @@ TEST_CASE("User groups empty member bug", "[config][groups][bug]") {
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::UserGroups c{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::UserGroups c{std::span<const unsigned char>{seed}, std::nullopt};
 
     CHECK_FALSE(c.needs_push());
 
@@ -836,7 +836,7 @@ TEST_CASE("User groups mute_until & joined_at are always seconds", "[config][gro
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::UserGroups c{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::UserGroups c{std::span<const unsigned char>{seed}, std::nullopt};
 
     CHECK_FALSE(c.needs_push());
 
@@ -902,7 +902,7 @@ TEST_CASE("User groups mute_until & joined_at are always seconds", "[config][gro
                 "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef64313a21303a313a4b"
                 "303a"
                 "313a6a303a65656565313a28303a313a296c6565"_hexbytes;
-        session::config::UserGroups c2{std::span<const unsigned char>{seed}, dump_with_not_seconds};
+        bchat::config::UserGroups c2{std::span<const unsigned char>{seed}, dump_with_not_seconds};
 
         auto gr = c2.get_or_construct_group(
                 "031234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");

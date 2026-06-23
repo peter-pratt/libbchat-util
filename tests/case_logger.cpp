@@ -21,7 +21,7 @@ struct formatter<Catch::StringRef, char> : formatter<std::string_view> {
 };
 }  // namespace fmt
 
-namespace session::test {
+namespace bchat::test {
 using namespace Catch;
 
 static auto cat = oxen::log::Cat("testcase");
@@ -88,6 +88,6 @@ class CaseLogger : public Catch::EventListenerBase {
     }
 };
 
-}  // namespace session::test
+}  // namespace bchat::test
 
-CATCH_REGISTER_LISTENER(session::test::CaseLogger)
+CATCH_REGISTER_LISTENER(bchat::test::CaseLogger)

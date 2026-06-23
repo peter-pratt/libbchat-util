@@ -1,4 +1,4 @@
-#include "session/config/contacts.hpp"
+#include "bchat/config/contacts.hpp"
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -10,15 +10,15 @@
 #include <variant>
 
 #include "internal.hpp"
-#include "session/blinding.hpp"
-#include "session/config/contacts.h"
-#include "session/config/error.h"
-#include "session/export.h"
-#include "session/types.hpp"
-#include "session/util.hpp"
+#include "bchat/blinding.hpp"
+#include "bchat/config/contacts.h"
+#include "bchat/config/error.h"
+#include "bchat/export.h"
+#include "bchat/types.hpp"
+#include "bchat/util.hpp"
 
 using namespace std::literals;
-using namespace session::config;
+using namespace bchat::config;
 using namespace oxen::log::literals;
 
 // Check for agreement between various C/C++ types
@@ -33,12 +33,12 @@ static_assert(CONVO_NOTIFY_ALL == static_cast<int>(notify_mode::all));
 static_assert(CONVO_NOTIFY_DISABLED == static_cast<int>(notify_mode::disabled));
 static_assert(CONVO_NOTIFY_MENTIONS_ONLY == static_cast<int>(notify_mode::mentions_only));
 
-LIBSESSION_C_API bool session_id_is_valid(const char* session_id) {
-    return std::strlen(session_id) == 66 && oxenc::is_hex(session_id, session_id + 66);
+LIBBCHAT_C_API bool bchat_id_is_valid(const char* bchat_id) {
+    return std::strlen(bchat_id) == 66 && oxenc::is_hex(bchat_id, bchat_id + 66);
 }
 
-contact_info::contact_info(std::string sid) : session_id{std::move(sid)} {
-    check_session_id(session_id);
+contact_info::contact_info(std::string sid) : bchat_id{std::move(sid)} {
+    check_bchat_id(bchat_id);
 }
 
 void contact_info::set_name(std::string n) {
@@ -116,13 +116,13 @@ void contact_info::load(const dict& info_dict) {
 
     created = to_epoch_seconds(int_or_0(info_dict, "j"));
 
-    const session::config::set* profile_bitset_set = maybe_set(info_dict, "f");
+    const bchat::config::set* profile_bitset_set = maybe_set(info_dict, "f");
     if (profile_bitset_set)
         profile_bitset.data = bitset_from_set_of_int64_or_0(*profile_bitset_set);
 }
 
 void contact_info::into(contacts_contact& c) const {
-    std::memcpy(c.session_id, session_id.data(), 67);
+    std::memcpy(c.bchat_id, bchat_id.data(), 67);
     copy_c_str(c.name, name);
     copy_c_str(c.nickname, nickname);
     if (profile_picture) {
@@ -146,7 +146,7 @@ void contact_info::into(contacts_contact& c) const {
     c.profile_bitset.data = profile_bitset.data;
 }
 
-contact_info::contact_info(const contacts_contact& c) : session_id{c.session_id, 66} {
+contact_info::contact_info(const contacts_contact& c) : bchat_id{c.bchat_id, 66} {
     assert(std::strlen(c.name) <= MAX_NAME_LENGTH);
     name = c.name;
     assert(std::strlen(c.nickname) <= MAX_NAME_LENGTH);
@@ -172,7 +172,7 @@ contact_info::contact_info(const contacts_contact& c) : session_id{c.session_id,
 }
 
 std::optional<contact_info> Contacts::get(std::string_view pubkey_hex) const {
-    std::string pubkey = session_id_to_bytes(pubkey_hex);
+    std::string pubkey = bchat_id_to_bytes(pubkey_hex);
 
     auto* info_dict = data["c"][pubkey].dict();
     if (!info_dict)
@@ -191,7 +191,7 @@ contact_info Contacts::get_or_construct(std::string_view pubkey_hex) const {
 }
 
 void Contacts::set(const contact_info& contact) {
-    std::string pk = session_id_to_bytes(contact.session_id);
+    std::string pk = bchat_id_to_bytes(contact.bchat_id);
     auto info = data["c"][pk];
 
     // Always set the name, even if empty, to keep the dict from getting pruned if there are no
@@ -231,82 +231,82 @@ void Contacts::set(const contact_info& contact) {
     set_int64_set_from_bitset(info["f"], contact.profile_bitset.data);
 }
 
-void Contacts::set_name(std::string_view session_id, std::string name) {
-    auto c = get_or_construct(session_id);
+void Contacts::set_name(std::string_view bchat_id, std::string name) {
+    auto c = get_or_construct(bchat_id);
     c.set_name(std::move(name));
     set(c);
 }
-void Contacts::set_nickname(std::string_view session_id, std::string nickname) {
-    auto c = get_or_construct(session_id);
+void Contacts::set_nickname(std::string_view bchat_id, std::string nickname) {
+    auto c = get_or_construct(bchat_id);
     c.set_nickname(std::move(nickname));
     set(c);
 }
-void Contacts::set_nickname_truncated(std::string_view session_id, std::string nickname) {
-    auto c = get_or_construct(session_id);
+void Contacts::set_nickname_truncated(std::string_view bchat_id, std::string nickname) {
+    auto c = get_or_construct(bchat_id);
     c.set_nickname_truncated(std::move(nickname));
     set(c);
 }
-void Contacts::set_profile_pic(std::string_view session_id, profile_pic pic) {
-    auto c = get_or_construct(session_id);
+void Contacts::set_profile_pic(std::string_view bchat_id, profile_pic pic) {
+    auto c = get_or_construct(bchat_id);
     c.profile_picture = std::move(pic);
     set(c);
 }
 void Contacts::set_profile_updated(
-        std::string_view session_id, std::chrono::sys_seconds profile_updated) {
-    auto c = get_or_construct(session_id);
+        std::string_view bchat_id, std::chrono::sys_seconds profile_updated) {
+    auto c = get_or_construct(bchat_id);
     c.profile_updated = profile_updated;
     set(c);
 }
-void Contacts::set_approved(std::string_view session_id, bool approved) {
-    auto c = get_or_construct(session_id);
+void Contacts::set_approved(std::string_view bchat_id, bool approved) {
+    auto c = get_or_construct(bchat_id);
     c.approved = approved;
     set(c);
 }
-void Contacts::set_approved_me(std::string_view session_id, bool approved_me) {
-    auto c = get_or_construct(session_id);
+void Contacts::set_approved_me(std::string_view bchat_id, bool approved_me) {
+    auto c = get_or_construct(bchat_id);
     c.approved_me = approved_me;
     set(c);
 }
-void Contacts::set_blocked(std::string_view session_id, bool blocked) {
-    auto c = get_or_construct(session_id);
+void Contacts::set_blocked(std::string_view bchat_id, bool blocked) {
+    auto c = get_or_construct(bchat_id);
     c.blocked = blocked;
     set(c);
 }
 
-void Contacts::set_priority(std::string_view session_id, int priority) {
-    auto c = get_or_construct(session_id);
+void Contacts::set_priority(std::string_view bchat_id, int priority) {
+    auto c = get_or_construct(bchat_id);
     c.priority = priority;
     set(c);
 }
 
-void Contacts::set_notifications(std::string_view session_id, notify_mode notifications) {
-    auto c = get_or_construct(session_id);
+void Contacts::set_notifications(std::string_view bchat_id, notify_mode notifications) {
+    auto c = get_or_construct(bchat_id);
     c.notifications = notifications;
     set(c);
 }
 
 void Contacts::set_expiry(
-        std::string_view session_id, expiration_mode mode, std::chrono::seconds timer) {
-    auto c = get_or_construct(session_id);
+        std::string_view bchat_id, expiration_mode mode, std::chrono::seconds timer) {
+    auto c = get_or_construct(bchat_id);
     c.exp_mode = mode;
     c.exp_timer = c.exp_mode == expiration_mode::none ? 0s : timer;
     set(c);
 }
 
-void Contacts::set_created(std::string_view session_id, int64_t timestamp) {
-    auto c = get_or_construct(session_id);
+void Contacts::set_created(std::string_view bchat_id, int64_t timestamp) {
+    auto c = get_or_construct(bchat_id);
     c.created = to_epoch_seconds(timestamp);
     set(c);
 }
 
-void Contacts::set_pro_features(std::string_view session_id, ProProfileBitset features) {
-    auto c = get_or_construct(session_id);
+void Contacts::set_pro_features(std::string_view bchat_id, ProProfileBitset features) {
+    auto c = get_or_construct(bchat_id);
     c.profile_bitset = features;
     set(c);
 }
 
-bool Contacts::erase(std::string_view session_id) {
-    std::string pk = session_id_to_bytes(session_id);
+bool Contacts::erase(std::string_view bchat_id) {
+    std::string pk = bchat_id_to_bytes(bchat_id);
     auto info = data["c"][pk];
     bool ret = info.exists();
     info.erase();
@@ -325,11 +325,11 @@ blinded_contact_info::blinded_contact_info(
         std::string_view blinded_id) :
         comm{community(
                 std::move(community_base_url), blinded_id.substr(2), std::move(community_pubkey))} {
-    auto prefix = get_session_id_prefix(blinded_id);
-    legacy_blinding = (prefix == session::SessionIDPrefix::community_blinded_legacy);
+    auto prefix = get_bchat_id_prefix(blinded_id);
+    legacy_blinding = (prefix == bchat::BChatIDPrefix::community_blinded_legacy);
 
-    if (prefix != session::SessionIDPrefix::community_blinded &&
-        prefix != session::SessionIDPrefix::community_blinded_legacy)
+    if (prefix != bchat::BChatIDPrefix::community_blinded &&
+        prefix != bchat::BChatIDPrefix::community_blinded_legacy)
         throw std::invalid_argument{
                 "Invalid blinded ID: Expected '15' or '25' prefix; got " + std::string{blinded_id}};
 }
@@ -351,17 +351,17 @@ void blinded_contact_info::load(const dict& info_dict) {
     created = ts_or_epoch(info_dict, "j");
     auto it = info_dict.find("f");
     if (it != info_dict.end()) {
-        if (auto* set = std::get_if<session::config::set>(&it->second))
+        if (auto* set = std::get_if<bchat::config::set>(&it->second))
             profile_bitset.data = bitset_from_set_of_int64_or_0(*set);
     }
 }
 
 void blinded_contact_info::into(contacts_blinded_contact& c) const {
     copy_c_str(c.base_url, comm.base_url());
-    c.session_id[0] = (legacy_blinding ? '1' : '2');
-    c.session_id[1] = '5';
-    std::memcpy(c.session_id + 2, session_id().data(), 64);
-    c.session_id[66] = '\0';
+    c.bchat_id[0] = (legacy_blinding ? '1' : '2');
+    c.bchat_id[1] = '5';
+    std::memcpy(c.bchat_id + 2, bchat_id().data(), 64);
+    c.bchat_id[66] = '\0';
     std::memcpy(c.pubkey, comm.pubkey().data(), 32);
     copy_c_str(c.name, name);
     if (profile_picture) {
@@ -378,7 +378,7 @@ void blinded_contact_info::into(contacts_blinded_contact& c) const {
 }
 
 blinded_contact_info::blinded_contact_info(const contacts_blinded_contact& c) {
-    comm = community(c.base_url, {c.session_id + 2, 64}, c.pubkey);
+    comm = community(c.base_url, {c.bchat_id + 2, 64}, c.pubkey);
     assert(std::strlen(c.name) <= contact_info::MAX_NAME_LENGTH);
     name = c.name;
     assert(std::strlen(c.profile_pic.url) <= profile_pic::MAX_URL_LENGTH);
@@ -393,7 +393,7 @@ blinded_contact_info::blinded_contact_info(const contacts_blinded_contact& c) {
     profile_bitset.data = c.profile_bitset.data;
 }
 
-const std::string blinded_contact_info::session_id() const {
+const std::string blinded_contact_info::bchat_id() const {
     return "{}{}"_format(legacy_blinding ? "15" : "25", comm.room());
 }
 
@@ -439,7 +439,7 @@ ConfigBase::DictFieldProxy Contacts::blinded_contact_field(
 using any_blinded_contact = std::variant<blinded_contact_info>;
 
 std::optional<blinded_contact_info> Contacts::get_blinded(std::string_view blinded_id_hex) const {
-    get_session_id_prefix(blinded_id_hex);
+    get_bchat_id_prefix(blinded_id_hex);
 
     if (auto* b = data["b"].dict()) {
         auto comm = comm_iterator_helper{b->begin(), b->end()};
@@ -448,7 +448,7 @@ std::optional<blinded_contact_info> Contacts::get_blinded(std::string_view blind
         while (!comm.done()) {
             if (comm.load<blinded_contact_info>(val))
                 if (auto* ptr = std::get_if<blinded_contact_info>(val.get());
-                    ptr && ptr->session_id() == blinded_id_hex)
+                    ptr && ptr->bchat_id() == blinded_id_hex)
                     return *ptr;
             comm.advance();
         }
@@ -488,7 +488,7 @@ std::vector<blinded_contact_info> Contacts::blinded() const {
 
 void Contacts::set_blinded(const blinded_contact_info& bc) {
     data["b"][bc.comm.base_url()]["#"] = bc.comm.pubkey();
-    auto info = blinded_contact_field(bc);  // data["b"][base]["R"][bc_session_id_without_prefix]
+    auto info = blinded_contact_field(bc);  // data["b"][base]["R"][bc_bchat_id_without_prefix]
 
     // Always set the name, even if empty, to keep the dict from getting pruned if there are no
     // other entries.
@@ -508,10 +508,10 @@ void Contacts::set_blinded(const blinded_contact_info& bc) {
 }
 
 bool Contacts::erase_blinded(std::string_view base_url_, std::string_view blinded_id) {
-    auto prefix = get_session_id_prefix(blinded_id);
+    auto prefix = get_bchat_id_prefix(blinded_id);
 
-    if (prefix != session::SessionIDPrefix::community_blinded &&
-        prefix != session::SessionIDPrefix::community_blinded_legacy)
+    if (prefix != bchat::BChatIDPrefix::community_blinded &&
+        prefix != bchat::BChatIDPrefix::community_blinded_legacy)
         throw std::invalid_argument{
                 "Invalid blinded ID: Expected '15' or '25' prefix; got " + std::string{blinded_id}};
 
@@ -565,9 +565,9 @@ Contacts::iterator& Contacts::iterator::operator++() {
 
 extern "C" {
 
-LIBSESSION_C_API const size_t CONTACT_MAX_NAME_LENGTH = contact_info::MAX_NAME_LENGTH;
+LIBBCHAT_C_API const size_t CONTACT_MAX_NAME_LENGTH = contact_info::MAX_NAME_LENGTH;
 
-LIBSESSION_C_API int contacts_init(
+LIBBCHAT_C_API int contacts_init(
         config_object** conf,
         const unsigned char* ed25519_secretkey_bytes,
         const unsigned char* dumpstr,
@@ -576,12 +576,12 @@ LIBSESSION_C_API int contacts_init(
     return c_wrapper_init<Contacts>(conf, ed25519_secretkey_bytes, dumpstr, dumplen, error);
 }
 
-LIBSESSION_C_API bool contacts_get(
-        config_object* conf, contacts_contact* contact, const char* session_id) {
+LIBBCHAT_C_API bool contacts_get(
+        config_object* conf, contacts_contact* contact, const char* bchat_id) {
     return wrap_exceptions(
             conf,
             [&] {
-                if (auto c = unbox<Contacts>(conf)->get(session_id)) {
+                if (auto c = unbox<Contacts>(conf)->get(bchat_id)) {
                     c->into(*contact);
                     return true;
                 }
@@ -590,18 +590,18 @@ LIBSESSION_C_API bool contacts_get(
             false);
 }
 
-LIBSESSION_C_API bool contacts_get_or_construct(
-        config_object* conf, contacts_contact* contact, const char* session_id) {
+LIBBCHAT_C_API bool contacts_get_or_construct(
+        config_object* conf, contacts_contact* contact, const char* bchat_id) {
     return wrap_exceptions(
             conf,
             [&] {
-                unbox<Contacts>(conf)->get_or_construct(session_id).into(*contact);
+                unbox<Contacts>(conf)->get_or_construct(bchat_id).into(*contact);
                 return true;
             },
             false);
 }
 
-LIBSESSION_C_API bool contacts_set(config_object* conf, const contacts_contact* contact) {
+LIBBCHAT_C_API bool contacts_set(config_object* conf, const contacts_contact* contact) {
     return wrap_exceptions(
             conf,
             [&] {
@@ -611,19 +611,19 @@ LIBSESSION_C_API bool contacts_set(config_object* conf, const contacts_contact* 
             false);
 }
 
-LIBSESSION_C_API bool contacts_erase(config_object* conf, const char* session_id) {
+LIBBCHAT_C_API bool contacts_erase(config_object* conf, const char* bchat_id) {
     try {
-        return unbox<Contacts>(conf)->erase(session_id);
+        return unbox<Contacts>(conf)->erase(bchat_id);
     } catch (...) {
         return false;
     }
 }
 
-LIBSESSION_C_API size_t contacts_size(const config_object* conf) {
+LIBBCHAT_C_API size_t contacts_size(const config_object* conf) {
     return unbox<Contacts>(conf)->size();
 }
 
-LIBSESSION_C_API bool contacts_get_blinded(
+LIBBCHAT_C_API bool contacts_get_blinded(
         config_object* conf, const char* blinded_id, contacts_blinded_contact* blinded_contact) {
     return wrap_exceptions(
             conf,
@@ -637,7 +637,7 @@ LIBSESSION_C_API bool contacts_get_blinded(
             false);
 }
 
-LIBSESSION_C_API bool contacts_get_or_construct_blinded(
+LIBBCHAT_C_API bool contacts_get_or_construct_blinded(
         config_object* conf,
         const char* community_base_url,
         const char* community_pubkey_hex,
@@ -655,7 +655,7 @@ LIBSESSION_C_API bool contacts_get_or_construct_blinded(
             false);
 }
 
-LIBSESSION_C_API contacts_blinded_contact_list* contacts_blinded(const config_object* conf) {
+LIBBCHAT_C_API contacts_blinded_contact_list* contacts_blinded(const config_object* conf) {
     try {
         auto cpp_contacts = unbox<Contacts>(conf)->blinded();
 
@@ -699,7 +699,7 @@ LIBSESSION_C_API contacts_blinded_contact_list* contacts_blinded(const config_ob
     }
 }
 
-LIBSESSION_C_API bool contacts_set_blinded(
+LIBBCHAT_C_API bool contacts_set_blinded(
         config_object* conf, const contacts_blinded_contact* bc) {
     return wrap_exceptions(
             conf,
@@ -710,7 +710,7 @@ LIBSESSION_C_API bool contacts_set_blinded(
             false);
 }
 
-LIBSESSION_C_API bool contacts_erase_blinded(
+LIBBCHAT_C_API bool contacts_erase_blinded(
         config_object* conf, const char* community_base_url, const char* blinded_id) {
     try {
         return unbox<Contacts>(conf)->erase_blinded(community_base_url, blinded_id);
@@ -719,18 +719,18 @@ LIBSESSION_C_API bool contacts_erase_blinded(
     }
 }
 
-LIBSESSION_C_API contacts_iterator* contacts_iterator_new(const config_object* conf) {
+LIBBCHAT_C_API contacts_iterator* contacts_iterator_new(const config_object* conf) {
     auto* it = new contacts_iterator{};
     it->_internals = new Contacts::iterator{unbox<Contacts>(conf)->begin()};
     return it;
 }
 
-LIBSESSION_C_API void contacts_iterator_free(contacts_iterator* it) {
+LIBBCHAT_C_API void contacts_iterator_free(contacts_iterator* it) {
     delete static_cast<Contacts::iterator*>(it->_internals);
     delete it;
 }
 
-LIBSESSION_C_API bool contacts_iterator_done(contacts_iterator* it, contacts_contact* c) {
+LIBBCHAT_C_API bool contacts_iterator_done(contacts_iterator* it, contacts_contact* c) {
     auto& real = *static_cast<Contacts::iterator*>(it->_internals);
     if (real.done())
         return true;
@@ -738,7 +738,7 @@ LIBSESSION_C_API bool contacts_iterator_done(contacts_iterator* it, contacts_con
     return false;
 }
 
-LIBSESSION_C_API void contacts_iterator_advance(contacts_iterator* it) {
+LIBBCHAT_C_API void contacts_iterator_advance(contacts_iterator* it) {
     ++*static_cast<Contacts::iterator*>(it->_internals);
 }
 

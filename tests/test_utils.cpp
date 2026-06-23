@@ -3,10 +3,10 @@
 #include "utils.hpp"
 
 TEST_CASE("Network", "[network][parse_url]") {
-    auto [proto1, host1, port1, path1] = session::parse_url("HTTPS://example.com/test");
-    auto [proto2, host2, port2, path2] = session::parse_url("http://example2.com:1234/test/123456");
-    auto [proto3, host3, port3, path3] = session::parse_url("https://example3.com");
-    auto [proto4, host4, port4, path4] = session::parse_url("https://example4.com/test?value=test");
+    auto [proto1, host1, port1, path1] = bchat::parse_url("HTTPS://example.com/test");
+    auto [proto2, host2, port2, path2] = bchat::parse_url("http://example2.com:1234/test/123456");
+    auto [proto3, host3, port3, path3] = bchat::parse_url("https://example3.com");
+    auto [proto4, host4, port4, path4] = bchat::parse_url("https://example4.com/test?value=test");
 
     CHECK(proto1 == "https://");
     CHECK(proto2 == "http://");

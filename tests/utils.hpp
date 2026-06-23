@@ -13,14 +13,14 @@
 #include <string_view>
 #include <vector>
 
-#include "session/types.hpp"
-#include "session/util.hpp"
+#include "bchat/types.hpp"
+#include "bchat/util.hpp"
 
 using namespace std::literals;
 using namespace oxenc::literals;
 using namespace oxen::log::literals;
 
-namespace session {
+namespace bchat {
 
 /// RAII class that resets the log level for the given category while the object is alive, then
 /// resets it to what it was at construction when the object is destroyed.
@@ -127,7 +127,7 @@ class CallTracker {
     }
 };
 
-}  // namespace session
+}  // namespace bchat
 
 inline std::vector<unsigned char> operator""_bytes(const char* x, size_t n) {
     auto begin = reinterpret_cast<const unsigned char*>(x);
@@ -182,12 +182,12 @@ inline std::string printable(std::span<const unsigned char> x) {
     return p;
 }
 inline std::string printable(std::string_view x) {
-    return printable(session::to_span(x));
+    return printable(bchat::to_span(x));
 }
 template <typename... T>
     requires(sizeof...(T) > 0)
 inline std::string printable(fmt::format_string<T...> format, T&&... args) {
-    return printable(session::to_span(fmt::format(format, std::forward<T>(args)...)));
+    return printable(bchat::to_span(fmt::format(format, std::forward<T>(args)...)));
 }
 std::string printable(const unsigned char* x) = delete;
 inline std::string printable(const unsigned char* x, size_t n) {
@@ -205,17 +205,17 @@ std::set<std::common_type_t<T...>> make_set(T&&... args) {
 }
 
 struct TestKeys {
-    session::array_uc32 seed0;
-    session::array_uc64 ed_sk0;
-    session::array_uc32 ed_pk0;
-    session::array_uc32 curve_pk0;
-    session::array_uc33 session_pk0;
+    bchat::array_uc32 seed0;
+    bchat::array_uc64 ed_sk0;
+    bchat::array_uc32 ed_pk0;
+    bchat::array_uc32 curve_pk0;
+    bchat::array_uc33 bchat_pk0;
 
-    session::array_uc32 seed1;
-    session::array_uc64 ed_sk1;
-    session::array_uc32 ed_pk1;
-    session::array_uc32 curve_pk1;
-    session::array_uc33 session_pk1;
+    bchat::array_uc32 seed1;
+    bchat::array_uc64 ed_sk1;
+    bchat::array_uc32 ed_pk1;
+    bchat::array_uc32 curve_pk1;
+    bchat::array_uc33 bchat_pk1;
 };
 
 static inline TestKeys get_deterministic_test_keys() {
@@ -235,9 +235,9 @@ static inline TestKeys get_deterministic_test_keys() {
         bool converted = crypto_sign_ed25519_pk_to_curve25519(result.curve_pk0.data(), result.ed_pk0.data()) == 0;
         assert(converted);
 
-        // Session PK
-        result.session_pk0[0] = 0x05;
-        std::memcpy(result.session_pk0.data() + 1, result.curve_pk0.data(), result.curve_pk0.size());
+        // BChat PK
+        result.bchat_pk0[0] = 0x05;
+        std::memcpy(result.bchat_pk0.data() + 1, result.curve_pk0.data(), result.curve_pk0.size());
     }
 
     // Key 1
@@ -253,20 +253,20 @@ static inline TestKeys get_deterministic_test_keys() {
         bool converted = crypto_sign_ed25519_pk_to_curve25519(result.curve_pk1.data(), result.ed_pk1.data()) == 0;
         assert(converted);
 
-        // Session PK
-        result.session_pk1[0] = 0x05;
-        std::memcpy(result.session_pk1.data() + 1, result.curve_pk1.data(), result.curve_pk1.size());
+        // BChat PK
+        result.bchat_pk1[0] = 0x05;
+        std::memcpy(result.bchat_pk1.data() + 1, result.curve_pk1.data(), result.curve_pk1.size());
     }
 
     assert(oxenc::to_hex(result.ed_sk0.begin(), result.ed_sk0.data() + crypto_sign_ed25519_SEEDBYTES) == oxenc::to_hex(result.seed0));
     assert(oxenc::to_hex(result.ed_pk0)      ==   "4cb76fdc6d32278e3f83dbf608360ecc6b65727934b85d2fb86862ff98c46ab7");
     assert(oxenc::to_hex(result.curve_pk0)   ==   "d2ad010eeb72d72e561d9de7bd7b6989af77dcabffa03a5111a6c859ae5c3a72");
-    assert(oxenc::to_hex(result.session_pk0) == "05d2ad010eeb72d72e561d9de7bd7b6989af77dcabffa03a5111a6c859ae5c3a72");
+    assert(oxenc::to_hex(result.bchat_pk0) == "05d2ad010eeb72d72e561d9de7bd7b6989af77dcabffa03a5111a6c859ae5c3a72");
 
     assert(oxenc::to_hex(result.ed_sk1.begin(), result.ed_sk1.data() + crypto_sign_ed25519_SEEDBYTES) == oxenc::to_hex(result.seed1));
     assert(oxenc::to_hex(result.ed_pk1)      ==   "5ea34e72bb044654a6a23675690ef5ffaaf1656b02f93fb76655f9cbdbe89876");
     assert(oxenc::to_hex(result.curve_pk1)   ==   "aa654f00fc39fc69fd0db829410ca38177d7732a8d2f0934ab3872ac56d5aa74");
-    assert(oxenc::to_hex(result.session_pk1) == "05aa654f00fc39fc69fd0db829410ca38177d7732a8d2f0934ab3872ac56d5aa74");
+    assert(oxenc::to_hex(result.bchat_pk1) == "05aa654f00fc39fc69fd0db829410ca38177d7732a8d2f0934ab3872ac56d5aa74");
     // clang-format on
     return result;
 }

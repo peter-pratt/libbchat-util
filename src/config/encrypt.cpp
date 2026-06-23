@@ -1,4 +1,4 @@
-#include "session/config/encrypt.hpp"
+#include "bchat/config/encrypt.hpp"
 
 #include <oxenc/endian.h>
 #include <sodium/crypto_aead_xchacha20poly1305.h>
@@ -7,12 +7,12 @@
 #include <array>
 #include <cassert>
 
-#include "session/export.h"
-#include "session/util.hpp"
+#include "bchat/export.h"
+#include "bchat/util.hpp"
 
 using namespace std::literals;
 
-namespace session::config {
+namespace bchat::config {
 
 // namespace {
 
@@ -24,7 +24,7 @@ namespace session::config {
 // }  // namespace
 
 static constexpr size_t DOMAIN_MAX_SIZE = 24;
-static constexpr auto NONCE_KEY_PREFIX = "libsessionutil-config-encrypted-"sv;
+static constexpr auto NONCE_KEY_PREFIX = "libbchatutil-config-encrypted-"sv;
 static_assert(NONCE_KEY_PREFIX.size() + DOMAIN_MAX_SIZE < crypto_generichash_blake2b_KEYBYTES_MAX);
 
 static std::array<unsigned char, crypto_aead_xchacha20poly1305_ietf_KEYBYTES> make_encrypt_key(
@@ -106,7 +106,7 @@ std::vector<unsigned char> decrypt(
         std::span<const unsigned char> ciphertext,
         std::span<const unsigned char> key_base,
         std::string_view domain) {
-    std::vector<unsigned char> x = session::to_vector(ciphertext);
+    std::vector<unsigned char> x = bchat::to_vector(ciphertext);
     decrypt_inplace(x, key_base, domain);
     return x;
 }
@@ -146,11 +146,11 @@ void pad_message(std::vector<unsigned char>& data, size_t overhead) {
         data.insert(data.begin(), target_size - data.size(), 0);
 }
 
-}  // namespace session::config
+}  // namespace bchat::config
 
 extern "C" {
 
-LIBSESSION_EXPORT unsigned char* config_encrypt(
+LIBBCHAT_EXPORT unsigned char* config_encrypt(
         const unsigned char* plaintext,
         size_t len,
         const unsigned char* key_base,
@@ -159,7 +159,7 @@ LIBSESSION_EXPORT unsigned char* config_encrypt(
 
     std::vector<unsigned char> ciphertext;
     try {
-        ciphertext = session::config::encrypt({plaintext, len}, {key_base, 32}, domain);
+        ciphertext = bchat::config::encrypt({plaintext, len}, {key_base, 32}, domain);
     } catch (...) {
         return nullptr;
     }
@@ -170,7 +170,7 @@ LIBSESSION_EXPORT unsigned char* config_encrypt(
     return data;
 }
 
-LIBSESSION_EXPORT unsigned char* config_decrypt(
+LIBBCHAT_EXPORT unsigned char* config_decrypt(
         const unsigned char* ciphertext,
         size_t clen,
         const unsigned char* key_base,
@@ -179,7 +179,7 @@ LIBSESSION_EXPORT unsigned char* config_decrypt(
 
     std::vector<unsigned char> plaintext;
     try {
-        plaintext = session::config::decrypt({ciphertext, clen}, {key_base, 32}, domain);
+        plaintext = bchat::config::decrypt({ciphertext, clen}, {key_base, 32}, domain);
     } catch (const std::exception& e) {
         return nullptr;
     }
@@ -190,7 +190,7 @@ LIBSESSION_EXPORT unsigned char* config_decrypt(
     return data;
 }
 
-LIBSESSION_EXPORT size_t config_padded_size(size_t s, size_t overhead) {
-    return session::config::padded_size(s, overhead);
+LIBBCHAT_EXPORT size_t config_padded_size(size_t s, size_t overhead) {
+    return bchat::config::padded_size(s, overhead);
 }
 }

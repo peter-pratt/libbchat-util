@@ -1,4 +1,4 @@
-#include "session/network/routing/direct_router.hpp"
+#include "bchat/network/routing/direct_router.hpp"
 
 #include <fmt/ranges.h>
 #include <fmt/std.h>
@@ -7,16 +7,16 @@
 #include <oxen/log.hpp>
 #include <oxen/log/format.hpp>
 
-#include "session/network/network_opt.hpp"
-#include "session/random.hpp"
+#include "bchat/network/network_opt.hpp"
+#include "bchat/random.hpp"
 
 using namespace oxen;
-using namespace session;
-using namespace session::network;
+using namespace bchat;
+using namespace bchat::network;
 using namespace std::literals;
 using namespace oxen::log::literals;
 
-namespace session::network {
+namespace bchat::network {
 
 namespace {
     auto cat = oxen::log::Cat("direct-router");
@@ -418,4 +418,4 @@ void DirectRouter::_handle_transport_response(
     }
 }
 
-}  // namespace session::network
+}  // namespace bchat::network

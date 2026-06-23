@@ -1,14 +1,14 @@
-#include "session/network/bchat_network_types.hpp"
+#include "bchat/network/bchat_network_types.hpp"
 
 #include <oxen/log.hpp>
 #include <oxen/log/format.hpp>
 
-#include "session/random.hpp"
+#include "bchat/random.hpp"
 
 using namespace oxen;
 using namespace oxen::log::literals;
 
-namespace session::network {
+namespace bchat::network {
 
 Request::Request(
         std::string request_id,
@@ -104,4 +104,4 @@ std::optional<int16_t> response::find_uniform_batch_error(std::string_view body)
     return std::nullopt;
 }
 
-}  // namespace session::network
+}  // namespace bchat::network

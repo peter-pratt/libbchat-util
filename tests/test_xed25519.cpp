@@ -4,9 +4,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "session/util.hpp"
-#include "session/xed25519.h"
-#include "session/xed25519.hpp"
+#include "bchat/util.hpp"
+#include "bchat/xed25519.h"
+#include "bchat/xed25519.hpp"
 
 constexpr std::array<unsigned char, 64> seed1{
         0xfe, 0xcd, 0x9a, 0x60, 0x34, 0xbc, 0x9a, 0xba, 0x27, 0x39, 0x25, 0xde, 0xe7,
@@ -43,7 +43,7 @@ constexpr std::array<unsigned char, 32> pub2_abs{
 
 template <size_t N>
 static std::string view_hex(const std::array<unsigned char, N>& x) {
-    return oxenc::to_hex(session::to_span(x));
+    return oxenc::to_hex(bchat::to_span(x));
 }
 
 TEST_CASE("XEd25519 pubkey conversion", "[xed25519][pubkey]") {
@@ -57,11 +57,11 @@ TEST_CASE("XEd25519 pubkey conversion", "[xed25519][pubkey]") {
     REQUIRE(rc == 0);
     REQUIRE(view_hex(xpk2) == view_hex(xpub2));
 
-    auto xed1 = session::xed25519::pubkey(session::to_span(xpub1));
+    auto xed1 = bchat::xed25519::pubkey(bchat::to_span(xpub1));
     REQUIRE(view_hex(xed1) == oxenc::to_hex(pub1));
 
     // This one fails because the original Ed pubkey is negative
-    auto xed2 = session::xed25519::pubkey(session::to_span(xpub2));
+    auto xed2 = bchat::xed25519::pubkey(bchat::to_span(xpub2));
     REQUIRE(view_hex(xed2) != oxenc::to_hex(pub2));
     // After making the xed negative we should be okay:
     xed2[31] |= 0x80;
@@ -81,14 +81,14 @@ TEST_CASE("XEd25519 signing", "[xed25519][sign]") {
     std::array<unsigned char, 32> xpk2;
     rc = crypto_sign_ed25519_pk_to_curve25519(xpk2.data(), pub2.data());
 
-    const auto msg = session::to_span("hello world");
+    const auto msg = bchat::to_span("hello world");
 
-    auto xed_sig1 = session::xed25519::sign(session::to_span(xsk1), msg);
+    auto xed_sig1 = bchat::xed25519::sign(bchat::to_span(xsk1), msg);
 
     rc = crypto_sign_ed25519_verify_detached(xed_sig1.data(), msg.data(), msg.size(), pub1.data());
     REQUIRE(rc == 0);
 
-    auto xed_sig2 = session::xed25519::sign(session::to_span(xsk2), msg);
+    auto xed_sig2 = bchat::xed25519::sign(bchat::to_span(xsk2), msg);
 
     // This one will fail, because Xed signing always uses the positive but our actual pub2 is the
     // negative:
@@ -110,26 +110,26 @@ TEST_CASE("XEd25519 verification", "[xed25519][verify]") {
     rc = crypto_sign_ed25519_sk_to_curve25519(xsk2.data(), seed2.data());
     REQUIRE(rc == 0);
 
-    const auto msg = session::to_span("hello world");
+    const auto msg = bchat::to_span("hello world");
 
-    auto xed_sig1 = session::xed25519::sign(session::to_span(xsk1), msg);
-    auto xed_sig2 = session::xed25519::sign(session::to_span(xsk2), msg);
+    auto xed_sig1 = bchat::xed25519::sign(bchat::to_span(xsk1), msg);
+    auto xed_sig2 = bchat::xed25519::sign(bchat::to_span(xsk2), msg);
 
-    REQUIRE(session::xed25519::verify(session::to_span(xed_sig1), session::to_span(xpub1), msg));
-    REQUIRE(session::xed25519::verify(session::to_span(xed_sig2), session::to_span(xpub2), msg));
+    REQUIRE(bchat::xed25519::verify(bchat::to_span(xed_sig1), bchat::to_span(xpub1), msg));
+    REQUIRE(bchat::xed25519::verify(bchat::to_span(xed_sig2), bchat::to_span(xpub2), msg));
 
     // Unlike regular Ed25519, XEd25519 uses randomness in the signature, so signing the same value
     // a second should give us a different signature:
-    auto xed_sig1b = session::xed25519::sign(session::to_span(xsk1), msg);
+    auto xed_sig1b = bchat::xed25519::sign(bchat::to_span(xsk1), msg);
     REQUIRE(view_hex(xed_sig1b) != view_hex(xed_sig1));
 }
 
 TEST_CASE("XEd25519 pubkey conversion (C wrapper)", "[xed25519][pubkey][c]") {
-    auto xed1 = session::xed25519::pubkey(session::to_span(xpub1));
+    auto xed1 = bchat::xed25519::pubkey(bchat::to_span(xpub1));
     REQUIRE(view_hex(xed1) == oxenc::to_hex(pub1));
 
     // This one fails because the original Ed pubkey is negative
-    auto xed2 = session::xed25519::pubkey(session::to_span(xpub2));
+    auto xed2 = bchat::xed25519::pubkey(bchat::to_span(xpub2));
     REQUIRE(view_hex(xed2) != oxenc::to_hex(pub2));
     // After making the xed negative we should be okay:
     xed2[31] |= 0x80;
@@ -148,11 +148,11 @@ TEST_CASE("XEd25519 signing (C wrapper)", "[xed25519][sign][c]") {
     std::array<unsigned char, 32> xpk2;
     rc = crypto_sign_ed25519_pk_to_curve25519(xpk2.data(), pub2.data());
 
-    const auto msg = session::to_span("hello world");
+    const auto msg = bchat::to_span("hello world");
 
     std::array<unsigned char, 64> xed_sig1, xed_sig2;
-    REQUIRE(session_xed25519_sign(xed_sig1.data(), xsk1.data(), msg.data(), msg.size()));
-    REQUIRE(session_xed25519_sign(xed_sig2.data(), xsk2.data(), msg.data(), msg.size()));
+    REQUIRE(bchat_xed25519_sign(xed_sig1.data(), xsk1.data(), msg.data(), msg.size()));
+    REQUIRE(bchat_xed25519_sign(xed_sig2.data(), xsk2.data(), msg.data(), msg.size()));
 
     rc = crypto_sign_ed25519_verify_detached(xed_sig1.data(), msg.data(), msg.size(), pub1.data());
     REQUIRE(rc == 0);
@@ -173,12 +173,12 @@ TEST_CASE("XEd25519 verification (C wrapper)", "[xed25519][verify][c]") {
     rc = crypto_sign_ed25519_sk_to_curve25519(xsk2.data(), seed2.data());
     REQUIRE(rc == 0);
 
-    const auto msg = session::to_span("hello world");
+    const auto msg = bchat::to_span("hello world");
 
     std::array<unsigned char, 64> xed_sig1, xed_sig2;
-    REQUIRE(session_xed25519_sign(xed_sig1.data(), xsk1.data(), msg.data(), msg.size()));
-    REQUIRE(session_xed25519_sign(xed_sig2.data(), xsk2.data(), msg.data(), msg.size()));
+    REQUIRE(bchat_xed25519_sign(xed_sig1.data(), xsk1.data(), msg.data(), msg.size()));
+    REQUIRE(bchat_xed25519_sign(xed_sig2.data(), xsk2.data(), msg.data(), msg.size()));
 
-    REQUIRE(session_xed25519_verify(xed_sig1.data(), xpub1.data(), msg.data(), msg.size()));
-    REQUIRE(session_xed25519_verify(xed_sig2.data(), xpub2.data(), msg.data(), msg.size()));
+    REQUIRE(bchat_xed25519_verify(xed_sig1.data(), xpub1.data(), msg.data(), msg.size()));
+    REQUIRE(bchat_xed25519_verify(xed_sig2.data(), xpub2.data(), msg.data(), msg.size()));
 }

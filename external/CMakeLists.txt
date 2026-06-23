@@ -38,7 +38,7 @@ if(NOT BUILD_STATIC_DEPS AND NOT FORCE_ALL_SUBMODULES)
   find_package(PkgConfig REQUIRED)
 endif()
 
-macro(libsession_system_or_submodule BIGNAME smallname target pkgconf subdir)
+macro(libbchat_system_or_submodule BIGNAME smallname target pkgconf subdir)
   if(NOT TARGET ${target})
     option(FORCE_${BIGNAME}_SUBMODULE "force using ${smallname} submodule" OFF)
     if(NOT BUILD_STATIC_DEPS AND NOT FORCE_${BIGNAME}_SUBMODULE AND NOT FORCE_ALL_SUBMODULES)
@@ -105,12 +105,12 @@ endif()
 
 if(ENABLE_NETWORKING)
   set(LIBQUIC_BUILD_TESTS OFF CACHE BOOL "")
-  libsession_system_or_submodule(OXENQUIC quic oxen::quic liboxenquic>=1.8 session-router/external/oxen-libquic)
+  libbchat_system_or_submodule(OXENQUIC quic oxen::quic liboxenquic>=1.8 session-router/external/oxen-libquic)
 endif()
 
-libsession_system_or_submodule(OXENC oxenc oxenc::oxenc liboxenc>=1.5.0 session-router/external/oxen-libquic/external/oxen-encoding)
+libbchat_system_or_submodule(OXENC oxenc oxenc::oxenc liboxenc>=1.5.0 session-router/external/oxen-libquic/external/oxen-encoding)
 
-libsession_system_or_submodule(OXENLOGGING oxenlogging oxen::logging liboxen-logging>=1.2.0 session-router/external/oxen-libquic/external/oxen-logging)
+libbchat_system_or_submodule(OXENLOGGING oxenlogging oxen::logging liboxen-logging>=1.2.0 session-router/external/oxen-libquic/external/oxen-logging)
 if(OXENLOGGING_FOUND)
     if(NOT TARGET oxen::logging)
         # If we load oxen-logging via system lib then we won't necessarily have fmt/spdlog targets,
@@ -152,6 +152,8 @@ add_static_subdirectory(libsodium-internal)
 libbchat_static_bundle(libsodium::sodium-internal)
 
 
+cmake_policy(SET CMP0069 NEW)
+
 set(protobuf_VERBOSE ON CACHE BOOL "" FORCE)
 set(protobuf_INSTALL ON CACHE BOOL "" FORCE)
 set(protobuf_WITH_ZLIB OFF CACHE BOOL "" FORCE)
@@ -162,7 +164,7 @@ set(protobuf_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(protobuf_ABSL_PROVIDER "module" CACHE STRING "" FORCE)
 set(protobuf_BUILD_PROTOC_BINARIES OFF CACHE BOOL "")
 set(protobuf_BUILD_PROTOBUF_BINARIES ON CACHE BOOL "" FORCE)
-libsession_system_or_submodule(PROTOBUF_LITE protobuf_lite protobuf::libprotobuf-lite protobuf-lite>=3.21 protobuf)
+libbchat_system_or_submodule(PROTOBUF_LITE protobuf_lite protobuf::libprotobuf-lite protobuf-lite>=3.21 protobuf)
 if(TARGET PkgConfig::PROTOBUF_LITE AND NOT TARGET protobuf::libprotobuf-lite)
     add_library(protobuf::libprotobuf-lite ALIAS PkgConfig::PROTOBUF_LITE)
 endif()
@@ -184,16 +186,16 @@ add_library(libzstd::static ALIAS libzstd_static_fixed_includes)
 export(
     TARGETS libzstd_static_fixed_includes
     NAMESPACE libbchat::
-    FILE libsessionZstd.cmake
+    FILE libbchatZstd.cmake
 )
 libbchat_static_bundle(libzstd_static)
 
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 set(JSON_Install ON CACHE INTERNAL "") # Required to export targets that we use
-libsession_system_or_submodule(NLOHMANN nlohmann_json nlohmann_json::nlohmann_json nlohmann_json>=3.7.0 session-router/external/nlohmann)
+libbchat_system_or_submodule(NLOHMANN nlohmann_json nlohmann_json::nlohmann_json nlohmann_json>=3.7.0 session-router/external/nlohmann)
 
-if(ENABLE_NETWORKING AND ENABLE_NETWORKING_SROUTER)
+if(ENABLE_NETWORKING AND ENABLE_NETWORKING_BELNET_ROUTER)
     set(SROUTER_FULL OFF CACHE BOOL "")
     set(SROUTER_DAEMON OFF CACHE BOOL "")
     set(SROUTER_NATIVE_BUILD OFF CACHE BOOL "")

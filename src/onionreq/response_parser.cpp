@@ -1,4 +1,4 @@
-#include "session/onionreq/response_parser.hpp"
+#include "bchat/onionreq/response_parser.hpp"
 
 #include <oxenc/base64.h>
 #include <oxenc/endian.h>
@@ -6,17 +6,17 @@
 
 #include <stdexcept>
 
-#include "session/export.h"
-#include "session/network/service_node.hpp"
-#include "session/onionreq/builder.h"
-#include "session/onionreq/builder.hpp"
-#include "session/onionreq/hop_encryption.hpp"
+#include "bchat/export.h"
+#include "bchat/network/master_node.hpp"
+#include "bchat/onionreq/builder.h"
+#include "bchat/onionreq/builder.hpp"
+#include "bchat/onionreq/hop_encryption.hpp"
 
-using namespace session;
+using namespace bchat;
 
-namespace session::onionreq {
+namespace bchat::onionreq {
 
-ResponseParser::ResponseParser(session::onionreq::Builder builder) {
+ResponseParser::ResponseParser(bchat::onionreq::Builder builder) {
     auto dest_x25519_pubkey = builder.get_destination_x25519_public_key();
 
     if (!dest_x25519_pubkey)
@@ -43,10 +43,10 @@ std::vector<unsigned char> ResponseParser::decrypt(std::vector<unsigned char> ci
     try {
         return d.decrypt(enc_type_, ciphertext, destination_x25519_public_key_);
     } catch (const std::exception& e) {
-        if (enc_type_ == session::onionreq::EncryptType::xchacha20) {
+        if (enc_type_ == bchat::onionreq::EncryptType::xchacha20) {
             try {
                 return d.decrypt(
-                        session::onionreq::EncryptType::aes_gcm,
+                        bchat::onionreq::EncryptType::aes_gcm,
                         ciphertext,
                         destination_x25519_public_key_);
             } catch (...) {
@@ -151,11 +151,11 @@ DecryptedResponse ResponseParser::_decrypt_v4_response(const std::string& respon
     return {status_code, headers, result_bencode.consume_string()};
 }
 
-}  // namespace session::onionreq
+}  // namespace bchat::onionreq
 
 extern "C" {
 
-LIBSESSION_C_API bool onion_request_decrypt(
+LIBBCHAT_C_API bool onion_request_decrypt(
         const unsigned char* ciphertext_,
         size_t ciphertext_len,
         ENCRYPT_TYPE enc_type_,
@@ -168,24 +168,24 @@ LIBSESSION_C_API bool onion_request_decrypt(
            ciphertext_len > 0);
 
     try {
-        auto enc_type = session::onionreq::EncryptType::xchacha20;
+        auto enc_type = bchat::onionreq::EncryptType::xchacha20;
 
         switch (enc_type_) {
             case ENCRYPT_TYPE::ENCRYPT_TYPE_AES_GCM:
-                enc_type = session::onionreq::EncryptType::aes_gcm;
+                enc_type = bchat::onionreq::EncryptType::aes_gcm;
                 break;
 
             case ENCRYPT_TYPE::ENCRYPT_TYPE_X_CHA_CHA_20:
-                enc_type = session::onionreq::EncryptType::xchacha20;
+                enc_type = bchat::onionreq::EncryptType::xchacha20;
                 break;
 
             default:
                 throw std::runtime_error{"Invalid decryption type " + std::to_string(enc_type_)};
         }
 
-        session::onionreq::HopEncryption d{
-                session::network::x25519_seckey::from_bytes({final_x25519_seckey, 32}),
-                session::network::x25519_pubkey::from_bytes({final_x25519_pubkey, 32}),
+        bchat::onionreq::HopEncryption d{
+                bchat::network::x25519_seckey::from_bytes({final_x25519_seckey, 32}),
+                bchat::network::x25519_pubkey::from_bytes({final_x25519_pubkey, 32}),
                 false};
 
         std::vector<unsigned char> result;
@@ -200,13 +200,13 @@ LIBSESSION_C_API bool onion_request_decrypt(
             result = d.decrypt(
                     enc_type,
                     ciphertext,
-                    session::network::x25519_pubkey::from_bytes({destination_x25519_pubkey, 32}));
+                    bchat::network::x25519_pubkey::from_bytes({destination_x25519_pubkey, 32}));
         } catch (...) {
-            if (enc_type == session::onionreq::EncryptType::xchacha20)
+            if (enc_type == bchat::onionreq::EncryptType::xchacha20)
                 result = d.decrypt(
-                        session::onionreq::EncryptType::aes_gcm,
+                        bchat::onionreq::EncryptType::aes_gcm,
                         ciphertext,
-                        session::network::x25519_pubkey::from_bytes(
+                        bchat::network::x25519_pubkey::from_bytes(
                                 {destination_x25519_pubkey, 32}));
             else
                 return false;

@@ -1,4 +1,4 @@
-#include "session/network/bchat_network.hpp"
+#include "bchat/network/bchat_network.hpp"
 
 #include <oxenc/base64.h>
 
@@ -11,26 +11,26 @@
 #include <ranges>
 #include <vector>
 
-#include "session/blinding.hpp"
-#include "session/network/backends/bchat_file_server.hpp"
-#include "session/network/network_config.hpp"
-#include "session/network/network_opt.hpp"
-#include "session/network/request_queue.hpp"
-#include "session/network/routing/direct_router.hpp"
-#include "session/network/routing/onion_request_router.hpp"
-#include "session/network/routing/belnet_router.hpp"
-#include "session/network/bchat_network.h"
-#include "session/network/bchat_network_types.hpp"
-#include "session/network/transport/quic_transport.hpp"
-#include "session/random.hpp"
+#include "bchat/blinding.hpp"
+#include "bchat/network/backends/bchat_file_server.hpp"
+#include "bchat/network/network_config.hpp"
+#include "bchat/network/network_opt.hpp"
+#include "bchat/network/request_queue.hpp"
+#include "bchat/network/routing/direct_router.hpp"
+#include "bchat/network/routing/onion_request_router.hpp"
+#include "bchat/network/routing/belnet_router.hpp"
+#include "bchat/network/bchat_network.h"
+#include "bchat/network/bchat_network_types.hpp"
+#include "bchat/network/transport/quic_transport.hpp"
+#include "bchat/random.hpp"
 
 using namespace oxen;
-using namespace session::network;
-using namespace session::network::config;
+using namespace bchat::network;
+using namespace bchat::network::config;
 using namespace std::literals;
 using namespace oxen::log::literals;
 
-namespace session::network {
+namespace bchat::network {
 
 namespace {
 
@@ -60,9 +60,9 @@ namespace {
         return file_server_config;
     }
 
-    config::SnodePool build_snode_pool_config(const config::Config& main_config) {
+    config::MnodePool build_mnode_pool_config(const config::Config& main_config) {
         return {main_config.cache_directory,
-                main_config.fallback_snode_pool_path,
+                main_config.fallback_mnode_pool_path,
                 main_config.cache_expiration,
                 main_config.cache_min_lifetime,
                 main_config.enforce_subnet_diversity,
@@ -87,14 +87,14 @@ namespace {
         return {file_server_config};
     }
 
-    config::SessionRouter build_session_router_config(
+    config::BelnetRouter build_belnet_router_config(
             const config::Config& main_config, const config::FileServer& file_server_config) {
         if (!main_config.cache_directory)
             throw std::invalid_argument{
-                    "Session Router requires a cache_directory to be configured."};
+                    "BChat Router requires a cache_directory to be configured."};
 
         if (main_config.netid == opt::netid::Target::devnet)
-            throw std::invalid_argument{"Session Router does not support devnet."};
+            throw std::invalid_argument{"BChat Router does not support devnet."};
 
         return {file_server_config,
                 main_config.netid,
@@ -124,11 +124,11 @@ namespace {
 
 namespace detail {
 
-    std::vector<network_service_node> convert_service_nodes(
-            std::vector<session::network::service_node> nodes) {
-        std::vector<network_service_node> converted_nodes;
+    std::vector<network_master_node> convert_master_nodes(
+            std::vector<bchat::network::master_node> nodes) {
+        std::vector<network_master_node> converted_nodes;
         for (auto& node : nodes) {
-            network_service_node converted_node;
+            network_master_node converted_node;
             node.into(converted_node);
             converted_nodes.push_back(converted_node);
         }
@@ -170,7 +170,7 @@ Network::Network(config::Config _conf) :
             break;
     }
 
-    // The SnodePool is needed regardless of the transport layer as it includes swarm information
+    // The MnodePool is needed regardless of the transport layer as it includes swarm information
     // which is needed by the clients in order to send requests
     auto bootstrap_fetcher = [bt = std::weak_ptr{_transport}](
                                      Request req, network_response_callback_t on_complete) {
@@ -179,14 +179,14 @@ Network::Network(config::Config _conf) :
         else
             log::error(
                     cat,
-                    "Transport provided to the SnodePool bootstrap fetcher has been destroyed.");
+                    "Transport provided to the MnodePool bootstrap fetcher has been destroyed.");
     };
-    _snode_pool = std::make_shared<SnodePool>(
-            std::move(build_snode_pool_config(config)), _loop, _disk_loop, bootstrap_fetcher);
+    _mnode_pool = std::make_shared<MnodePool>(
+            std::move(build_mnode_pool_config(config)), _loop, _disk_loop, bootstrap_fetcher);
 
     // Additional transport configuration
     _transport->set_node_failure_reporter(
-            [pool = _snode_pool.get()](const ed25519_pubkey& pubkey, bool permanent) {
+            [pool = _mnode_pool.get()](const ed25519_pubkey& pubkey, bool permanent) {
                 if (pool)
                     pool->record_node_failure(pubkey, permanent);
             });
@@ -198,15 +198,15 @@ Network::Network(config::Config _conf) :
                     std::move(build_onion_request_router_config(config, file_server_config)),
                     _loop,
                     _disk_loop,
-                    _snode_pool,
+                    _mnode_pool,
                     _transport);
             break;
 
-        case opt::router::Type::session_router:
-            _router = SessionRouter::make(
-                    std::move(build_session_router_config(config, file_server_config)),
+        case opt::router::Type::belnet_router:
+            _router = BelnetRouter::make(
+                    std::move(build_belnet_router_config(config, file_server_config)),
                     _loop,
-                    _snode_pool,
+                    _mnode_pool,
                     _transport);
             break;
 
@@ -218,7 +218,7 @@ Network::Network(config::Config _conf) :
             break;
     }
 
-    // Now that we have our router setup we need to setup the `standard_fetcher` on the `SnodePool`
+    // Now that we have our router setup we need to setup the `standard_fetcher` on the `MnodePool`
     auto routed_fetcher = [r = std::weak_ptr{_router}, loop = _loop](
                                   Request req, network_response_callback_t on_complete) {
         loop->call([r, req = std::move(req), on_complete = std::move(on_complete)] {
@@ -226,7 +226,7 @@ Network::Network(config::Config _conf) :
                 router->send_request(std::move(req), std::move(on_complete));
             else
                 log::error(
-                        cat, "Router provided to the SnodePool routed_fetcher has been destroyed.");
+                        cat, "Router provided to the MnodePool routed_fetcher has been destroyed.");
         });
     };
     auto routed_fetcher_connected = [r = std::weak_ptr{_router}, loop = _loop]() -> bool {
@@ -237,7 +237,7 @@ Network::Network(config::Config _conf) :
             return false;
         });
     };
-    _snode_pool->set_routed_fetcher(std::move(routed_fetcher), std::move(routed_fetcher_connected));
+    _mnode_pool->set_routed_fetcher(std::move(routed_fetcher), std::move(routed_fetcher_connected));
 
     // Add hooks to update the connection status
     _router->on_status_changed = [this] { _recalculate_status(); };
@@ -264,7 +264,7 @@ Network::~Network() {
     // Explicitly destroy in dependency order while _loop is still alive. Their destructors post
     // final cleanup via call_get so the loop must be running when they destruct.
     _router.reset();
-    _snode_pool.reset();
+    _mnode_pool.reset();
     _transport.reset();
 
     // Now shut down the loops (these destructors join their threads)
@@ -277,8 +277,8 @@ Network::~Network() {
 void Network::clear_cache() {
     // Use 'call_get' to force this to be synchronous
     _loop->call_get([this] {
-        if (_snode_pool)
-            _snode_pool->clear_cache();
+        if (_mnode_pool)
+            _mnode_pool->clear_cache();
         if (_router)
             _router->clear_cache();
     });
@@ -293,8 +293,8 @@ void Network::suspend() {
     _loop->call_get([this] {
         _suspended = true;
 
-        if (_snode_pool)
-            _snode_pool->suspend();
+        if (_mnode_pool)
+            _mnode_pool->suspend();
         if (_transport)
             _transport->suspend();
         if (_router)
@@ -328,8 +328,8 @@ void Network::resume(bool automatically_reconnect) {
         if (!_suspended)
             return;
 
-        if (_snode_pool)
-            _snode_pool->resume();
+        if (_mnode_pool)
+            _mnode_pool->resume();
         if (_transport)
             _transport->resume(automatically_reconnect);
         if (_router)
@@ -373,43 +373,43 @@ std::vector<PathInfo> Network::get_active_paths() {
 }
 
 void Network::get_swarm(
-        session::network::x25519_pubkey swarm_pubkey,
+        bchat::network::x25519_pubkey swarm_pubkey,
         bool ignore_strike_count,
-        std::function<void(swarm_id_t swarm_id, std::vector<service_node> swarm)> callback) {
+        std::function<void(swarm_id_t swarm_id, std::vector<master_node> swarm)> callback) {
     _loop->call([this,
                  pubkey = std::move(swarm_pubkey),
                  ignore_strike_count,
                  cb = std::move(callback)] {
-        if (!_snode_pool) {
+        if (!_mnode_pool) {
             log::warning(
                     cat,
-                    "Attempted to get swarm for {} but SnodePool has been destroyed.",
+                    "Attempted to get swarm for {} but MnodePool has been destroyed.",
                     pubkey.hex());
             return cb(INVALID_SWARM_ID, {});
         }
 
-        _snode_pool->get_swarm(std::move(pubkey), ignore_strike_count, std::move(cb));
+        _mnode_pool->get_swarm(std::move(pubkey), ignore_strike_count, std::move(cb));
     });
 }
 
 void Network::get_random_nodes(
-        uint16_t count, std::function<void(std::vector<service_node> nodes)> callback) {
+        uint16_t count, std::function<void(std::vector<master_node> nodes)> callback) {
     _loop->call([this, count, cb = std::move(callback)] {
-        if (!_snode_pool) {
+        if (!_mnode_pool) {
             log::warning(
                     cat,
-                    "Attempted to get {} random nodes(s) but SnodePool has been destroyed.",
+                    "Attempted to get {} random nodes(s) but MnodePool has been destroyed.",
                     count);
             return cb({});
         }
 
-        auto unused_nodes = _snode_pool->get_unused_nodes(count);
+        auto unused_nodes = _mnode_pool->get_unused_nodes(count);
 
-        // If we don't have sufficient nodes then we need to refresh the snode cache
+        // If we don't have sufficient nodes then we need to refresh the mnode cache
         if (unused_nodes.size() < count) {
-            std::vector<service_node> nodes_to_exclude = _router->get_all_used_nodes();
+            std::vector<master_node> nodes_to_exclude = _router->get_all_used_nodes();
 
-            return _snode_pool->refresh_if_needed(
+            return _mnode_pool->refresh_if_needed(
                     nodes_to_exclude,
                     [this, count, cb = std::move(cb)] { get_random_nodes(count, cb); });
         }
@@ -454,15 +454,15 @@ void Network::send_request(Request request, network_response_callback_t callback
                     if (!self)
                         return;
 
-                    const auto dest_is_snode =
-                            std::holds_alternative<service_node>(original_req.destination);
+                    const auto dest_is_mnode =
+                            std::holds_alternative<master_node>(original_req.destination);
 
                     // If we got a successful response (with a body) and the request was sent to a
-                    // service node then we should update the network state based on the response
+                    // master node then we should update the network state based on the response
                     // (Note: we don't want to do this for server requests because they could
-                    // include values in different formats, eg. the "Session Network" API returns
+                    // include values in different formats, eg. the "BChat Network" API returns
                     // `t` in seconds)
-                    if (success && body && dest_is_snode)
+                    if (success && body && dest_is_mnode)
                         _update_network_state(*body);
 
                     int16_t final_status_code = status_code;
@@ -471,10 +471,10 @@ void Network::send_request(Request request, network_response_callback_t callback
                         if (auto uniform_error = response::find_uniform_batch_error(*body))
                             final_status_code = *uniform_error;
 
-                    // If we got a 406 from a snode, or a 425 from a server, then the device clock
+                    // If we got a 406 from a mnode, or a 425 from a server, then the device clock
                     // is out of sync so we need to kick off a clock resync request
-                    if ((final_status_code == ERROR_NOT_ACCEPTABLE && dest_is_snode) ||
-                        (final_status_code == ERROR_TOO_EARLY && !dest_is_snode)) {
+                    if ((final_status_code == ERROR_NOT_ACCEPTABLE && dest_is_mnode) ||
+                        (final_status_code == ERROR_TOO_EARLY && !dest_is_mnode)) {
                         _resync_clock(std::move(original_req), std::move(cb));
                         return;
                     }
@@ -797,7 +797,7 @@ void Network::_handle_421_retry(
 
     // Shouldn't automatically retry if the destination isn't a node (we on'y want to auto-retry due
     // to a node being in the wrong swarm)
-    auto* original_dest_node = std::get_if<service_node>(&original_request.destination);
+    auto* original_dest_node = std::get_if<master_node>(&original_request.destination);
     if (!original_dest_node)
         return final_callback(
                 false,
@@ -806,7 +806,7 @@ void Network::_handle_421_retry(
                 {content_type_plain_text},
                 "Received 421 from a non-service-node destination");
 
-    // If we got a 421 it means our snode cache is outdated (because the swarm the destination node
+    // If we got a 421 it means our mnode cache is outdated (because the swarm the destination node
     // belongs to doesn't match our cache anymore)
     log::info(
             cat,
@@ -815,8 +815,8 @@ void Network::_handle_421_retry(
             original_dest_node->to_string());
 
     auto failed_node_copy = *original_dest_node;
-    std::vector<service_node> nodes_to_exclude = _router->get_all_used_nodes();
-    _snode_pool->refresh_if_needed(
+    std::vector<master_node> nodes_to_exclude = _router->get_all_used_nodes();
+    _mnode_pool->refresh_if_needed(
             std::move(nodes_to_exclude),
             [this,
              req_to_retry = std::move(original_request),
@@ -824,13 +824,13 @@ void Network::_handle_421_retry(
              failed_node = failed_node_copy] {
                 auto swarm_pubkey = failed_node.swarm_pubkey();
 
-                _snode_pool->get_swarm(
+                _mnode_pool->get_swarm(
                         swarm_pubkey,
                         false,
                         [this,
                          req_to_retry = std::move(req_to_retry),
                          cb = std::move(cb),
-                         failed_node](swarm::swarm_id_t, std::vector<service_node> swarm_nodes) {
+                         failed_node](swarm::swarm_id_t, std::vector<master_node> swarm_nodes) {
                             // Extract a single random index from the vector indices, but excluding
                             // the index of the failing node:
                             size_t new_target;
@@ -879,15 +879,15 @@ void Network::_resync_clock(
         return;
     }
 
-    if (!_snode_pool) {
-        log::info(cat, "Ignoring clock resync attempt as SnodePool has been destroyed.");
+    if (!_mnode_pool) {
+        log::info(cat, "Ignoring clock resync attempt as MnodePool has been destroyed.");
         if (request_callback)
             request_callback(
                     false,
                     false,
-                    ERROR_NO_SNODE_POOL,
+                    ERROR_NO_MNODE_POOL,
                     {content_type_plain_text},
-                    "SnodePool was destroyed.");
+                    "MnodePool was destroyed.");
     }
 
     // Add the request to the request queue, we do this so we can trigger it's callback after the
@@ -916,13 +916,13 @@ void Network::_resync_clock(
     _current_clock_resync_id = request_id;
     _clock_resync_results.clear();
 
-    // Refresh the snode pool if needed to ensure we have the most up-to-date cache
-    std::vector<service_node> nodes_to_exclude = _router->get_all_used_nodes();
-    _snode_pool->refresh_if_needed(std::move(nodes_to_exclude), [this, request_id] {
+    // Refresh the mnode pool if needed to ensure we have the most up-to-date cache
+    std::vector<master_node> nodes_to_exclude = _router->get_all_used_nodes();
+    _mnode_pool->refresh_if_needed(std::move(nodes_to_exclude), [this, request_id] {
         // Pick the random nodes we want to use for retrying (these won't change for this resync
         // attempt)
         auto resync_nodes =
-                _snode_pool->get_unused_nodes(config.num_nodes_to_check_for_network_offset);
+                _mnode_pool->get_unused_nodes(config.num_nodes_to_check_for_network_offset);
 
         for (uint8_t i = 0; i < resync_nodes.size(); ++i)
             _launch_next_clock_out_of_sync_request(
@@ -933,7 +933,7 @@ void Network::_resync_clock(
 void Network::_launch_next_clock_out_of_sync_request(
         const std::string& request_id,
         const uint8_t index,
-        const service_node& node,
+        const master_node& node,
         const uint8_t total_requests) {
     if (!_current_clock_resync_id)
         return;
@@ -1079,17 +1079,17 @@ void Network::_on_clock_resync_complete(const uint8_t total_requests) {
 
     // Now that the clock resync is complete (regardless of whether it was successful or not) we can
     // fail any requests which received clock out of sync errors while waiting for the resync to
-    // complete (we can't automatically retry as libSession can't currently reconstruct the requests
+    // complete (we can't automatically retry as libBChat can't currently reconstruct the requests
     // with updated timestamps)
     if (_clock_resync_request_queue && !_clock_resync_request_queue->is_empty()) {
         auto pending = _clock_resync_request_queue->pop_all();
         log::debug(cat, "Failing {} requests queued during clock resync.", pending.size());
 
         for (auto& [req, cb] : pending) {
-            const auto dest_is_snode = std::holds_alternative<service_node>(req.destination);
+            const auto dest_is_mnode = std::holds_alternative<master_node>(req.destination);
             cb(false,
                false,
-               (dest_is_snode ? ERROR_NOT_ACCEPTABLE : ERROR_TOO_EARLY),
+               (dest_is_mnode ? ERROR_NOT_ACCEPTABLE : ERROR_TOO_EARLY),
                {content_type_plain_text},
                clock_out_of_sync_error);
         }
@@ -1111,19 +1111,19 @@ void Network::_on_clock_resync_complete(const uint8_t total_requests) {
     }
 }
 
-}  // namespace session::network
+}  // namespace bchat::network
 
 // MARK: C API
 
-struct session_response_handle_cpp_t {
-    session::network::network_response_callback_t cpp_callback;
+struct bchat_response_handle_cpp_t {
+    bchat::network::network_response_callback_t cpp_callback;
 };
 
 namespace {
 
-inline std::shared_ptr<session::network::Network> unbox(network_object* network_) {
+inline std::shared_ptr<bchat::network::Network> unbox(network_object* network_) {
     assert(network_ && network_->internals);
-    return *static_cast<std::shared_ptr<session::network::Network>*>(network_->internals);
+    return *static_cast<std::shared_ptr<bchat::network::Network>*>(network_->internals);
 }
 
 inline bool set_error(char* error, const std::exception& e) {
@@ -1141,42 +1141,42 @@ inline bool set_error(char* error, const std::exception& e) {
 
 extern "C" {
 
-using namespace session;
-using namespace session::network;
+using namespace bchat;
+using namespace bchat::network;
 
-struct session_upload_handle_t {
+struct bchat_upload_handle_t {
     std::shared_ptr<std::atomic<bool>> cancelled;
-    session_upload_callbacks callbacks;
+    bchat_upload_callbacks callbacks;
 };
 
-struct session_download_handle_t {
+struct bchat_download_handle_t {
     std::shared_ptr<std::atomic<bool>> cancelled;
-    session_download_callbacks callbacks;
+    bchat_download_callbacks callbacks;
 };
 
-LIBSESSION_C_API session_network_config session_network_config_default() {
+LIBBCHAT_C_API bchat_network_config bchat_network_config_default() {
     Config cpp_defaults{};
-    session_network_config config = {};
+    bchat_network_config config = {};
 
     switch (cpp_defaults.netid) {
-        case opt::netid::Target::mainnet: config.netid = SESSION_NETWORK_MAINNET;
-        case opt::netid::Target::testnet: config.netid = SESSION_NETWORK_TESTNET;
-        case opt::netid::Target::devnet: config.netid = SESSION_NETWORK_DEVNET;
-        default: config.netid = SESSION_NETWORK_MAINNET;
+        case opt::netid::Target::mainnet: config.netid = BCHAT_NETWORK_MAINNET;
+        case opt::netid::Target::testnet: config.netid = BCHAT_NETWORK_TESTNET;
+        case opt::netid::Target::devnet: config.netid = BCHAT_NETWORK_DEVNET;
+        default: config.netid = BCHAT_NETWORK_MAINNET;
     }
 
     switch (cpp_defaults.router) {
         case opt::router::Type::onion_requests:
-            config.router = SESSION_NETWORK_ROUTER_ONION_REQUESTS;
-        case opt::router::Type::session_router:
-            config.router = SESSION_NETWORK_ROUTER_SESSION_ROUTER;
-        case opt::router::Type::direct: config.router = SESSION_NETWORK_ROUTER_DIRECT;
-        default: config.router = SESSION_NETWORK_ROUTER_ONION_REQUESTS;
+            config.router = BCHAT_NETWORK_ROUTER_ONION_REQUESTS;
+        case opt::router::Type::belnet_router:
+            config.router = BCHAT_NETWORK_ROUTER_BELNET_ROUTER;
+        case opt::router::Type::direct: config.router = BCHAT_NETWORK_ROUTER_DIRECT;
+        default: config.router = BCHAT_NETWORK_ROUTER_ONION_REQUESTS;
     }
 
     switch (cpp_defaults.transport) {
-        case opt::transport::Type::quic: config.transport = SESSION_NETWORK_TRANSPORT_QUIC;
-        default: config.transport = SESSION_NETWORK_TRANSPORT_QUIC;
+        case opt::transport::Type::quic: config.transport = BCHAT_NETWORK_TRANSPORT_QUIC;
+        default: config.transport = BCHAT_NETWORK_TRANSPORT_QUIC;
     }
 
     config.file_server_use_stream_encryption = cpp_defaults.file_server_use_stream_encryption;
@@ -1198,7 +1198,7 @@ LIBSESSION_C_API session_network_config session_network_config_default() {
     config.devnet_seed_nodes_size = 0;
 
     config.cache_dir = nullptr;
-    config.fallback_snode_pool_path = nullptr;
+    config.fallback_mnode_pool_path = nullptr;
     config.cache_expiration_minutes =
             std::chrono::duration_cast<std::chrono::minutes>(cpp_defaults.cache_expiration).count();
     config.cache_min_lifetime_ms =
@@ -1234,8 +1234,8 @@ LIBSESSION_C_API session_network_config session_network_config_default() {
     return config;
 }
 
-LIBSESSION_C_API bool session_network_init(
-        network_object** network, const session_network_config* config, char* error) {
+LIBBCHAT_C_API bool bchat_network_init(
+        network_object** network, const bchat_network_config* config, char* error) {
     if (!network || !config)
         return set_error(error, std::invalid_argument{"network or config were null."});
 
@@ -1246,18 +1246,18 @@ LIBSESSION_C_API bool session_network_init(
 
         // Network ID
         switch (config->netid) {
-            case SESSION_NETWORK_MAINNET: cpp_opts.emplace_back(opt::netid::mainnet()); break;
-            case SESSION_NETWORK_TESTNET: cpp_opts.emplace_back(opt::netid::testnet()); break;
-            case SESSION_NETWORK_DEVNET:
+            case BCHAT_NETWORK_MAINNET: cpp_opts.emplace_back(opt::netid::mainnet()); break;
+            case BCHAT_NETWORK_TESTNET: cpp_opts.emplace_back(opt::netid::testnet()); break;
+            case BCHAT_NETWORK_DEVNET:
                 if (!config->devnet_seed_nodes || config->devnet_seed_nodes_size == 0)
                     throw std::runtime_error(
-                            "SESSION_NETWORK_DEVNET requires at least one seed node.");
+                            "BCHAT_NETWORK_DEVNET requires at least one seed node.");
 
-                std::vector<service_node> seed_nodes;
+                std::vector<master_node> seed_nodes;
                 seed_nodes.reserve(config->devnet_seed_nodes_size);
 
                 for (size_t i = 0; i < config->devnet_seed_nodes_size; ++i)
-                    seed_nodes.push_back(service_node::from(config->devnet_seed_nodes[i]));
+                    seed_nodes.push_back(master_node::from(config->devnet_seed_nodes[i]));
 
                 cpp_opts.emplace_back(opt::netid::devnet(std::move(seed_nodes)));
                 break;
@@ -1265,18 +1265,18 @@ LIBSESSION_C_API bool session_network_init(
 
         // Router
         switch (config->router) {
-            case SESSION_NETWORK_ROUTER_ONION_REQUESTS:
+            case BCHAT_NETWORK_ROUTER_ONION_REQUESTS:
                 cpp_opts.emplace_back(opt::router::onion_requests());
                 break;
-            case SESSION_NETWORK_ROUTER_SESSION_ROUTER:
-                cpp_opts.emplace_back(opt::router::session_router());
+            case BCHAT_NETWORK_ROUTER_BELNET_ROUTER:
+                cpp_opts.emplace_back(opt::router::belnet_router());
                 break;
-            case SESSION_NETWORK_ROUTER_DIRECT: cpp_opts.emplace_back(opt::router::direct()); break;
+            case BCHAT_NETWORK_ROUTER_DIRECT: cpp_opts.emplace_back(opt::router::direct()); break;
         }
 
         // Transport
         switch (config->transport) {
-            case SESSION_NETWORK_TRANSPORT_QUIC:
+            case BCHAT_NETWORK_TRANSPORT_QUIC:
                 cpp_opts.emplace_back(opt::transport::quic());
                 break;
         }
@@ -1325,13 +1325,13 @@ LIBSESSION_C_API bool session_network_init(
             cpp_opts.emplace_back(opt::min_resume_clock_resync_interval{
                     std::chrono::minutes{config->min_resume_clock_resync_interval_minutes}});
 
-        // Snode cache
+        // Mnode cache
         if (config->cache_dir)
             cpp_opts.emplace_back(opt::cache_directory{std::filesystem::path{config->cache_dir}});
 
-        if (config->fallback_snode_pool_path)
-            cpp_opts.emplace_back(opt::fallback_snode_pool_path{
-                    std::filesystem::path{config->fallback_snode_pool_path}});
+        if (config->fallback_mnode_pool_path)
+            cpp_opts.emplace_back(opt::fallback_mnode_pool_path{
+                    std::filesystem::path{config->fallback_mnode_pool_path}});
 
         if (config->cache_expiration_minutes > 0)
             cpp_opts.emplace_back(
@@ -1359,7 +1359,7 @@ LIBSESSION_C_API bool session_network_init(
 
         // Router-specific settings
         switch (config->router) {
-            case SESSION_NETWORK_ROUTER_ONION_REQUESTS:
+            case BCHAT_NETWORK_ROUTER_ONION_REQUESTS:
                 // Process the Onion Request options since we are using them
                 if (config->path_length > 0)
                     cpp_opts.emplace_back(opt::path_length{config->path_length});
@@ -1396,18 +1396,18 @@ LIBSESSION_C_API bool session_network_init(
                             std::chrono::days{config->onionreq_edge_node_cache_duration_days}});
                 break;
 
-            case SESSION_NETWORK_ROUTER_SESSION_ROUTER:
-                // Process the Session Router options since we are using them
+            case BCHAT_NETWORK_ROUTER_BELNET_ROUTER:
+                // Process the BChat Router options since we are using them
                 if (config->path_length > 0)
                     cpp_opts.emplace_back(opt::path_length{config->path_length});
                 break;
 
-            case SESSION_NETWORK_ROUTER_DIRECT: break;
+            case BCHAT_NETWORK_ROUTER_DIRECT: break;
         }
 
         // Transport-specific settings
         switch (config->transport) {
-            case SESSION_NETWORK_TRANSPORT_QUIC:
+            case BCHAT_NETWORK_TRANSPORT_QUIC:
                 if (config->quic_handshake_timeout_seconds > 0)
                     cpp_opts.emplace_back(opt::quic_handshake_timeout{
                             std::chrono::seconds{config->quic_handshake_timeout_seconds}});
@@ -1434,50 +1434,50 @@ LIBSESSION_C_API bool session_network_init(
     }
 }
 
-LIBSESSION_C_API void session_network_free(network_object* network) {
-    delete static_cast<std::shared_ptr<session::network::Network>*>(network->internals);
+LIBBCHAT_C_API void bchat_network_free(network_object* network) {
+    delete static_cast<std::shared_ptr<bchat::network::Network>*>(network->internals);
     delete network;
 }
 
-LIBSESSION_C_API void session_request_params_free(session_request_params* params) {
+LIBBCHAT_C_API void bchat_request_params_free(bchat_request_params* params) {
     if (params)
         std::free(params);
 }
 
-LIBSESSION_C_API void session_network_suspend(network_object* network) {
+LIBBCHAT_C_API void bchat_network_suspend(network_object* network) {
     unbox(network)->suspend();
 }
 
-LIBSESSION_C_API void session_network_resume(
+LIBBCHAT_C_API void bchat_network_resume(
         network_object* network, bool automatically_reconnect) {
     unbox(network)->resume(automatically_reconnect);
 }
 
-LIBSESSION_C_API void session_network_close_connections(network_object* network) {
+LIBBCHAT_C_API void bchat_network_close_connections(network_object* network) {
     unbox(network)->close_connections();
 }
 
-LIBSESSION_C_API void session_network_clear_cache(network_object* network) {
+LIBBCHAT_C_API void bchat_network_clear_cache(network_object* network) {
     unbox(network)->clear_cache();
 }
 
-LIBSESSION_C_API bool session_network_has_retrieved_time_offset(network_object* network) {
+LIBBCHAT_C_API bool bchat_network_has_retrieved_time_offset(network_object* network) {
     return unbox(network)->has_retrieved_time_offset();
 }
 
-LIBSESSION_C_API int64_t session_network_time_offset(network_object* network) {
+LIBBCHAT_C_API int64_t bchat_network_time_offset(network_object* network) {
     return unbox(network)->network_time_offset().count();
 }
 
-LIBSESSION_C_API uint16_t session_network_hardfork(network_object* network) {
+LIBBCHAT_C_API uint16_t bchat_network_hardfork(network_object* network) {
     return unbox(network)->hardfork();
 }
 
-LIBSESSION_C_API uint16_t session_network_softfork(network_object* network) {
+LIBBCHAT_C_API uint16_t bchat_network_softfork(network_object* network) {
     return unbox(network)->softfork();
 }
 
-LIBSESSION_C_API void session_network_set_status_changed_callback(
+LIBBCHAT_C_API void bchat_network_set_status_changed_callback(
         network_object* network, void (*callback)(CONNECTION_STATUS status, void* ctx), void* ctx) {
     if (!callback)
         unbox(network)->on_status_changed = nullptr;
@@ -1488,7 +1488,7 @@ LIBSESSION_C_API void session_network_set_status_changed_callback(
         };
 }
 
-LIBSESSION_C_API void session_network_set_network_info_changed_callback(
+LIBBCHAT_C_API void bchat_network_set_network_info_changed_callback(
         network_object* network,
         void (*callback)(
                 int64_t network_time_offset, uint16_t hardfork, uint16_t softfork, void* ctx),
@@ -1505,9 +1505,9 @@ LIBSESSION_C_API void session_network_set_network_info_changed_callback(
                 };
 }
 
-LIBSESSION_C_API void session_network_callbacks_respond(
+LIBBCHAT_C_API void bchat_network_callbacks_respond(
         network_object* network,
-        session_response_handle_t* response_handle,
+        bchat_response_handle_t* response_handle,
         bool success,
         bool timeout,
         int16_t status_code,
@@ -1519,7 +1519,7 @@ LIBSESSION_C_API void session_network_callbacks_respond(
     if (!response_handle)
         return;
 
-    std::unique_ptr<session_response_handle_cpp_t> handle_edge(response_handle);
+    std::unique_ptr<bchat_response_handle_cpp_t> handle_edge(response_handle);
     std::vector<std::pair<std::string, std::string>> headers;
     headers.reserve(headers_size);
 
@@ -1534,15 +1534,15 @@ LIBSESSION_C_API void session_network_callbacks_respond(
     handle_edge->cpp_callback(success, timeout, status_code, std::move(headers), std::move(body));
 }
 
-LIBSESSION_C_API CONNECTION_STATUS session_network_get_status(network_object* network) {
+LIBBCHAT_C_API CONNECTION_STATUS bchat_network_get_status(network_object* network) {
     if (!network)
         return CONNECTION_STATUS_UNKNOWN;
 
     return static_cast<CONNECTION_STATUS>(unbox(network)->get_status());
 }
 
-LIBSESSION_C_API void session_network_get_active_paths(
-        network_object* network, session_path_info** out_paths, size_t* out_paths_len) {
+LIBBCHAT_C_API void bchat_network_get_active_paths(
+        network_object* network, bchat_path_info** out_paths, size_t* out_paths_len) {
     if (!network || !out_paths || !out_paths_len)
         return;
 
@@ -1555,21 +1555,21 @@ LIBSESSION_C_API void session_network_get_active_paths(
             return;
 
         // Calculate the size of the data
-        size_t total_size = cpp_paths.size() * sizeof(session_path_info);
+        size_t total_size = cpp_paths.size() * sizeof(bchat_path_info);
         size_t total_nodes = 0;
         for (const auto& path : cpp_paths)
             total_nodes += path.nodes.size();
-        total_size += total_nodes * sizeof(network_service_node);
+        total_size += total_nodes * sizeof(network_master_node);
 
         size_t total_metadata_size = 0;
         for (const auto& p : cpp_paths) {
             std::visit(
                     [&]<typename T>(const T& md) {
                         if constexpr (std::is_same_v<T, OnionPathMetadata>)
-                            total_metadata_size += sizeof(session_onion_path_metadata);
+                            total_metadata_size += sizeof(bchat_onion_path_metadata);
                         else {
-                            static_assert(std::is_same_v<T, SessionRouterTunnelMetadata>);
-                            total_metadata_size += sizeof(session_router_tunnel_metadata);
+                            static_assert(std::is_same_v<T, BelnetRouterTunnelMetadata>);
+                            total_metadata_size += sizeof(belnet_router_tunnel_metadata);
                         }
                     },
                     p.metadata);
@@ -1581,9 +1581,9 @@ LIBSESSION_C_API void session_network_get_active_paths(
         if (!buffer)
             return;
 
-        auto* c_paths_array = reinterpret_cast<session_path_info*>(buffer);
+        auto* c_paths_array = reinterpret_cast<bchat_path_info*>(buffer);
         auto* current_node_ptr =
-                reinterpret_cast<network_service_node*>(c_paths_array + cpp_paths.size());
+                reinterpret_cast<network_master_node*>(c_paths_array + cpp_paths.size());
         unsigned char* current_metadata_ptr =
                 reinterpret_cast<unsigned char*>(current_node_ptr + total_nodes);
 
@@ -1591,12 +1591,12 @@ LIBSESSION_C_API void session_network_get_active_paths(
             const auto& cpp_path = cpp_paths[i];
             auto& c_path = c_paths_array[i];
 
-            new (&c_path) session_path_info{};
+            new (&c_path) bchat_path_info{};
 
             c_path.nodes = current_node_ptr;
             c_path.nodes_count = cpp_path.nodes.size();
             for (const auto& cpp_node : cpp_path.nodes) {
-                new (current_node_ptr) network_service_node{};
+                new (current_node_ptr) network_master_node{};
                 cpp_node.into(*current_node_ptr);
                 current_node_ptr++;
             }
@@ -1605,28 +1605,28 @@ LIBSESSION_C_API void session_network_get_active_paths(
             std::visit(
                     [&]<typename T>(const T& m) {
                         if constexpr (std::is_same_v<T, OnionPathMetadata>) {
-                            auto* meta = reinterpret_cast<session_onion_path_metadata*>(
+                            auto* meta = reinterpret_cast<bchat_onion_path_metadata*>(
                                     current_metadata_ptr);
-                            new (meta) session_onion_path_metadata{};
-                            meta->category = static_cast<SESSION_NETWORK_PATH_CATEGORY>(m.category);
+                            new (meta) bchat_onion_path_metadata{};
+                            meta->category = static_cast<BCHAT_NETWORK_PATH_CATEGORY>(m.category);
                             c_path.onion_metadata = meta;
-                            current_metadata_ptr += sizeof(session_onion_path_metadata);
+                            current_metadata_ptr += sizeof(bchat_onion_path_metadata);
                         } else {
-                            static_assert(std::is_same_v<T, SessionRouterTunnelMetadata>);
-                            auto* meta = reinterpret_cast<session_router_tunnel_metadata*>(
+                            static_assert(std::is_same_v<T, BelnetRouterTunnelMetadata>);
+                            auto* meta = reinterpret_cast<belnet_router_tunnel_metadata*>(
                                     current_metadata_ptr);
-                            new (meta) session_router_tunnel_metadata{};
+                            new (meta) belnet_router_tunnel_metadata{};
                             strncpy(meta->destination_pubkey,
                                     m.destination_pubkey.c_str(),
                                     sizeof(meta->destination_pubkey) - 1);
                             meta->destination_pubkey[sizeof(meta->destination_pubkey) - 1] = '\0';
-                            strncpy(meta->destination_snode_address,
-                                    m.destination_snode_address.c_str(),
-                                    sizeof(meta->destination_snode_address) - 1);
-                            meta->destination_snode_address
-                                    [sizeof(meta->destination_snode_address) - 1] = '\0';
-                            c_path.session_router_metadata = meta;
-                            current_metadata_ptr += sizeof(session_router_tunnel_metadata);
+                            strncpy(meta->destination_master_node_address,
+                                    m.destination_master_node_address.c_str(),
+                                    sizeof(meta->destination_master_node_address) - 1);
+                            meta->destination_master_node_address
+                                    [sizeof(meta->destination_master_node_address) - 1] = '\0';
+                            c_path.belnet_router_metadata = meta;
+                            current_metadata_ptr += sizeof(belnet_router_tunnel_metadata);
                         }
                     },
                     cpp_path.metadata);
@@ -1640,44 +1640,44 @@ LIBSESSION_C_API void session_network_get_active_paths(
     }
 }
 
-LIBSESSION_C_API void session_network_paths_free(session_path_info* paths) {
+LIBBCHAT_C_API void bchat_network_paths_free(bchat_path_info* paths) {
     if (paths)
         std::free(paths);
 }
 
-LIBSESSION_C_API void session_network_get_swarm(
+LIBBCHAT_C_API void bchat_network_get_swarm(
         network_object* network,
         const char* swarm_pubkey_hex,
         bool ignore_strike_count,
-        void (*callback)(network_service_node* nodes, size_t nodes_len, void*),
+        void (*callback)(network_master_node* nodes, size_t nodes_len, void*),
         void* ctx) {
     assert(swarm_pubkey_hex && callback);
     unbox(network)->get_swarm(
             x25519_pubkey::from_hex({swarm_pubkey_hex, 64}),
             ignore_strike_count,
-            [cb = std::move(callback), ctx](swarm_id_t, std::vector<service_node> nodes) {
-                auto c_nodes = network::detail::convert_service_nodes(nodes);
+            [cb = std::move(callback), ctx](swarm_id_t, std::vector<master_node> nodes) {
+                auto c_nodes = network::detail::convert_master_nodes(nodes);
                 cb(c_nodes.data(), c_nodes.size(), ctx);
             });
 }
 
-LIBSESSION_C_API void session_network_get_random_nodes(
+LIBBCHAT_C_API void bchat_network_get_random_nodes(
         network_object* network,
         uint16_t count,
-        void (*callback)(network_service_node*, size_t, void*),
+        void (*callback)(network_master_node*, size_t, void*),
         void* ctx) {
     assert(callback);
     unbox(network)->get_random_nodes(
-            count, [cb = std::move(callback), ctx](std::vector<service_node> nodes) {
-                auto c_nodes = network::detail::convert_service_nodes(nodes);
+            count, [cb = std::move(callback), ctx](std::vector<master_node> nodes) {
+                auto c_nodes = network::detail::convert_master_nodes(nodes);
                 cb(c_nodes.data(), c_nodes.size(), ctx);
             });
 }
 
-LIBSESSION_C_API void session_network_send_request(
+LIBBCHAT_C_API void bchat_network_send_request(
         network_object* network,
-        const session_request_params* params,
-        session_network_response_t callback,
+        const bchat_request_params* params,
+        bchat_network_response_t callback,
         void* ctx) {
     assert(callback);
 
@@ -1689,12 +1689,12 @@ LIBSESSION_C_API void session_network_send_request(
 
         network_destination dest;
 
-        if (params->snode_dest && params->server_dest)
+        if (params->mnode_dest && params->server_dest)
             throw std::invalid_argument(
-                    "Invalid request: Cannot have both 'snode_dest' and 'server_dest' set.");
+                    "Invalid request: Cannot have both 'mnode_dest' and 'server_dest' set.");
 
-        if (params->snode_dest) {
-            dest = service_node::from(*params->snode_dest);
+        if (params->mnode_dest) {
+            dest = master_node::from(*params->mnode_dest);
         } else if (params->server_dest) {
             const auto& c_server = *params->server_dest;
 
@@ -1728,7 +1728,7 @@ LIBSESSION_C_API void session_network_send_request(
                     c_server.method};
         } else
             throw std::invalid_argument(
-                    "Invalid request: Must have either 'snode_dest' or 'server_dest' set.");
+                    "Invalid request: Must have either 'mnode_dest' or 'server_dest' set.");
 
         std::optional<std::vector<unsigned char>> body;
         if (params->body && params->body_size > 0)
@@ -1787,11 +1787,11 @@ LIBSESSION_C_API void session_network_send_request(
     }
 }
 
-LIBSESSION_C_API session_upload_handle_t* session_network_upload(
+LIBBCHAT_C_API bchat_upload_handle_t* bchat_network_upload(
         network_object* network,
         const char* file_name,
         uint64_t ttl,
-        const session_upload_callbacks* callbacks,
+        const bchat_upload_callbacks* callbacks,
         int64_t stall_timeout_ms,
         int64_t request_timeout_ms,
         int64_t overall_timeout_ms,
@@ -1801,7 +1801,7 @@ LIBSESSION_C_API session_upload_handle_t* session_network_upload(
         return nullptr;
 
     try {
-        auto handle = std::make_unique<session_upload_handle_t>();
+        auto handle = std::make_unique<bchat_upload_handle_t>();
         handle->callbacks = *callbacks;
 
         UploadRequest cpp_request{};
@@ -1837,7 +1837,7 @@ LIBSESSION_C_API session_upload_handle_t* session_network_upload(
             std::visit(
                     [&]<typename T>(T& arg) {
                         if constexpr (std::same_as<T, file_metadata>) {
-                            session_file_metadata c_meta{};
+                            bchat_file_metadata c_meta{};
                             std::strncpy(
                                     c_meta.file_id, arg.id.c_str(), sizeof(c_meta.file_id) - 1);
                             c_meta.file_id[sizeof(c_meta.file_id) - 1] = '\0';
@@ -1863,10 +1863,10 @@ LIBSESSION_C_API session_upload_handle_t* session_network_upload(
     }
 }
 
-LIBSESSION_C_API session_download_handle_t* session_network_download(
+LIBBCHAT_C_API bchat_download_handle_t* bchat_network_download(
         network_object* network,
         const char* download_url,
-        const session_download_callbacks* callbacks,
+        const bchat_download_callbacks* callbacks,
         int64_t stall_timeout_ms,
         int64_t request_timeout_ms,
         int64_t overall_timeout_ms,
@@ -1877,7 +1877,7 @@ LIBSESSION_C_API session_download_handle_t* session_network_download(
         return nullptr;
 
     try {
-        auto handle = std::make_unique<session_download_handle_t>();
+        auto handle = std::make_unique<bchat_download_handle_t>();
         handle->callbacks = *callbacks;
 
         auto cpp_request = DownloadRequest{};
@@ -1899,7 +1899,7 @@ LIBSESSION_C_API session_download_handle_t* session_network_download(
             cpp_request.on_data = [on_data_fn, ctx](
                                           const file_metadata& metadata,
                                           std::vector<unsigned char> data) {
-                session_file_metadata c_meta{};
+                bchat_file_metadata c_meta{};
                 std::strncpy(c_meta.file_id, metadata.id.c_str(), sizeof(c_meta.file_id) - 1);
                 c_meta.file_id[sizeof(c_meta.file_id) - 1] = '\0';
                 c_meta.size = metadata.size;
@@ -1915,7 +1915,7 @@ LIBSESSION_C_API session_download_handle_t* session_network_download(
                     [&](auto&& arg) {
                         using T = std::decay_t<decltype(arg)>;
                         if constexpr (std::is_same_v<T, file_metadata>) {
-                            session_file_metadata c_meta{};
+                            bchat_file_metadata c_meta{};
                             std::strncpy(
                                     c_meta.file_id, arg.id.c_str(), sizeof(c_meta.file_id) - 1);
                             c_meta.file_id[sizeof(c_meta.file_id) - 1] = '\0';
@@ -1941,21 +1941,21 @@ LIBSESSION_C_API session_download_handle_t* session_network_download(
     }
 }
 
-LIBSESSION_C_API void session_network_upload_cancel(session_upload_handle_t* handle) {
+LIBBCHAT_C_API void bchat_network_upload_cancel(bchat_upload_handle_t* handle) {
     if (handle && handle->cancelled)
         *handle->cancelled = true;
 }
 
-LIBSESSION_C_API void session_network_download_cancel(session_download_handle_t* handle) {
+LIBBCHAT_C_API void bchat_network_download_cancel(bchat_download_handle_t* handle) {
     if (handle && handle->cancelled)
         *handle->cancelled = true;
 }
 
-LIBSESSION_C_API void session_network_upload_free(session_upload_handle_t* handle) {
+LIBBCHAT_C_API void bchat_network_upload_free(bchat_upload_handle_t* handle) {
     delete handle;
 }
 
-LIBSESSION_C_API void session_network_download_free(session_download_handle_t* handle) {
+LIBBCHAT_C_API void bchat_network_download_free(bchat_download_handle_t* handle) {
     delete handle;
 }
 

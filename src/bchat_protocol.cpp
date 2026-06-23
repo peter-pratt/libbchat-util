@@ -1,74 +1,74 @@
 #include <fmt/core.h>
 #include <oxenc/hex.h>
-#include <session/config/groups/keys.h>
+#include <bchat/config/groups/keys.h>
 #include <simdutf.h>
 #include <sodium/crypto_generichash_blake2b.h>
 #include <sodium/crypto_sign_ed25519.h>
 #include <sodium/randombytes.h>
 
 #include <oxen/log.hpp>
-#include <session/pro_backend.hpp>
-#include <session/bchat_encrypt.hpp>
-#include <session/bchat_protocol.hpp>
-#include <session/types.hpp>
-#include <session/util.hpp>
+#include <bchat/pro_backend.hpp>
+#include <bchat/bchat_encrypt.hpp>
+#include <bchat/bchat_protocol.hpp>
+#include <bchat/types.hpp>
+#include <bchat/util.hpp>
 
-#include "SessionProtos.pb.h"
+#include "BChatProtos.pb.h"
 #include "WebSocketResources.pb.h"
-#include "session/export.h"
+#include "bchat/export.h"
 
 static_assert(
-        sizeof(SESSION_PROTOCOL_GENERATE_PROOF_HASH_PERSONALISATION) - 1 ==
+        sizeof(BCHAT_PROTOCOL_GENERATE_PROOF_HASH_PERSONALISATION) - 1 ==
         crypto_generichash_blake2b_PERSONALBYTES);
 
 static_assert(
-        sizeof(SESSION_PROTOCOL_BUILD_PROOF_HASH_PERSONALISATION) - 1 ==
+        sizeof(BCHAT_PROTOCOL_BUILD_PROOF_HASH_PERSONALISATION) - 1 ==
         crypto_generichash_blake2b_PERSONALBYTES);
 
 static_assert(
-        sizeof(SESSION_PROTOCOL_ADD_PRO_PAYMENT_HASH_PERSONALISATION) - 1 ==
+        sizeof(BCHAT_PROTOCOL_ADD_PRO_PAYMENT_HASH_PERSONALISATION) - 1 ==
         crypto_generichash_blake2b_PERSONALBYTES);
 
 static_assert(
-        sizeof(SESSION_PROTOCOL_SET_PAYMENT_REFUND_REQUESTED_HASH_PERSONALISATION) - 1 ==
+        sizeof(BCHAT_PROTOCOL_SET_PAYMENT_REFUND_REQUESTED_HASH_PERSONALISATION) - 1 ==
         crypto_generichash_blake2b_PERSONALBYTES);
 
 static_assert(
-        sizeof(SESSION_PROTOCOL_GET_PRO_DETAILS_HASH_PERSONALISATION) - 1 ==
+        sizeof(BCHAT_PROTOCOL_GET_PRO_DETAILS_HASH_PERSONALISATION) - 1 ==
         crypto_generichash_blake2b_PERSONALBYTES);
 
 // clang-format off
-const session_protocol_strings SESSION_PROTOCOL_STRINGS = {
+const bchat_protocol_strings BCHAT_PROTOCOL_STRINGS = {
     .build_variant_apk        = string8_literal("APK"),
     .build_variant_fdroid     = string8_literal("F-Droid Store"),
     .build_variant_huawei     = string8_literal("Huawei App Gallery"),
     .build_variant_ipa        = string8_literal("IPA"),
-    .url_donations            = string8_literal("https://getsession.org/donate"),
-    .url_donations_app        = string8_literal("https://getsession.org/donate#app"),
-    .url_download             = string8_literal("https://getsession.org/download"),
-    .url_faq                  = string8_literal("https://getsession.org/faq"),
-    .url_feedback             = string8_literal("https://getsession.org/feedback"),
-    .url_network              = string8_literal("https://docs.getsession.org/session-network"),
-    .url_privacy_policy       = string8_literal("https://getsession.org/privacy-policy"),
-    .url_pro_access_not_found = string8_literal("https://sessionapp.zendesk.com/hc/sections/4416517450649-Support"),
-    .url_pro_faq              = string8_literal("https://getsession.org/pro#faq"),
-    .url_pro_page             = string8_literal("https://getsession.org/pro"),
-    .url_pro_privacy_policy   = string8_literal("https://getsession.org/pro-privacy"),
-    .url_pro_roadmap          = string8_literal("https://getsession.org/pro#roadmap"),
-    .url_pro_support          = string8_literal("https://getsession.org/pro-support"),
-    .url_pro_terms_of_service = string8_literal("https://getsession.org/pro-terms"),
-    .url_pro_upgrade          = string8_literal("https://getsession.org/pro#upgrade"),
-    .url_staking              = string8_literal("https://docs.getsession.org/session-network/staking"),
-    .url_support              = string8_literal("https://getsession.org/support"),
-    .url_survey               = string8_literal("https://getsession.org/survey"),
-    .url_terms_of_service     = string8_literal("https://getsession.org/terms-of-service"),
-    .url_token                = string8_literal("https://token.getsession.org"),
-    .url_translate            = string8_literal("https://getsession.org/translate"),
+    .url_donations            = string8_literal("https://getbchat.org/donate"),
+    .url_donations_app        = string8_literal("https://getbchat.org/donate#app"),
+    .url_download             = string8_literal("https://getbchat.org/download"),
+    .url_faq                  = string8_literal("https://getbchat.org/faq"),
+    .url_feedback             = string8_literal("https://getbchat.org/feedback"),
+    .url_network              = string8_literal("https://docs.getbchat.org/bchat-network"),
+    .url_privacy_policy       = string8_literal("https://getbchat.org/privacy-policy"),
+    .url_pro_access_not_found = string8_literal("https://bchatapp.zendesk.com/hc/sections/4416517450649-Support"),
+    .url_pro_faq              = string8_literal("https://getbchat.org/pro#faq"),
+    .url_pro_page             = string8_literal("https://getbchat.org/pro"),
+    .url_pro_privacy_policy   = string8_literal("https://getbchat.org/pro-privacy"),
+    .url_pro_roadmap          = string8_literal("https://getbchat.org/pro#roadmap"),
+    .url_pro_support          = string8_literal("https://getbchat.org/pro-support"),
+    .url_pro_terms_of_service = string8_literal("https://getbchat.org/pro-terms"),
+    .url_pro_upgrade          = string8_literal("https://getbchat.org/pro#upgrade"),
+    .url_staking              = string8_literal("https://docs.getbchat.org/bchat-network/staking"),
+    .url_support              = string8_literal("https://getbchat.org/support"),
+    .url_survey               = string8_literal("https://getbchat.org/survey"),
+    .url_terms_of_service     = string8_literal("https://getbchat.org/terms-of-service"),
+    .url_token                = string8_literal("https://token.getbchat.org"),
+    .url_translate            = string8_literal("https://getbchat.org/translate"),
 };
 // clang-format on
 
 namespace {
-session::array_uc32 proof_hash_internal(
+bchat::array_uc32 proof_hash_internal(
         std::uint8_t version,
         std::span<const std::uint8_t> gen_index_hash,
         std::span<const std::uint8_t> rotating_pubkey,
@@ -76,13 +76,13 @@ session::array_uc32 proof_hash_internal(
 
     constexpr std::string_view PRO_BACKEND_BLAKE2B_PERSONALISATION = "SeshProBackend__";
     // This must match the hashing routine at
-    // https://github.com/Doy-lee/session-pro-backend/blob/9417e00adbff3bf608b7ae831f87045bdab06232/backend.py#L545-L558
-    session::array_uc32 result = {};
+    // https://github.com/Doy-lee/bchat-pro-backend/blob/9417e00adbff3bf608b7ae831f87045bdab06232/backend.py#L545-L558
+    bchat::array_uc32 result = {};
     crypto_generichash_blake2b_state state = {};
-    session::make_blake2b32_hasher(
+    bchat::make_blake2b32_hasher(
             &state,
-            {SESSION_PROTOCOL_BUILD_PROOF_HASH_PERSONALISATION,
-             sizeof(SESSION_PROTOCOL_BUILD_PROOF_HASH_PERSONALISATION) - 1});
+            {BCHAT_PROTOCOL_BUILD_PROOF_HASH_PERSONALISATION,
+             sizeof(BCHAT_PROTOCOL_BUILD_PROOF_HASH_PERSONALISATION) - 1});
     crypto_generichash_blake2b_update(&state, &version, sizeof(version));
     crypto_generichash_blake2b_update(&state, gen_index_hash.data(), gen_index_hash.size());
     crypto_generichash_blake2b_update(&state, rotating_pubkey.data(), rotating_pubkey.size());
@@ -128,7 +128,7 @@ bool proof_verify_message_internal(
 
 struct array_uc32_from_ptr_result {
     bool success;
-    session::array_uc32 data;
+    bchat::array_uc32 data;
 };
 
 static array_uc32_from_ptr_result array_uc32_from_ptr(const void* ptr, size_t len) {
@@ -142,8 +142,8 @@ static array_uc32_from_ptr_result array_uc32_from_ptr(const void* ptr, size_t le
     return result;
 }
 
-static session_protocol_envelope envelope_from_cpp(const session::Envelope& cpp) {
-    session_protocol_envelope result = {};
+static bchat_protocol_envelope envelope_from_cpp(const bchat::Envelope& cpp) {
+    bchat_protocol_envelope result = {};
     result.flags = cpp.flags;
     result.timestamp_ms = static_cast<uint64_t>(cpp.timestamp.count());
     std::memcpy(result.source.data, cpp.source.data(), sizeof(result.source.data));
@@ -153,9 +153,9 @@ static session_protocol_envelope envelope_from_cpp(const session::Envelope& cpp)
     return result;
 }
 
-static session_protocol_decoded_pro decoded_pro_from_cpp(const session::DecodedPro& cpp) {
-    session_protocol_decoded_pro result = {};
-    result.status = static_cast<SESSION_PROTOCOL_PRO_STATUS>(cpp.status);
+static bchat_protocol_decoded_pro decoded_pro_from_cpp(const bchat::DecodedPro& cpp) {
+    bchat_protocol_decoded_pro result = {};
+    result.status = static_cast<BCHAT_PROTOCOL_PRO_STATUS>(cpp.status);
     result.proof.version = cpp.proof.version;
     std::memcpy(
             result.proof.gen_index_hash.data,
@@ -165,7 +165,7 @@ static session_protocol_decoded_pro decoded_pro_from_cpp(const session::DecodedP
             result.proof.rotating_pubkey.data,
             cpp.proof.rotating_pubkey.data(),
             cpp.proof.rotating_pubkey.max_size());
-    result.proof.expiry_unix_ts_ms = session::epoch_ms(cpp.proof.expiry_unix_ts);
+    result.proof.expiry_unix_ts_ms = bchat::epoch_ms(cpp.proof.expiry_unix_ts);
     std::memcpy(result.proof.sig.data, cpp.proof.sig.data(), cpp.proof.sig.max_size());
     result.msg_bitset.data = cpp.msg_bitset.data;
     result.profile_bitset.data = cpp.profile_bitset.data;
@@ -173,7 +173,7 @@ static session_protocol_decoded_pro decoded_pro_from_cpp(const session::DecodedP
 }
 }  // namespace
 
-namespace session {
+namespace bchat {
 
 static_assert(sizeof(((ProProof*)0)->gen_index_hash) == 32);
 static_assert(sizeof(((ProProof*)0)->rotating_pubkey) == crypto_sign_ed25519_PUBLICKEYBYTES);
@@ -207,7 +207,7 @@ ProStatus ProProof::status(
         std::chrono::sys_time<std::chrono::milliseconds> unix_ts,
         const std::optional<ProSignedMessage>& signed_msg) {
     ProStatus result = ProStatus::Valid;
-    // Verify the at the proof is verified by the Session Pro Backend key (e.g.: It was
+    // Verify the at the proof is verified by the BChat Pro Backend key (e.g.: It was
     // issued by an authoritative backend)
     if (!verify_signature(verify_pubkey))
         result = ProStatus::InvalidProBackendSig;
@@ -230,62 +230,62 @@ array_uc32 ProProof::hash() const {
     return result;
 }
 
-void ProProfileBitset::set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES features) {
+void ProProfileBitset::set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES features) {
     data |= (1ULL << static_cast<uint64_t>(features));
 }
 
-void ProProfileBitset::unset(SESSION_PROTOCOL_PRO_PROFILE_FEATURES features) {
+void ProProfileBitset::unset(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES features) {
     data &= ~(1ULL << static_cast<uint64_t>(features));
 }
 
-bool ProProfileBitset::is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES features) const {
+bool ProProfileBitset::is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES features) const {
     bool result = data & (1ULL << static_cast<uint64_t>(features));
     return result;
 }
 
-void ProMessageBitset::set(SESSION_PROTOCOL_PRO_MESSAGE_FEATURES features) {
+void ProMessageBitset::set(BCHAT_PROTOCOL_PRO_MESSAGE_FEATURES features) {
     data |= (1ULL << static_cast<uint64_t>(features));
 }
 
-void ProMessageBitset::unset(SESSION_PROTOCOL_PRO_MESSAGE_FEATURES features) {
+void ProMessageBitset::unset(BCHAT_PROTOCOL_PRO_MESSAGE_FEATURES features) {
     data &= ~(1ULL << static_cast<uint64_t>(features));
 }
 
-bool ProMessageBitset::is_set(SESSION_PROTOCOL_PRO_MESSAGE_FEATURES features) const {
+bool ProMessageBitset::is_set(BCHAT_PROTOCOL_PRO_MESSAGE_FEATURES features) const {
     bool result = data & (1ULL << static_cast<uint64_t>(features));
     return result;
 }
 
-session::ProFeaturesForMsg pro_features_for_utf8_or_16(
+bchat::ProFeaturesForMsg pro_features_for_utf8_or_16(
         const void* utf, size_t utf_size, bool is_utf8) {
-    session::ProFeaturesForMsg result = {};
+    bchat::ProFeaturesForMsg result = {};
     simdutf::result validate = is_utf8 ? simdutf::validate_utf8_with_errors(
                                                  reinterpret_cast<const char*>(utf), utf_size)
                                        : simdutf::validate_utf16_with_errors(
                                                  reinterpret_cast<const char16_t*>(utf), utf_size);
     if (validate.is_ok()) {
-        result.status = session::ProFeaturesForMsgStatus::Success;
+        result.status = bchat::ProFeaturesForMsgStatus::Success;
         result.codepoint_count =
                 is_utf8 ? simdutf::count_utf8(reinterpret_cast<const char*>(utf), utf_size)
                         : simdutf::count_utf16(reinterpret_cast<const char16_t*>(utf), utf_size);
 
-        if (result.codepoint_count > SESSION_PROTOCOL_PRO_STANDARD_CHARACTER_LIMIT) {
-            if (result.codepoint_count <= SESSION_PROTOCOL_PRO_HIGHER_CHARACTER_LIMIT) {
-                result.bitset.set(SESSION_PROTOCOL_PRO_MESSAGE_FEATURES_10K_CHARACTER_LIMIT);
+        if (result.codepoint_count > BCHAT_PROTOCOL_PRO_STANDARD_CHARACTER_LIMIT) {
+            if (result.codepoint_count <= BCHAT_PROTOCOL_PRO_HIGHER_CHARACTER_LIMIT) {
+                result.bitset.set(BCHAT_PROTOCOL_PRO_MESSAGE_FEATURES_10K_CHARACTER_LIMIT);
             } else {
                 result.error = "Message exceeds the maximum character limit allowed";
-                result.status = session::ProFeaturesForMsgStatus::ExceedsCharacterLimit;
+                result.status = bchat::ProFeaturesForMsgStatus::ExceedsCharacterLimit;
             }
         }
     } else {
-        result.status = session::ProFeaturesForMsgStatus::UTFDecodingError;
+        result.status = bchat::ProFeaturesForMsgStatus::UTFDecodingError;
         result.error = simdutf::error_to_string(validate.error);
     }
     return result;
 }
-};  // namespace session
+};  // namespace bchat
 
-namespace session {
+namespace bchat {
 
 ProFeaturesForMsg pro_features_for_utf8(const char* utf, size_t utf_size) {
     ProFeaturesForMsg result = pro_features_for_utf8_or_16(utf, utf_size, /*is_utf8*/ true);
@@ -375,10 +375,10 @@ std::vector<uint8_t> pad_message(std::span<const uint8_t> payload) {
     // Calculate amount of padding required
     size_t padded_content_size = payload.size() + 1 /*padding byte*/;
     uint8_t const bytes_for_padding =
-            SESSION_PROTOCOL_COMMUNITY_OR_1O1_MSG_PADDING -
-            (padded_content_size % SESSION_PROTOCOL_COMMUNITY_OR_1O1_MSG_PADDING);
+            BCHAT_PROTOCOL_COMMUNITY_OR_1O1_MSG_PADDING -
+            (padded_content_size % BCHAT_PROTOCOL_COMMUNITY_OR_1O1_MSG_PADDING);
     padded_content_size += bytes_for_padding;
-    assert(padded_content_size % SESSION_PROTOCOL_COMMUNITY_OR_1O1_MSG_PADDING == 0);
+    assert(padded_content_size % BCHAT_PROTOCOL_COMMUNITY_OR_1O1_MSG_PADDING == 0);
 
     // Do the padding
     std::vector<uint8_t> result;
@@ -425,7 +425,7 @@ static EncryptedForDestinationInternal encode_for_destination_internal(
     // The following arguments are passed in from structs with fixed-sized arrays so we expect the
     // sizes to be correct. It being wrong would be a development error
     //
-    // The ed25519_privkey is passed into the lower level layer, session encrypt which has its own
+    // The ed25519_privkey is passed into the lower level layer, bchat encrypt which has its own
     // private key normalisation to 64 bytes for us.
     assert(dest_recipient_pubkey.size() == 1 + crypto_sign_ed25519_PUBLICKEYBYTES);
     assert(dest_community_inbox_server_pubkey.size() == crypto_sign_ed25519_PUBLICKEYBYTES);
@@ -441,7 +441,7 @@ static EncryptedForDestinationInternal encode_for_destination_internal(
                ed25519_privkey.size() == crypto_sign_ed25519_SEEDBYTES);
     }
 
-    // Ensure the Session Pro rotating key is a 64 byte key if given
+    // Ensure the BChat Pro rotating key is a 64 byte key if given
     cleared_uc64 pro_ed_sk_from_seed;
     if (dest_pro_rotating_ed25519_privkey.size()) {
         if (dest_pro_rotating_ed25519_privkey.size() == 32) {
@@ -468,7 +468,7 @@ static EncryptedForDestinationInternal encode_for_destination_internal(
         case DestinationType::Group: /*FALLTHRU*/
         case DestinationType::SyncOr1o1: {
             if (is_group &&
-                dest_group_ed25519_pubkey[0] != static_cast<uint8_t>(SessionIDPrefix::group)) {
+                dest_group_ed25519_pubkey[0] != static_cast<uint8_t>(BChatIDPrefix::group)) {
                 // Legacy groups which have a 05 prefixed key
                 throw std::runtime_error{
                         "Unsupported configuration, encrypting for a legacy group (0x05 prefix) is "
@@ -476,7 +476,7 @@ static EncryptedForDestinationInternal encode_for_destination_internal(
             }
 
             // For Sync or 1o1 mesasges, we need to pad the contents to 160 bytes, see:
-            //   https://github.com/session-foundation/session-desktop/blob/a04e62427034a6b6fee39dcff7dbabf0d0131b13/ts/session/crypto/BufferPadding.ts#L49
+            //   https://github.com/bchat-foundation/bchat-desktop/blob/a04e62427034a6b6fee39dcff7dbabf0d0131b13/ts/bchat/crypto/BufferPadding.ts#L49
             std::vector<uint8_t> tmp_content_buffer;
             if (is_1o1) {  // Encrypt the padded output
                 std::vector<uint8_t> padded_payload = pad_message(content);
@@ -487,16 +487,16 @@ static EncryptedForDestinationInternal encode_for_destination_internal(
 
             // Create envelope
             // Set sourcedevice to 1 as per:
-            // https://github.com/session-foundation/session-ios/blob/82deef869d0f7389b799295817f42ad14f8a1316/SessionMessagingKit/Utilities/MessageWrapper.swift#L57
-            SessionProtos::Envelope envelope = {};
+            // https://github.com/bchat-foundation/bchat-ios/blob/82deef869d0f7389b799295817f42ad14f8a1316/BChatMessagingKit/Utilities/MessageWrapper.swift#L57
+            BChatProtos::Envelope envelope = {};
             envelope.set_type(
-                    is_1o1 ? SessionProtos::Envelope_Type_SESSION_MESSAGE
-                           : SessionProtos::Envelope_Type_CLOSED_GROUP_MESSAGE);
+                    is_1o1 ? BChatProtos::Envelope_Type_BCHAT_MESSAGE
+                           : BChatProtos::Envelope_Type_CLOSED_GROUP_MESSAGE);
             envelope.set_sourcedevice(1);
             envelope.set_timestamp(dest_sent_timestamp_ms.count());
             envelope.set_content(content.data(), content.size());
 
-            // Generate the session pro signature. If there's no pro ed25519 key specified, we still
+            // Generate the bchat pro signature. If there's no pro ed25519 key specified, we still
             // fill out the pro signature with a valid but unverifiable signature by creating a
             // throw-away key. This makes pro and non-pro messages indistinguishable on the wire.
             {
@@ -538,7 +538,7 @@ static EncryptedForDestinationInternal encode_for_destination_internal(
 
                 if (use_malloc == UseMalloc::Yes) {
                     result.ciphertext_c =
-                            session::span_u8_copy_or_throw(ciphertext.data(), ciphertext.size());
+                            bchat::span_u8_copy_or_throw(ciphertext.data(), ciphertext.size());
                 } else {
                     result.ciphertext_cpp = std::move(ciphertext);
                 }
@@ -574,9 +574,9 @@ static EncryptedForDestinationInternal encode_for_destination_internal(
             // Setup the pro signature for the community message
             std::vector<uint8_t> tmp_content_buffer;
 
-            // Sign the message with the Session Pro key if given and then pad the message (both
+            // Sign the message with the BChat Pro key if given and then pad the message (both
             // community message types require it)
-            //   https://github.com/session-foundation/session-ios/blob/82deef869d0f7389b799295817f42ad14f8a1316/SessionMessagingKit/Sending%20%26%20Receiving/MessageSender.swift#L398
+            //   https://github.com/bchat-foundation/bchat-ios/blob/82deef869d0f7389b799295817f42ad14f8a1316/BChatMessagingKit/Sending%20%26%20Receiving/MessageSender.swift#L398
             if (dest_pro_rotating_ed25519_privkey.size()) {
                 // Key should be verified by the time we hit this branch
                 assert(dest_pro_rotating_ed25519_privkey.size() ==
@@ -584,19 +584,19 @@ static EncryptedForDestinationInternal encode_for_destination_internal(
 
                 // TODO: Sub-optimal, but we parse the content again to make sure it's valid. Sign
                 // the blob then, fill in the signature in-place as part of the transitioning of
-                // open groups messages to envelopes. As part of that, libsession is going to take
+                // open groups messages to envelopes. As part of that, libbchat is going to take
                 // responsibility of constructing community messages so that eventually all
                 // platforms switch over to envelopes and we can change the implementation across
                 // all platforms in one swoop and remove this.
                 //
                 // Parse the content blob
-                SessionProtos::Content content_w_sig = {};
+                BChatProtos::Content content_w_sig = {};
                 if (!content_w_sig.ParseFromArray(content.data(), content.size()))
                     throw std::runtime_error{"Parsing community message failed"};
 
                 if (content_w_sig.has_prosigforcommunitymessageonly())
                     throw std::runtime_error{
-                            "Pro signature for community message must not be set. Libsession's "
+                            "Pro signature for community message must not be set. Libbchat's "
                             "responsible for generating the signature and setting it"};
 
                 // We need to sign the padded content, so we pad the `Content` then sign it
@@ -681,7 +681,7 @@ DecodedEnvelope decode_envelope(
         std::span<const uint8_t> envelope_payload,
         const array_uc32& pro_backend_pubkey) {
     DecodedEnvelope result = {};
-    SessionProtos::Envelope envelope = {};
+    BChatProtos::Envelope envelope = {};
     std::span<const uint8_t> envelope_plaintext = envelope_payload;
 
     // The caller is indicating that the envelope_payload is encrypted, if the group keys are
@@ -694,21 +694,21 @@ DecodedEnvelope decode_envelope(
         DecryptGroupMessage decrypt = decrypt_group_message(
                 keys.decrypt_keys, *keys.group_ed25519_pubkey, envelope_plaintext);
 
-        if (decrypt.session_id.size() != ((crypto_sign_ed25519_PUBLICKEYBYTES + 1) * 2))
+        if (decrypt.bchat_id.size() != ((crypto_sign_ed25519_PUBLICKEYBYTES + 1) * 2))
             throw std::runtime_error{fmt::format(
-                    "Parse encrypted envelope failed, extracted session ID was wrong size: "
+                    "Parse encrypted envelope failed, extracted bchat ID was wrong size: "
                     "{}",
-                    decrypt.session_id.size())};
+                    decrypt.bchat_id.size())};
 
         // Update the plaintext to use the decrypted envelope
         envelope_from_decrypted_groups = std::move(decrypt.plaintext);
         envelope_plaintext = envelope_from_decrypted_groups;
 
         // Copy keys out
-        assert(decrypt.session_id.starts_with("05"));
+        assert(decrypt.bchat_id.starts_with("05"));
         oxenc::from_hex(
-                decrypt.session_id.begin() + 2,
-                decrypt.session_id.end(),
+                decrypt.bchat_id.begin() + 2,
+                decrypt.bchat_id.end(),
                 result.sender_x25519_pubkey.begin());
     } else {
         // Assumed to be a 1o1/sync message which is wrapped in a websocket message
@@ -744,25 +744,25 @@ DecodedEnvelope decode_envelope(
     // Parse timestamp
     if (envelope.has_timestamp()) {
         result.envelope.timestamp = std::chrono::milliseconds(envelope.timestamp());
-        result.envelope.flags |= SESSION_PROTOCOL_ENVELOPE_FLAGS_TIMESTAMP;
+        result.envelope.flags |= BCHAT_PROTOCOL_ENVELOPE_FLAGS_TIMESTAMP;
     }
 
     // Parse source (optional)
     if (envelope.has_source()) {
-        // Libsession is now responsible for creating the envelope. The only data that we send in
-        // the source is a Session public key (see: encode_for_destination)
+        // Libbchat is now responsible for creating the envelope. The only data that we send in
+        // the source is a BChat public key (see: encode_for_destination)
 
         // TODO: For backwards compatibility, iOS and Android does not set the source sender's
         // public key for 1o1s but marks the field as present. So we accept either a 0 sized string
         // or a 32 byte public key.
         //
         //  iOS
-        //    https://github.com/session-foundation/session-ios/blob/7dc430ed548ce844f10f9a28c69fb8ccac13d8c3/SessionMessagingKit/Sending%20%26%20Receiving/MessageSender.swift#L472
-        //    https://github.com/session-foundation/session-ios/blob/7dc430ed548ce844f10f9a28c69fb8ccac13d8c3/SessionMessagingKit/Utilities/MessageWrapper.swift#L56
+        //    https://github.com/bchat-foundation/bchat-ios/blob/7dc430ed548ce844f10f9a28c69fb8ccac13d8c3/BChatMessagingKit/Sending%20%26%20Receiving/MessageSender.swift#L472
+        //    https://github.com/bchat-foundation/bchat-ios/blob/7dc430ed548ce844f10f9a28c69fb8ccac13d8c3/BChatMessagingKit/Utilities/MessageWrapper.swift#L56
         //
         //  Android
-        //    https://github.com/session-foundation/session-android/blob/403c5f6b0e402279f25d55c0d492bdcf006608e5/app/src/main/java/org/session/libsession/messaging/sending_receiving/MessageSender.kt#L147
-        //    https://github.com/session-foundation/session-android/blob/403c5f6b0e402279f25d55c0d492bdcf006608e5/app/src/main/java/org/session/libsession/messaging/utilities/MessageWrapper.kt#L40
+        //    https://github.com/bchat-foundation/bchat-android/blob/403c5f6b0e402279f25d55c0d492bdcf006608e5/app/src/main/java/org/bchat/libbchat/messaging/sending_receiving/MessageSender.kt#L147
+        //    https://github.com/bchat-foundation/bchat-android/blob/403c5f6b0e402279f25d55c0d492bdcf006608e5/app/src/main/java/org/bchat/libbchat/messaging/utilities/MessageWrapper.kt#L40
         //
         // This can be removed after a while once we want to stop supporting old clients.
         const std::string& source = envelope.source();
@@ -772,20 +772,20 @@ DecodedEnvelope decode_envelope(
 
         if (source.size()) {
             oxenc::from_hex(source.begin(), source.end(), result.envelope.source.data());
-            result.envelope.flags |= SESSION_PROTOCOL_ENVELOPE_FLAGS_SOURCE;
+            result.envelope.flags |= BCHAT_PROTOCOL_ENVELOPE_FLAGS_SOURCE;
         }
     }
 
     // Parse source device (optional)
     if (envelope.has_sourcedevice()) {
         result.envelope.source_device = envelope.sourcedevice();
-        result.envelope.flags |= SESSION_PROTOCOL_ENVELOPE_FLAGS_SOURCE_DEVICE;
+        result.envelope.flags |= BCHAT_PROTOCOL_ENVELOPE_FLAGS_SOURCE_DEVICE;
     }
 
     // Parse server timestamp (optional)
     if (envelope.has_servertimestamp()) {
         result.envelope.server_timestamp = envelope.servertimestamp();
-        result.envelope.flags |= SESSION_PROTOCOL_ENVELOPE_FLAGS_SERVER_TIMESTAMP;
+        result.envelope.flags |= BCHAT_PROTOCOL_ENVELOPE_FLAGS_SERVER_TIMESTAMP;
     }
 
     // Parse content
@@ -809,7 +809,7 @@ DecodedEnvelope decode_envelope(
         for (const auto& privkey_it : keys.decrypt_keys) {
             try {
                 std::tie(content_plaintext, sender_ed25519_pubkey) =
-                        session::decrypt_incoming(privkey_it, to_span(content));
+                        bchat::decrypt_incoming(privkey_it, to_span(content));
                 assert(result.sender_ed25519_pubkey.size() == crypto_sign_ed25519_PUBLICKEYBYTES);
                 decrypt_success = true;
                 break;
@@ -840,12 +840,12 @@ DecodedEnvelope decode_envelope(
                     "key.");
     }
 
-    // TODO: We parse the content in libsession to extract pro metadata but we return the unparsed
+    // TODO: We parse the content in libbchat to extract pro metadata but we return the unparsed
     // blob back to the caller. This is temporary, eventually we will return a proxy structure for
     // the protobuf Content type to the user. We avoid returning the direct protobuf type to keep
-    // the interface simple and avoid leaking protobuf implementation detail into the libsession
+    // the interface simple and avoid leaking protobuf implementation detail into the libbchat
     // interface.
-    SessionProtos::Content content = {};
+    BChatProtos::Content content = {};
     if (!content.ParseFromArray(result.content_plaintext.data(), result.content_plaintext.size()))
         throw std::runtime_error{fmt::format(
                 "Parse content from envelope failed: {}b", result.content_plaintext.size())};
@@ -878,21 +878,21 @@ DecodedEnvelope decode_envelope(
                         result.content_plaintext.size())};
 
             // Mark the envelope as having a pro signature that the caller can use.
-            result.envelope.flags |= SESSION_PROTOCOL_ENVELOPE_FLAGS_PRO_SIG;
+            result.envelope.flags |= BCHAT_PROTOCOL_ENVELOPE_FLAGS_PRO_SIG;
             DecodedPro& pro = result.pro.emplace();
 
             // Extract the pro message
-            const SessionProtos::ProMessage& pro_msg = content.promessage();
+            const BChatProtos::ProMessage& pro_msg = content.promessage();
             if (!pro_msg.has_proof())
                 throw std::runtime_error(
                         "Parse decrypted message failed, pro config missing proof");
 
             // Parse the proof from protobufs
-            const SessionProtos::ProProof& proto_proof = pro_msg.proof();
-            session::ProProof& proof = pro.proof;
+            const BChatProtos::ProProof& proto_proof = pro_msg.proof();
+            bchat::ProProof& proof = pro.proof;
             // clang-format off
             size_t proof_errors = 0;
-            proof_errors += !proto_proof.has_version()           || proto_proof.version()                  != static_cast<std::uint32_t>(session::ProProofVersion_v0);
+            proof_errors += !proto_proof.has_version()           || proto_proof.version()                  != static_cast<std::uint32_t>(bchat::ProProofVersion_v0);
             proof_errors += !proto_proof.has_genindexhash()      || proto_proof.genindexhash().size()      != proof.gen_index_hash.max_size();
             proof_errors += !proto_proof.has_rotatingpublickey() || proto_proof.rotatingpublickey().size() != proof.rotating_pubkey.max_size();
             proof_errors += !proto_proof.has_expiryunixts();
@@ -946,7 +946,7 @@ DecodedCommunityMessage decode_for_community(
     //
     // We have intermediate steps to allow a timeframe for providing backwards compatibility with
     // older clients before changing data structures and shutting them out from receiving messages.
-    // More detailed information on this transition is documented in the SessionProtos.proto file
+    // More detailed information on this transition is documented in the BChatProtos.proto file
     //
     // In the intermediary stages, handling community messages requires some custom code that's
     // similar but different to the normal path that it's less friction to write some custom
@@ -956,7 +956,7 @@ DecodedCommunityMessage decode_for_community(
 
     // Attempt to parse the blob as an envelope
     std::optional<std::span<const uint8_t>> pro_sig;
-    SessionProtos::Envelope pb_envelope = {};
+    BChatProtos::Envelope pb_envelope = {};
     {
         bool envelope_parsed = pb_envelope.ParseFromArray(
                 content_or_envelope_payload.data(), content_or_envelope_payload.size());
@@ -970,32 +970,32 @@ DecodedCommunityMessage decode_for_community(
             // Extract the envelope into our type
             // Parse source (optional)
             if (pb_envelope.has_source()) {
-                // Libsession is now responsible for creating the envelope. The only data that we
-                // send in the source is a Session public key (see: encode_for_destination)
+                // Libbchat is now responsible for creating the envelope. The only data that we
+                // send in the source is a BChat public key (see: encode_for_destination)
                 const std::string& source = pb_envelope.source();
                 if (source.size() != envelope.source.max_size())
                     throw std::runtime_error(fmt::format(
                             "Parse envelope failed, source had unexpected size ({} bytes)",
                             source.size()));
                 std::memcpy(envelope.source.data(), source.data(), source.size());
-                envelope.flags |= SESSION_PROTOCOL_ENVELOPE_FLAGS_SOURCE;
+                envelope.flags |= BCHAT_PROTOCOL_ENVELOPE_FLAGS_SOURCE;
             }
 
             // Parse source device (optional)
             if (pb_envelope.has_sourcedevice()) {
                 envelope.source_device = pb_envelope.sourcedevice();
-                envelope.flags |= SESSION_PROTOCOL_ENVELOPE_FLAGS_SOURCE_DEVICE;
+                envelope.flags |= BCHAT_PROTOCOL_ENVELOPE_FLAGS_SOURCE_DEVICE;
             }
 
             // Parse server timestamp (optional)
             if (pb_envelope.has_servertimestamp()) {
                 envelope.server_timestamp = pb_envelope.servertimestamp();
-                envelope.flags |= SESSION_PROTOCOL_ENVELOPE_FLAGS_SERVER_TIMESTAMP;
+                envelope.flags |= BCHAT_PROTOCOL_ENVELOPE_FLAGS_SERVER_TIMESTAMP;
             }
 
             // Parse pro signature (optional)
             if (pb_envelope.has_prosig()) {
-                envelope.flags |= SESSION_PROTOCOL_ENVELOPE_FLAGS_PRO_SIG;
+                envelope.flags |= BCHAT_PROTOCOL_ENVELOPE_FLAGS_PRO_SIG;
                 pro_sig = to_span(pb_envelope.prosig());
             }
         } else {
@@ -1007,7 +1007,7 @@ DecodedCommunityMessage decode_for_community(
 
     // Parse the content blob
     std::span<const uint8_t> unpadded_content = unpad_message(result.content_plaintext);
-    SessionProtos::Content content = {};
+    BChatProtos::Content content = {};
     if (!content.ParseFromArray(unpadded_content.data(), unpadded_content.size()))
         throw std::runtime_error{
                 "Decoding community message failed, could not interpret blob as content or "
@@ -1017,7 +1017,7 @@ DecodedCommunityMessage decode_for_community(
     if (content.has_prosigforcommunitymessageonly()) {
         // Signature must be in the envelope if it existed or the content. Specifying both is
         // not allowed.
-        if (result.envelope && result.envelope->flags & SESSION_PROTOCOL_ENVELOPE_FLAGS_PRO_SIG) {
+        if (result.envelope && result.envelope->flags & BCHAT_PROTOCOL_ENVELOPE_FLAGS_PRO_SIG) {
             throw std::runtime_error(
                     "Decoding community message failed, envelope and content both had a pro "
                     "signature specified");
@@ -1045,16 +1045,16 @@ DecodedCommunityMessage decode_for_community(
     if (result.pro_sig && content.has_promessage()) {
         // Extract the pro message
         DecodedPro& pro = result.pro.emplace();
-        const SessionProtos::ProMessage& pro_msg = content.promessage();
+        const BChatProtos::ProMessage& pro_msg = content.promessage();
         if (!pro_msg.has_proof())
             throw std::runtime_error("Decoding community message failed, pro config missing proof");
 
         // Parse the proof from protobufs
-        const SessionProtos::ProProof& proto_proof = pro_msg.proof();
-        session::ProProof& proof = pro.proof;
+        const BChatProtos::ProProof& proto_proof = pro_msg.proof();
+        bchat::ProProof& proof = pro.proof;
         // clang-format off
         size_t proof_errors = 0;
-        proof_errors += !proto_proof.has_version()           || proto_proof.version()                  != static_cast<std::uint32_t>(session::ProProofVersion_v0);
+        proof_errors += !proto_proof.has_version()           || proto_proof.version()                  != static_cast<std::uint32_t>(bchat::ProProofVersion_v0);
         proof_errors += !proto_proof.has_genindexhash()      || proto_proof.genindexhash().size()      != proof.gen_index_hash.max_size();
         proof_errors += !proto_proof.has_rotatingpublickey() || proto_proof.rotatingpublickey().size() != proof.rotating_pubkey.max_size();
         proof_errors += !proto_proof.has_expiryunixts();
@@ -1091,11 +1091,11 @@ DecodedCommunityMessage decode_for_community(
         if (result.envelope) {
             // Entering the `pro_sig` and `result.envelope` branch means that the envelope must have
             // a pro signature.
-            assert(result.envelope->flags & SESSION_PROTOCOL_ENVELOPE_FLAGS_PRO_SIG);
+            assert(result.envelope->flags & BCHAT_PROTOCOL_ENVELOPE_FLAGS_PRO_SIG);
             signed_msg.msg = result.content_plaintext;
             pro.status = proof.status(pro_backend_pubkey, unix_ts, signed_msg);
         } else {
-            SessionProtos::Content content_copy_without_sig = content;
+            BChatProtos::Content content_copy_without_sig = content;
             assert(content_copy_without_sig.has_prosigforcommunitymessageonly());
 
             // Remove signature from the payload
@@ -1112,7 +1112,7 @@ DecodedCommunityMessage decode_for_community(
     }
 
     // Strip padding from content, we only strip at the very end once we're done using the padded
-    // content. A Session Pro proof, if provided will contain a signature that signs over the
+    // content. A BChat Pro proof, if provided will contain a signature that signs over the
     // content including its padding- that is verified in this function above.
     //
     // After that verification is complete then we can remove the padding here and return it to the
@@ -1135,61 +1135,61 @@ void make_blake2b32_hasher(
             /*salt*/ nullptr,
             reinterpret_cast<const unsigned char*>(personalization.data()));
 }
-}  // namespace session
+}  // namespace bchat
 
-using namespace session;
+using namespace bchat;
 
-static_assert((sizeof((session_protocol_pro_proof*)0)->gen_index_hash) == 32);
+static_assert((sizeof((bchat_protocol_pro_proof*)0)->gen_index_hash) == 32);
 static_assert(
-        (sizeof((session_protocol_pro_proof*)0)->rotating_pubkey) ==
+        (sizeof((bchat_protocol_pro_proof*)0)->rotating_pubkey) ==
         crypto_sign_ed25519_PUBLICKEYBYTES);
-static_assert((sizeof((session_protocol_pro_proof*)0)->sig) == crypto_sign_ed25519_BYTES);
+static_assert((sizeof((bchat_protocol_pro_proof*)0)->sig) == crypto_sign_ed25519_BYTES);
 
 static_assert(
-        SESSION_PROTOCOL_PRO_PROFILE_FEATURES_COUNT <=
-                sizeof(((session_protocol_pro_profile_bitset*)0)->data) * 8 /*bits per byte*/,
+        BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_COUNT <=
+                sizeof(((bchat_protocol_pro_profile_bitset*)0)->data) * 8 /*bits per byte*/,
         "There are more feature flags than is available in the bitset, the bitset needs to be "
         "upgraded into an array of bytes");
 
-LIBSESSION_C_API bool session_protocol_pro_profile_bitset_is_set(
-        session_protocol_pro_profile_bitset value, SESSION_PROTOCOL_PRO_PROFILE_FEATURES features) {
+LIBBCHAT_C_API bool bchat_protocol_pro_profile_bitset_is_set(
+        bchat_protocol_pro_profile_bitset value, BCHAT_PROTOCOL_PRO_PROFILE_FEATURES features) {
     bool result = value.data & (1ULL << features);
     return result;
 }
 
-LIBSESSION_C_API void session_protocol_pro_profile_bitset_set(
-        session_protocol_pro_profile_bitset* value,
-        SESSION_PROTOCOL_PRO_PROFILE_FEATURES features) {
+LIBBCHAT_C_API void bchat_protocol_pro_profile_bitset_set(
+        bchat_protocol_pro_profile_bitset* value,
+        BCHAT_PROTOCOL_PRO_PROFILE_FEATURES features) {
     value->data |= (1ULL << features);
 }
 
-LIBSESSION_C_API void session_protocol_pro_profile_bitset_unset(
-        session_protocol_pro_profile_bitset* value,
-        SESSION_PROTOCOL_PRO_PROFILE_FEATURES features) {
+LIBBCHAT_C_API void bchat_protocol_pro_profile_bitset_unset(
+        bchat_protocol_pro_profile_bitset* value,
+        BCHAT_PROTOCOL_PRO_PROFILE_FEATURES features) {
     value->data &= ~(1ULL << features);
 }
 
-LIBSESSION_C_API bool session_protocol_pro_message_bitset_is_set(
-        session_protocol_pro_message_bitset value, SESSION_PROTOCOL_PRO_MESSAGE_FEATURES features) {
+LIBBCHAT_C_API bool bchat_protocol_pro_message_bitset_is_set(
+        bchat_protocol_pro_message_bitset value, BCHAT_PROTOCOL_PRO_MESSAGE_FEATURES features) {
     bool result = value.data & (1ULL << features);
     return result;
 }
 
-LIBSESSION_C_API void session_protocol_pro_message_bitset_set(
-        session_protocol_pro_message_bitset* value,
-        SESSION_PROTOCOL_PRO_MESSAGE_FEATURES features) {
+LIBBCHAT_C_API void bchat_protocol_pro_message_bitset_set(
+        bchat_protocol_pro_message_bitset* value,
+        BCHAT_PROTOCOL_PRO_MESSAGE_FEATURES features) {
     value->data |= (1ULL << features);
 }
 
-LIBSESSION_C_API void session_protocol_pro_message_bitset_unset(
-        session_protocol_pro_message_bitset* value,
-        SESSION_PROTOCOL_PRO_MESSAGE_FEATURES features) {
+LIBBCHAT_C_API void bchat_protocol_pro_message_bitset_unset(
+        bchat_protocol_pro_message_bitset* value,
+        BCHAT_PROTOCOL_PRO_MESSAGE_FEATURES features) {
     value->data &= ~(1ULL << features);
 }
 
-LIBSESSION_C_API bytes32 session_protocol_pro_proof_hash(session_protocol_pro_proof const* proof) {
+LIBBCHAT_C_API bytes32 bchat_protocol_pro_proof_hash(bchat_protocol_pro_proof const* proof) {
     bytes32 result = {};
-    session::array_uc32 hash = proof_hash_internal(
+    bchat::array_uc32 hash = proof_hash_internal(
             proof->version,
             proof->gen_index_hash.data,
             proof->rotating_pubkey.data,
@@ -1198,14 +1198,14 @@ LIBSESSION_C_API bytes32 session_protocol_pro_proof_hash(session_protocol_pro_pr
     return result;
 }
 
-LIBSESSION_C_API bool session_protocol_pro_proof_verify_signature(
-        session_protocol_pro_proof const* proof,
+LIBBCHAT_C_API bool bchat_protocol_pro_proof_verify_signature(
+        bchat_protocol_pro_proof const* proof,
         uint8_t const* verify_pubkey,
         size_t verify_pubkey_len) {
     if (verify_pubkey_len != crypto_sign_ed25519_PUBLICKEYBYTES)
         return false;
     auto verify_pubkey_span = std::span<const std::uint8_t>(verify_pubkey, verify_pubkey_len);
-    session::array_uc32 hash = proof_hash_internal(
+    bchat::array_uc32 hash = proof_hash_internal(
             proof->version,
             proof->gen_index_hash.data,
             proof->rotating_pubkey.data,
@@ -1214,8 +1214,8 @@ LIBSESSION_C_API bool session_protocol_pro_proof_verify_signature(
     return result;
 }
 
-LIBSESSION_C_API bool session_protocol_pro_proof_verify_message(
-        session_protocol_pro_proof const* proof,
+LIBBCHAT_C_API bool bchat_protocol_pro_proof_verify_message(
+        bchat_protocol_pro_proof const* proof,
         uint8_t const* sig,
         size_t sig_len,
         uint8_t const* msg,
@@ -1226,45 +1226,45 @@ LIBSESSION_C_API bool session_protocol_pro_proof_verify_message(
     return result;
 }
 
-LIBSESSION_C_API bool session_protocol_pro_proof_is_active(
-        session_protocol_pro_proof const* proof, uint64_t unix_ts_ms) {
+LIBBCHAT_C_API bool bchat_protocol_pro_proof_is_active(
+        bchat_protocol_pro_proof const* proof, uint64_t unix_ts_ms) {
     return unix_ts_ms <= proof->expiry_unix_ts_ms;
 }
 
-LIBSESSION_C_API SESSION_PROTOCOL_PRO_STATUS session_protocol_pro_proof_status(
-        session_protocol_pro_proof const* proof,
+LIBBCHAT_C_API BCHAT_PROTOCOL_PRO_STATUS bchat_protocol_pro_proof_status(
+        bchat_protocol_pro_proof const* proof,
         const uint8_t* verify_pubkey,
         size_t verify_pubkey_len,
         uint64_t unix_ts_ms,
-        const session_protocol_pro_signed_message* signed_msg) {
-    SESSION_PROTOCOL_PRO_STATUS result = SESSION_PROTOCOL_PRO_STATUS_VALID;
-    if (!session_protocol_pro_proof_verify_signature(proof, verify_pubkey, verify_pubkey_len))
-        result = SESSION_PROTOCOL_PRO_STATUS_INVALID_PRO_BACKEND_SIG;
+        const bchat_protocol_pro_signed_message* signed_msg) {
+    BCHAT_PROTOCOL_PRO_STATUS result = BCHAT_PROTOCOL_PRO_STATUS_VALID;
+    if (!bchat_protocol_pro_proof_verify_signature(proof, verify_pubkey, verify_pubkey_len))
+        result = BCHAT_PROTOCOL_PRO_STATUS_INVALID_PRO_BACKEND_SIG;
 
     // Check if the message was signed if the user passed one in to verify against
-    if (result == SESSION_PROTOCOL_PRO_STATUS_VALID && signed_msg) {
-        if (!session_protocol_pro_proof_verify_message(
+    if (result == BCHAT_PROTOCOL_PRO_STATUS_VALID && signed_msg) {
+        if (!bchat_protocol_pro_proof_verify_message(
                     proof,
                     signed_msg->sig.data,
                     signed_msg->sig.size,
                     signed_msg->msg.data,
                     signed_msg->msg.size))
-            result = SESSION_PROTOCOL_PRO_STATUS_INVALID_USER_SIG;
+            result = BCHAT_PROTOCOL_PRO_STATUS_INVALID_USER_SIG;
     }
 
     // Check if the proof has expired
-    if (result == SESSION_PROTOCOL_PRO_STATUS_VALID &&
-        !session_protocol_pro_proof_is_active(proof, unix_ts_ms))
-        result = SESSION_PROTOCOL_PRO_STATUS_EXPIRED;
+    if (result == BCHAT_PROTOCOL_PRO_STATUS_VALID &&
+        !bchat_protocol_pro_proof_is_active(proof, unix_ts_ms))
+        result = BCHAT_PROTOCOL_PRO_STATUS_EXPIRED;
     return result;
 }
 
-LIBSESSION_C_API
-session_protocol_pro_features_for_msg session_protocol_pro_features_for_utf8(
+LIBBCHAT_C_API
+bchat_protocol_pro_features_for_msg bchat_protocol_pro_features_for_utf8(
         const char* utf, size_t utf_size) {
     ProFeaturesForMsg result_cpp = pro_features_for_utf8_or_16(utf, utf_size, /*is_utf8*/ true);
-    session_protocol_pro_features_for_msg result = {
-            .status = static_cast<SESSION_PROTOCOL_PRO_FEATURES_FOR_MSG_STATUS>(result_cpp.status),
+    bchat_protocol_pro_features_for_msg result = {
+            .status = static_cast<BCHAT_PROTOCOL_PRO_FEATURES_FOR_MSG_STATUS>(result_cpp.status),
             .error = {const_cast<char*>(result_cpp.error.data()), result_cpp.error.size()},
             .bitset = {result_cpp.bitset.data},
             .codepoint_count = result_cpp.codepoint_count,
@@ -1272,12 +1272,12 @@ session_protocol_pro_features_for_msg session_protocol_pro_features_for_utf8(
     return result;
 }
 
-LIBSESSION_C_API
-session_protocol_pro_features_for_msg session_protocol_pro_features_for_utf16(
+LIBBCHAT_C_API
+bchat_protocol_pro_features_for_msg bchat_protocol_pro_features_for_utf16(
         const uint16_t* utf, size_t utf_size) {
     ProFeaturesForMsg result_cpp = pro_features_for_utf8_or_16(utf, utf_size, /*is_utf8*/ false);
-    session_protocol_pro_features_for_msg result = {
-            .status = static_cast<SESSION_PROTOCOL_PRO_FEATURES_FOR_MSG_STATUS>(result_cpp.status),
+    bchat_protocol_pro_features_for_msg result = {
+            .status = static_cast<BCHAT_PROTOCOL_PRO_FEATURES_FOR_MSG_STATUS>(result_cpp.status),
             .error = {const_cast<char*>(result_cpp.error.data()), result_cpp.error.size()},
             .bitset = {result_cpp.bitset.data},
             .codepoint_count = result_cpp.codepoint_count,
@@ -1285,8 +1285,8 @@ session_protocol_pro_features_for_msg session_protocol_pro_features_for_utf16(
     return result;
 }
 
-LIBSESSION_C_API
-session_protocol_encoded_for_destination session_protocol_encode_for_1o1(
+LIBBCHAT_C_API
+bchat_protocol_encoded_for_destination bchat_protocol_encode_for_1o1(
         const void* plaintext,
         size_t plaintext_len,
         const void* ed25519_privkey,
@@ -1298,14 +1298,14 @@ session_protocol_encoded_for_destination session_protocol_encode_for_1o1(
         char* error,
         size_t error_len) {
 
-    session_protocol_destination dest = {};
-    dest.type = SESSION_PROTOCOL_DESTINATION_TYPE_SYNC_OR_1O1;
+    bchat_protocol_destination dest = {};
+    dest.type = BCHAT_PROTOCOL_DESTINATION_TYPE_SYNC_OR_1O1;
     dest.pro_rotating_ed25519_privkey = pro_rotating_ed25519_privkey;
     dest.pro_rotating_ed25519_privkey_len = pro_rotating_ed25519_privkey_len;
     dest.recipient_pubkey = *recipient_pubkey;
     dest.sent_timestamp_ms = sent_timestamp_ms;
 
-    session_protocol_encoded_for_destination result = session_protocol_encode_for_destination(
+    bchat_protocol_encoded_for_destination result = bchat_protocol_encode_for_destination(
             plaintext,
             plaintext_len,
             ed25519_privkey,
@@ -1316,8 +1316,8 @@ session_protocol_encoded_for_destination session_protocol_encode_for_1o1(
     return result;
 }
 
-LIBSESSION_C_API
-session_protocol_encoded_for_destination session_protocol_encode_for_community_inbox(
+LIBBCHAT_C_API
+bchat_protocol_encoded_for_destination bchat_protocol_encode_for_community_inbox(
         const void* plaintext,
         size_t plaintext_len,
         const void* ed25519_privkey,
@@ -1330,15 +1330,15 @@ session_protocol_encoded_for_destination session_protocol_encode_for_community_i
         char* error,
         size_t error_len) {
 
-    session_protocol_destination dest = {};
-    dest.type = SESSION_PROTOCOL_DESTINATION_TYPE_COMMUNITY_INBOX;
+    bchat_protocol_destination dest = {};
+    dest.type = BCHAT_PROTOCOL_DESTINATION_TYPE_COMMUNITY_INBOX;
     dest.pro_rotating_ed25519_privkey = pro_rotating_ed25519_privkey;
     dest.pro_rotating_ed25519_privkey_len = pro_rotating_ed25519_privkey_len;
     dest.sent_timestamp_ms = sent_timestamp_ms;
     dest.recipient_pubkey = *recipient_pubkey;
     dest.community_inbox_server_pubkey = *community_pubkey;
 
-    session_protocol_encoded_for_destination result = session_protocol_encode_for_destination(
+    bchat_protocol_encoded_for_destination result = bchat_protocol_encode_for_destination(
             plaintext,
             plaintext_len,
             ed25519_privkey,
@@ -1349,8 +1349,8 @@ session_protocol_encoded_for_destination session_protocol_encode_for_community_i
     return result;
 }
 
-LIBSESSION_C_API
-session_protocol_encoded_for_destination session_protocol_encode_for_community(
+LIBBCHAT_C_API
+bchat_protocol_encoded_for_destination bchat_protocol_encode_for_community(
         const void* plaintext,
         size_t plaintext_len,
         const void* pro_rotating_ed25519_privkey,
@@ -1358,18 +1358,18 @@ session_protocol_encoded_for_destination session_protocol_encode_for_community(
         char* error,
         size_t error_len) {
 
-    session_protocol_destination dest = {};
-    dest.type = SESSION_PROTOCOL_DESTINATION_TYPE_COMMUNITY;
+    bchat_protocol_destination dest = {};
+    dest.type = BCHAT_PROTOCOL_DESTINATION_TYPE_COMMUNITY;
     dest.pro_rotating_ed25519_privkey = pro_rotating_ed25519_privkey;
     dest.pro_rotating_ed25519_privkey_len = pro_rotating_ed25519_privkey_len;
 
-    session_protocol_encoded_for_destination result = session_protocol_encode_for_destination(
+    bchat_protocol_encoded_for_destination result = bchat_protocol_encode_for_destination(
             plaintext, plaintext_len, nullptr, 0, &dest, error, error_len);
     return result;
 }
 
-LIBSESSION_C_API
-session_protocol_encoded_for_destination session_protocol_encode_for_group(
+LIBBCHAT_C_API
+bchat_protocol_encoded_for_destination bchat_protocol_encode_for_group(
         const void* plaintext,
         size_t plaintext_len,
         const void* ed25519_privkey,
@@ -1382,15 +1382,15 @@ session_protocol_encoded_for_destination session_protocol_encode_for_group(
         char* error,
         size_t error_len) {
 
-    session_protocol_destination dest = {};
-    dest.type = SESSION_PROTOCOL_DESTINATION_TYPE_GROUP;
+    bchat_protocol_destination dest = {};
+    dest.type = BCHAT_PROTOCOL_DESTINATION_TYPE_GROUP;
     dest.pro_rotating_ed25519_privkey = pro_rotating_ed25519_privkey;
     dest.pro_rotating_ed25519_privkey_len = pro_rotating_ed25519_privkey_len;
     dest.group_ed25519_pubkey = *group_ed25519_pubkey;
     dest.group_enc_key = *group_enc_key;
     dest.sent_timestamp_ms = sent_timestamp_ms;
 
-    session_protocol_encoded_for_destination result = session_protocol_encode_for_destination(
+    bchat_protocol_encoded_for_destination result = bchat_protocol_encode_for_destination(
             plaintext,
             plaintext_len,
             ed25519_privkey,
@@ -1401,16 +1401,16 @@ session_protocol_encoded_for_destination session_protocol_encode_for_group(
     return result;
 }
 
-LIBSESSION_C_API session_protocol_encoded_for_destination session_protocol_encode_for_destination(
+LIBBCHAT_C_API bchat_protocol_encoded_for_destination bchat_protocol_encode_for_destination(
         const void* plaintext,
         size_t plaintext_len,
         const void* ed25519_privkey,
         size_t ed25519_privkey_len,
-        const session_protocol_destination* dest,
+        const bchat_protocol_destination* dest,
         char* error,
         size_t error_len) {
 
-    session_protocol_encoded_for_destination result = {};
+    bchat_protocol_encoded_for_destination result = {};
 
     try {
         std::span<const uint8_t> dest_pro_rotating_ed25519_privkey = std::span(
@@ -1451,24 +1451,24 @@ LIBSESSION_C_API session_protocol_encoded_for_destination session_protocol_encod
     return result;
 }
 
-LIBSESSION_C_API void session_protocol_encode_for_destination_free(
-        session_protocol_encoded_for_destination* encrypt) {
+LIBBCHAT_C_API void bchat_protocol_encode_for_destination_free(
+        bchat_protocol_encoded_for_destination* encrypt) {
     if (encrypt) {
         free(encrypt->ciphertext.data);
         *encrypt = {};
     }
 }
 
-LIBSESSION_C_API
-session_protocol_decoded_envelope session_protocol_decode_envelope(
-        const session_protocol_decode_envelope_keys* keys,
+LIBBCHAT_C_API
+bchat_protocol_decoded_envelope bchat_protocol_decode_envelope(
+        const bchat_protocol_decode_envelope_keys* keys,
         const void* envelope_plaintext,
         size_t envelope_plaintext_len,
         const void* pro_backend_pubkey,
         size_t pro_backend_pubkey_len,
         char* error,
         size_t error_len) {
-    session_protocol_decoded_envelope result = {};
+    bchat_protocol_decoded_envelope result = {};
 
     // Setup the pro backend pubkey
     array_uc32_from_ptr_result pro_backend_pubkey_cpp =
@@ -1522,7 +1522,7 @@ session_protocol_decoded_envelope session_protocol_decode_envelope(
 
     // Marshall into c type
     try {
-        result.content_plaintext = session::span_u8_copy_or_throw(
+        result.content_plaintext = bchat::span_u8_copy_or_throw(
                 result_cpp.content_plaintext.data(), result_cpp.content_plaintext.size());
     } catch (const std::exception& e) {
         std::string error_cpp = e.what();
@@ -1559,16 +1559,16 @@ session_protocol_decoded_envelope session_protocol_decode_envelope(
     return result;
 }
 
-LIBSESSION_C_API
-void session_protocol_decode_envelope_free(session_protocol_decoded_envelope* envelope) {
+LIBBCHAT_C_API
+void bchat_protocol_decode_envelope_free(bchat_protocol_decoded_envelope* envelope) {
     if (envelope) {
         free(envelope->content_plaintext.data);
         *envelope = {};
     }
 }
 
-LIBSESSION_C_API
-session_protocol_decoded_community_message session_protocol_decode_for_community(
+LIBBCHAT_C_API
+bchat_protocol_decoded_community_message bchat_protocol_decode_for_community(
         const void* content_or_envelope_payload,
         size_t content_or_envelope_payload_len,
         uint64_t unix_ts_ms,
@@ -1576,7 +1576,7 @@ session_protocol_decoded_community_message session_protocol_decode_for_community
         size_t pro_backend_pubkey_len,
         OPTIONAL char* error,
         size_t error_len) {
-    session_protocol_decoded_community_message result = {};
+    bchat_protocol_decoded_community_message result = {};
     auto content_or_envelope_payload_span = std::span<const uint8_t>(
             reinterpret_cast<const uint8_t*>(content_or_envelope_payload),
             content_or_envelope_payload_len);
@@ -1601,7 +1601,7 @@ session_protocol_decoded_community_message session_protocol_decode_for_community
         result.has_envelope = decoded.envelope.has_value();
         if (result.has_envelope)
             result.envelope = envelope_from_cpp(*decoded.envelope);
-        result.content_plaintext = session::span_u8_copy_or_throw(
+        result.content_plaintext = bchat::span_u8_copy_or_throw(
                 decoded.content_plaintext.data(), decoded.content_plaintext.size());
         result.has_pro = decoded.pro.has_value();
         if (decoded.pro_sig)
@@ -1624,8 +1624,8 @@ session_protocol_decoded_community_message session_protocol_decode_for_community
     return result;
 }
 
-LIBSESSION_C_API void session_protocol_decode_for_community_free(
-        session_protocol_decoded_community_message* community_msg) {
+LIBBCHAT_C_API void bchat_protocol_decode_for_community_free(
+        bchat_protocol_decoded_community_message* community_msg) {
     if (community_msg) {
         free(community_msg->content_plaintext.data);
         *community_msg = {};

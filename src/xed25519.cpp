@@ -1,4 +1,4 @@
-#include "session/xed25519.hpp"
+#include "bchat/xed25519.hpp"
 
 #include <sodium/crypto_core_ed25519.h>
 #include <sodium/crypto_generichash_blake2b.h>
@@ -11,10 +11,10 @@
 #include <cstring>
 #include <stdexcept>
 
-#include "session/export.h"
-#include "session/util.hpp"
+#include "bchat/export.h"
+#include "bchat/util.hpp"
 
-namespace session::xed25519 {
+namespace bchat::xed25519 {
 
 template <size_t N>
 using bytes = std::array<unsigned char, N>;
@@ -152,18 +152,18 @@ std::string pubkey(std::string_view curve25519_pubkey) {
     return std::string{reinterpret_cast<const char*>(ed_pk.data()), ed_pk.size()};
 }
 
-}  // namespace session::xed25519
+}  // namespace bchat::xed25519
 
 extern "C" {
 
-LIBSESSION_C_API bool session_xed25519_sign(
+LIBBCHAT_C_API bool bchat_xed25519_sign(
         unsigned char* signature,
         const unsigned char* curve25519_privkey,
         const unsigned char* msg,
         size_t msg_len) {
     assert(signature != NULL);
     try {
-        auto sig = session::xed25519::sign({curve25519_privkey, 32}, {msg, msg_len});
+        auto sig = bchat::xed25519::sign({curve25519_privkey, 32}, {msg, msg_len});
         std::memcpy(signature, sig.data(), sig.size());
         return true;
     } catch (...) {
@@ -171,19 +171,19 @@ LIBSESSION_C_API bool session_xed25519_sign(
     }
 }
 
-LIBSESSION_C_API bool session_xed25519_verify(
+LIBBCHAT_C_API bool bchat_xed25519_verify(
         const unsigned char* signature,
         const unsigned char* pubkey,
         const unsigned char* msg,
         size_t msg_len) {
-    return session::xed25519::verify({signature, 64}, {pubkey, 32}, {msg, msg_len});
+    return bchat::xed25519::verify({signature, 64}, {pubkey, 32}, {msg, msg_len});
 }
 
-LIBSESSION_C_API bool session_xed25519_pubkey(
+LIBBCHAT_C_API bool bchat_xed25519_pubkey(
         unsigned char* ed25519_pubkey, const unsigned char* curve25519_pubkey) {
     assert(ed25519_pubkey != NULL);
     try {
-        auto edpk = session::xed25519::pubkey({curve25519_pubkey, 32});
+        auto edpk = bchat::xed25519::pubkey({curve25519_pubkey, 32});
         std::memcpy(ed25519_pubkey, edpk.data(), edpk.size());
         return true;
     } catch (...) {

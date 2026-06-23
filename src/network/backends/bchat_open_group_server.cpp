@@ -1,4 +1,4 @@
-#include "session/network/backends/bchat_open_group_server.hpp"
+#include "bchat/network/backends/bchat_open_group_server.hpp"
 
 #include <fmt/ranges.h>
 #include <oxenc/base64.h>
@@ -7,14 +7,14 @@
 #include <oxen/log/format.hpp>
 
 #include "../bchat_network_internal.hpp"
-#include "session/network/backends/backend_util.hpp"
-#include "session/network/backends/bchat_open_group_server.h"
+#include "bchat/network/backends/backend_util.hpp"
+#include "bchat/network/backends/bchat_open_group_server.h"
 
 using namespace oxen;
 using namespace std::literals;
 using namespace oxen::log::literals;
 
-namespace session::network::open_group_server {
+namespace bchat::network::open_group_server {
 
 constexpr std::string_view ENDPOINT_ROOM = "room/{}";
 constexpr std::string_view ENDPOINT_FILE = "room/{}/file/{}";
@@ -68,14 +68,14 @@ std::string generate_download_url(uint64_t file_id, const config::OpenGroupServe
     return buf;
 }
 
-}  // namespace session::network::open_group_server
+}  // namespace bchat::network::open_group_server
 
 extern "C" {
 
-using namespace session;
-using namespace session::network;
+using namespace bchat;
+using namespace bchat::network;
 
-LIBSESSION_C_API bool session_open_group_server_parse_download_url(
+LIBBCHAT_C_API bool bchat_open_group_server_parse_download_url(
         const char* url, open_group_server_parsed_download_url* out) {
     auto info = open_group_server::parse_download_url(url);
     if (!info)
@@ -94,7 +94,7 @@ LIBSESSION_C_API bool session_open_group_server_parse_download_url(
     return true;
 }
 
-LIBSESSION_C_API bool session_open_group_server_generate_download_url(
+LIBBCHAT_C_API bool bchat_open_group_server_generate_download_url(
         uint64_t file_id,
         const char* base_url,
         const char* room,

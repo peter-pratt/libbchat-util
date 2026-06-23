@@ -1,4 +1,4 @@
-# Session utility library
+# BChat utility library
 
 ## Build
 
@@ -10,13 +10,13 @@
 #
 #     -D ENABLE_ONIONERQ
 #
-#   Enable testing of a Session Pro Backend by defining on the configure line:
+#   Enable testing of a BChat Pro Backend by defining on the configure line:
 #
 #     -D TEST_PRO_BACKEND_WITH_DEV_SERVER=1
 #
-#   These tests require the Session Pro Backend running in development mode (SESH_PRO_BACKEND_DEV=1)
+#   These tests require the BChat Pro Backend running in development mode (SESH_PRO_BACKEND_DEV=1)
 #   to be running and tests the request and response flow of registering, updating and revoking
-#   Session Pro from the development backend. You must also have a libcurl available such that
+#   BChat Pro from the development backend. You must also have a libcurl available such that
 #   `find_package(CURL)` succeeds (e.g. a system installed libcurl) for this to compile
 #   successfully.
 #
@@ -34,6 +34,6 @@ cmake --build Build --parallel --verbose
 
 ## Docs
 
-C Library: https://api.oxen.io/libsession-util-c/#/
+C Library: https://api.oxen.io/libbchat-util-c/#/
 
-C++ Library: https://api.oxen.io/libsession-util-cpp/#/
+C++ Library: https://api.oxen.io/libbchat-util-cpp/#/

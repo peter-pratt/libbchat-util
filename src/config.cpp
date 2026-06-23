@@ -1,4 +1,4 @@
-#include "session/config.hpp"
+#include "bchat/config.hpp"
 
 #include <oxenc/bt_producer.h>
 #include <oxenc/bt_serialize.h>
@@ -15,12 +15,12 @@
 #include <variant>
 
 #include "config/internal.hpp"
-#include "session/bt_merge.hpp"
-#include "session/util.hpp"
+#include "bchat/bt_merge.hpp"
+#include "bchat/util.hpp"
 
 using namespace std::literals;
 
-namespace session::config {
+namespace bchat::config {
 
 namespace {
 
@@ -794,4 +794,4 @@ const hash_t& MutableConfigMessage::hash(std::span<const unsigned char> serializ
     return hash_msg(seqno_hash_.second, serialized);
 }
 
-}  // namespace session::config
+}  // namespace bchat::config

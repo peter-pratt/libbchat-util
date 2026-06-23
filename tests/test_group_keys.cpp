@@ -1,10 +1,10 @@
 #include <oxenc/base64.h>
 #include <oxenc/endian.h>
 #include <oxenc/hex.h>
-#include <session/config/contacts.h>
-#include <session/config/groups/info.h>
-#include <session/config/groups/keys.h>
-#include <session/config/groups/members.h>
+#include <bchat/config/contacts.h>
+#include <bchat/config/groups/info.h>
+#include <bchat/config/groups/keys.h>
+#include <bchat/config/groups/members.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <algorithm>
@@ -12,17 +12,17 @@
 #include <catch2/generators/catch_generators_range.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
 #include <iterator>
-#include <session/config/groups/info.hpp>
-#include <session/config/groups/keys.hpp>
-#include <session/config/groups/members.hpp>
-#include <session/config/user_groups.hpp>
+#include <bchat/config/groups/info.hpp>
+#include <bchat/config/groups/keys.hpp>
+#include <bchat/config/groups/members.hpp>
+#include <bchat/config/user_groups.hpp>
 #include <string_view>
 #include <unordered_map>
 
 #include "utils.hpp"
 
 using namespace std::literals;
-using namespace session::config;
+using namespace bchat::config;
 
 static std::array<unsigned char, 64> sk_from_seed(std::span<const unsigned char> seed) {
     std::array<unsigned char, 32> ignore;
@@ -31,7 +31,7 @@ static std::array<unsigned char, 64> sk_from_seed(std::span<const unsigned char>
     return sk;
 }
 
-static std::string session_id_from_ed(std::span<const unsigned char> ed_pk) {
+static std::string bchat_id_from_ed(std::span<const unsigned char> ed_pk) {
     std::string sid;
     std::array<unsigned char, 32> xpk;
     int rc = crypto_sign_ed25519_pk_to_curve25519(xpk.data(), ed_pk.data());
@@ -54,7 +54,7 @@ struct hacky_list : std::list<T> {
 struct pseudo_client {
     std::array<unsigned char, 64> secret_key;
     const std::span<const unsigned char> public_key{secret_key.data() + 32, 32};
-    std::string session_id{session_id_from_ed(public_key)};
+    std::string bchat_id{bchat_id_from_ed(public_key)};
 
     groups::Info info;
     groups::Members members;
@@ -77,7 +77,7 @@ struct pseudo_client {
                     admin ? std::make_optional<std::span<const unsigned char>>({*gsk, 64})
                           : std::nullopt,
                     members_dump},
-            keys{session::to_span(secret_key),
+            keys{bchat::to_span(secret_key),
                  std::span<const unsigned char>{gpk, 32},
                  admin ? std::make_optional<std::span<const unsigned char>>({*gsk, 64})
                        : std::nullopt,
@@ -126,17 +126,17 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
     for (int i = 0; i < 4; ++i)
         members.emplace_back(member_seeds[i], false, group_pk.data(), std::nullopt);
 
-    REQUIRE(admins[0].session_id ==
+    REQUIRE(admins[0].bchat_id ==
             "05f1e8b64bbf761edf8f7b47e3a1f369985644cce0a62adb8e21604474bdd49627");
-    REQUIRE(admins[1].session_id ==
+    REQUIRE(admins[1].bchat_id ==
             "05c5ba413c336f2fe1fb9a2c525f8a86a412a1db128a7841b4e0e217fa9eb7fd5e");
-    REQUIRE(members[0].session_id ==
+    REQUIRE(members[0].bchat_id ==
             "05ece06dd8e02fb2f7d9497f956a1996e199953c651f4016a2f79a3b3e38d55628");
-    REQUIRE(members[1].session_id ==
+    REQUIRE(members[1].bchat_id ==
             "053ac269b71512776b0bd4a1234aaf93e67b4e9068a2c252f3b93a20acb590ae3c");
-    REQUIRE(members[2].session_id ==
+    REQUIRE(members[2].bchat_id ==
             "05a2b03abdda4df8316f9d7aed5d2d1e483e9af269d0b39191b08321b8495bc118");
-    REQUIRE(members[3].session_id ==
+    REQUIRE(members[3].bchat_id ==
             "050a41669a06c098f22633aee2eba03764ef6813bd4f770a3a2b9033b868ca470d");
 
     for (const auto& a : admins)
@@ -150,7 +150,7 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
     // add admin account, re-key, distribute
     auto& admin1 = admins[0];
 
-    auto m = admin1.members.get_or_construct(admin1.session_id);
+    auto m = admin1.members.get_or_construct(admin1.bchat_id);
     m.admin = true;
     m.name = "Admin1";
     admin1.members.set(m);
@@ -201,7 +201,7 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
 
     // add non-admin members, re-key, distribute
     for (size_t i = 0; i < members.size(); ++i) {
-        auto m = admin1.members.get_or_construct(members[i].session_id);
+        auto m = admin1.members.get_or_construct(members[i].bchat_id);
         m.admin = false;
         m.name = "Member{}"_format(i);
         admin1.members.set(m);
@@ -290,17 +290,17 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
 
     // remove members, re-key, distribute
     CHECK(admin1.members.size() == 5);
-    CHECK(admin1.members.erase(members[3].session_id));
-    CHECK(admin1.members.erase(members[2].session_id));
+    CHECK(admin1.members.erase(members[3].bchat_id));
+    CHECK(admin1.members.erase(members[2].bchat_id));
     CHECK(admin1.members.size() == 3);
 
     CHECK(admin1.members.needs_push());
 
-    std::vector<unsigned char> old_key = session::to_vector(admin1.keys.group_enc_key());
+    std::vector<unsigned char> old_key = bchat::to_vector(admin1.keys.group_enc_key());
     auto new_keys_config4 = admin1.keys.rekey(admin1.info, admin1.members);
     CHECK(not new_keys_config4.empty());
 
-    CHECK(old_key != session::to_vector(admin1.keys.group_enc_key()));
+    CHECK(old_key != bchat::to_vector(admin1.keys.group_enc_key()));
 
     auto [iseq4, new_info_config4, iobs4] = admin1.info.push();
     admin1.info.confirm_pushed(iseq4, {"fakehash4"});
@@ -354,9 +354,9 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
     for (int i = 0; i < 5; ++i)
         msg += msg;
 
-    auto compressed = admin1.keys.encrypt_message(session::to_span(msg));
+    auto compressed = admin1.keys.encrypt_message(bchat::to_span(msg));
     CHECK(compressed.size() == 256);
-    auto uncompressed = admin1.keys.encrypt_message(session::to_span(msg), false);
+    auto uncompressed = admin1.keys.encrypt_message(bchat::to_span(msg), false);
     CHECK(uncompressed.size() == 2048);
 
     CHECK(compressed.size() < msg.size());
@@ -365,7 +365,7 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
     for (int i = 0; i < 2; ++i) {
         auto& m = members.emplace_back(member_seeds[4 + i], false, group_pk.data(), std::nullopt);
 
-        auto memb = admin1.members.get_or_construct(m.session_id);
+        auto memb = admin1.members.get_or_construct(m.bchat_id);
         memb.set_invite_sent();
         memb.supplement = true;
         memb.name = i == 0 ? "fred" : "JOHN";
@@ -374,9 +374,9 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
         CHECK_FALSE(m.keys.admin());
     }
 
-    REQUIRE(members[2].session_id ==
+    REQUIRE(members[2].bchat_id ==
             "054eb4fafee2bd3018a24e310de8106333c2b364eaed029a7f05d7b45ccc77683a");
-    REQUIRE(members[3].session_id ==
+    REQUIRE(members[3].bchat_id ==
             "057ce31baa9a04b5cfb83ab7ccdd7b669b911a082d29883d6aad3256294a0a5e0c");
 
     // We actually send supplemental keys to members 1, as well, by mistake just to make sure it
@@ -384,7 +384,7 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
     std::vector<std::string> supp_sids;
     std::transform(
             std::next(members.begin()), members.end(), std::back_inserter(supp_sids), [](auto& m) {
-                return m.session_id;
+                return m.bchat_id;
             });
     auto supp = admin1.keys.key_supplement(supp_sids);
     CHECK(admin1.members.needs_push());
@@ -433,12 +433,12 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
 
     std::pair<std::string, std::vector<unsigned char>> decrypted1, decrypted2;
     REQUIRE_NOTHROW(decrypted1 = members.back().keys.decrypt_message(compressed));
-    CHECK(decrypted1.first == admin1.session_id);
-    CHECK(session::to_string(decrypted1.second) == msg);
+    CHECK(decrypted1.first == admin1.bchat_id);
+    CHECK(bchat::to_string(decrypted1.second) == msg);
 
     REQUIRE_NOTHROW(decrypted2 = members.back().keys.decrypt_message(uncompressed));
-    CHECK(decrypted2.first == admin1.session_id);
-    CHECK(session::to_string(decrypted2.second) == msg);
+    CHECK(decrypted2.first == admin1.bchat_id);
+    CHECK(bchat::to_string(decrypted2.second) == msg);
 
     auto bad_compressed = compressed;
     bad_compressed.back() ^= 0b100;
@@ -460,9 +460,9 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
     CHECK(m1b.keys.active_hashes() ==
           std::unordered_set{{"keyhash2"s, "keyhash3"s, "keyhash4"s, "keyhash5"s}});
     CHECK(m1b.members.size() == 5);
-    auto m1b_m2 = m1b.members.get(members[2].session_id);
+    auto m1b_m2 = m1b.members.get(members[2].bchat_id);
     REQUIRE(m1b_m2);
-    CHECK(m1b.members.get_status(*m1b_m2) == session::config::groups::member::Status::invite_sent);
+    CHECK(m1b.members.get_status(*m1b_m2) == bchat::config::groups::member::Status::invite_sent);
     CHECK(m1b_m2->name == "fred");
 
     // Rekey after 10d, then again after 71d (10+61) and everything except those two new gens should
@@ -470,7 +470,7 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
     info_configs.clear();
     mem_configs.clear();
     std::vector<unsigned char> new_keys_config6 =
-            session::to_vector(admin1.keys.rekey(admin1.info, admin1.members));
+            bchat::to_vector(admin1.keys.rekey(admin1.info, admin1.members));
     auto [iseq6, ipush6, iobs6] = admin1.info.push();
     info_configs.emplace_back("ifakehash6", ipush6[0]);
     REQUIRE(info_configs.size() == 1);
@@ -500,11 +500,11 @@ TEST_CASE("Group Keys - C++ API", "[config][groups][keys][cpp]") {
     }
 
     std::vector<unsigned char> new_keys_config7 =
-            session::to_vector(admin1.keys.rekey(admin1.info, admin1.members));
+            bchat::to_vector(admin1.keys.rekey(admin1.info, admin1.members));
 
     // Make sure we can encrypt & decrypt even if the rekey is still pending:
     CHECK_NOTHROW(
-            admin1.keys.decrypt_message(admin1.keys.encrypt_message(session::to_span("abc"))));
+            admin1.keys.decrypt_message(admin1.keys.encrypt_message(bchat::to_span("abc"))));
 
     auto [iseq7, ipush7, iobs7] = admin1.info.push();
     REQUIRE(ipush7.size() == 1);
@@ -580,7 +580,7 @@ TEST_CASE("Group Keys - C API", "[config][groups][keys][c]") {
     struct pseudo_client {
         std::array<unsigned char, 64> secret_key;
         const std::span<const unsigned char> public_key{secret_key.data() + 32, 32};
-        std::string session_id{session_id_from_ed(public_key)};
+        std::string bchat_id{bchat_id_from_ed(public_key)};
 
         config_group_keys* keys;
         config_object* info;
@@ -653,17 +653,17 @@ TEST_CASE("Group Keys - C API", "[config][groups][keys][c]") {
     for (int i = 0; i < 4; ++i)
         members.emplace_back(member_seeds[i], false, group_pk.data(), std::nullopt);
 
-    REQUIRE(admins[0].session_id ==
+    REQUIRE(admins[0].bchat_id ==
             "05f1e8b64bbf761edf8f7b47e3a1f369985644cce0a62adb8e21604474bdd49627");
-    REQUIRE(admins[1].session_id ==
+    REQUIRE(admins[1].bchat_id ==
             "05c5ba413c336f2fe1fb9a2c525f8a86a412a1db128a7841b4e0e217fa9eb7fd5e");
-    REQUIRE(members[0].session_id ==
+    REQUIRE(members[0].bchat_id ==
             "05ece06dd8e02fb2f7d9497f956a1996e199953c651f4016a2f79a3b3e38d55628");
-    REQUIRE(members[1].session_id ==
+    REQUIRE(members[1].bchat_id ==
             "053ac269b71512776b0bd4a1234aaf93e67b4e9068a2c252f3b93a20acb590ae3c");
-    REQUIRE(members[2].session_id ==
+    REQUIRE(members[2].bchat_id ==
             "05a2b03abdda4df8316f9d7aed5d2d1e483e9af269d0b39191b08321b8495bc118");
-    REQUIRE(members[3].session_id ==
+    REQUIRE(members[3].bchat_id ==
             "050a41669a06c098f22633aee2eba03764ef6813bd4f770a3a2b9033b868ca470d");
 
     for (const auto& a : admins)
@@ -676,7 +676,7 @@ TEST_CASE("Group Keys - C API", "[config][groups][keys][c]") {
     config_group_member new_admin1;
 
     REQUIRE(groups_members_get_or_construct(
-            admin1.members, &new_admin1, admin1.session_id.c_str()));
+            admin1.members, &new_admin1, admin1.bchat_id.c_str()));
 
     new_admin1.admin = true;
     groups_members_set(admin1.members, &new_admin1);
@@ -768,7 +768,7 @@ TEST_CASE("Group Keys - C API", "[config][groups][keys][c]") {
         config_group_member new_mem;
 
         REQUIRE(groups_members_get_or_construct(
-                members[i].members, &new_mem, members[i].session_id.c_str()));
+                members[i].members, &new_mem, members[i].bchat_id.c_str()));
         new_mem.admin = false;
         groups_members_set(admin1.members, &new_mem);
     }
@@ -870,25 +870,25 @@ TEST_CASE("Group Keys - swarm authentication", "[config][groups][keys][swarm]") 
 
     pseudo_client admin{admin_seed, true, group_pk.data(), group_sk.data()};
     pseudo_client member{member_seed, false, group_pk.data(), std::nullopt};
-    session::config::UserGroups member_groups{member_seed, std::nullopt};
+    bchat::config::UserGroups member_groups{member_seed, std::nullopt};
 
-    CHECK(admin.session_id == "05f1e8b64bbf761edf8f7b47e3a1f369985644cce0a62adb8e21604474bdd49627");
+    CHECK(admin.bchat_id == "05f1e8b64bbf761edf8f7b47e3a1f369985644cce0a62adb8e21604474bdd49627");
 
-    CHECK(member.session_id ==
+    CHECK(member.bchat_id ==
           "05c5ba413c336f2fe1fb9a2c525f8a86a412a1db128a7841b4e0e217fa9eb7fd5"
           "e");
     CHECK(oxenc::to_hex(group_pk.begin(), group_pk.end()) ==
           "c50cb3ae956947a8de19135b5be2685ff348afc63fc34a837aca12bc5c1f5625");
     CHECK(member.info.id == "03c50cb3ae956947a8de19135b5be2685ff348afc63fc34a837aca12bc5c1f5625");
 
-    auto auth_data = admin.keys.swarm_make_subaccount(member.session_id);
+    auto auth_data = admin.keys.swarm_make_subaccount(member.bchat_id);
     {
         auto g = member_groups.get_or_construct_group(member.info.id);
         g.auth_data = auth_data;
         member_groups.set(g);
     }
 
-    session::config::UserGroups member_gr2{member_seed, std::nullopt};
+    bchat::config::UserGroups member_gr2{member_seed, std::nullopt};
     auto [seqno, push, obs] = member_groups.push();
 
     REQUIRE(push.size() == 1);
@@ -903,7 +903,7 @@ TEST_CASE("Group Keys - swarm authentication", "[config][groups][keys][swarm]") 
     CHECK(g->id == member.info.id);
     CHECK(g->auth_data == auth_data);
 
-    auto to_sign = session::to_span("retrieve9991693340111000");
+    auto to_sign = bchat::to_span("retrieve9991693340111000");
     auto subauth_b64 = member.keys.swarm_subaccount_sign(to_sign, auth_data);
 
     CHECK(subauth_b64.subaccount == "AwMAAIWvMR2nJXCFnK5+hNahNecWqMC39/TVVLjaR3imNug5");
@@ -927,8 +927,8 @@ TEST_CASE("Group Keys - swarm authentication", "[config][groups][keys][swarm]") 
                   reinterpret_cast<const unsigned char*>(subauth.subaccount.substr(4).data())));
 
     CHECK(member.keys.swarm_verify_subaccount(auth_data));
-    CHECK(session::config::groups::Keys::swarm_verify_subaccount(
-            member.info.id, session::to_span(member.secret_key), auth_data));
+    CHECK(bchat::config::groups::Keys::swarm_verify_subaccount(
+            member.info.id, bchat::to_span(member.secret_key), auth_data));
 
     // Try flipping a bit in each position of the auth data and make sure it fails to validate:
     for (size_t i = 0; i < auth_data.size(); i++) {
@@ -939,8 +939,8 @@ TEST_CASE("Group Keys - swarm authentication", "[config][groups][keys][swarm]") 
                 continue;
             auto auth_data2 = auth_data;
             auth_data2[i] ^= 1 << b;
-            CHECK_FALSE(session::config::groups::Keys::swarm_verify_subaccount(
-                    member.info.id, session::to_span(member.secret_key), auth_data2));
+            CHECK_FALSE(bchat::config::groups::Keys::swarm_verify_subaccount(
+                    member.info.id, bchat::to_span(member.secret_key), auth_data2));
         }
     }
 }
@@ -966,13 +966,13 @@ TEST_CASE("Group Keys promotion", "[config][groups][keys][promotion]") {
 
     std::vector<std::pair<std::string, std::span<const unsigned char>>> configs;
     {
-        auto m = admin.members.get_or_construct(admin.session_id);
+        auto m = admin.members.get_or_construct(admin.bchat_id);
         m.admin = true;
         m.name = "Lrrr";
         admin.members.set(m);
     }
     {
-        auto m = admin.members.get_or_construct(member.session_id);
+        auto m = admin.members.get_or_construct(member.bchat_id);
         m.admin = false;
         m.name = "Nibbler";
         admin.members.set(m);
@@ -999,7 +999,7 @@ TEST_CASE("Group Keys promotion", "[config][groups][keys][promotion]") {
 
     member.keys.load_key_message(
             "keyhash2",
-            admin.keys.key_supplement(member.session_id),
+            admin.keys.key_supplement(member.bchat_id),
             get_timestamp_ms(),
             member.info,
             member.members);
@@ -1018,7 +1018,7 @@ TEST_CASE("Group Keys promotion", "[config][groups][keys][promotion]") {
     REQUIRE(member.info.is_readonly());
     REQUIRE(member.members.is_readonly());
 
-    member.keys.load_admin_key(session::to_span(group_sk), member.info, member.members);
+    member.keys.load_admin_key(bchat::to_span(group_sk), member.info, member.members);
 
     CHECK(member.keys.admin());
     CHECK_FALSE(member.members.is_readonly());

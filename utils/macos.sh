@@ -2,8 +2,8 @@
 
 set -e
 
-if ! [ -f LICENSE ] || ! [ -d include/session ]; then
-    echo "You need to run this as ./utils/macos.sh from the top-level libsession-util project directory"
+if ! [ -f LICENSE ] || ! [ -d include/bchat ]; then
+    echo "You need to run this as ./utils/macos.sh from the top-level libbchat-util project directory"
     exit 1
 fi
 
@@ -12,7 +12,7 @@ if ! command -v xcodebuild; then
     exit 1
 fi
 
-archive="${1:-libsession-util-macos-TAG.tar.xz}"
+archive="${1:-libbchat-util-macos-TAG.tar.xz}"
 
 if [[ "$archive" =~ TAG ]]; then
     if [ -n "$DRONE_TAG" ]; then
@@ -60,10 +60,10 @@ pkg_dir="build-macos/$pkg"
 mkdir -p "$pkg_dir"/{lib,include}
 
 # Combine arch builds a multi-arch lib
-lipo -create build-macos/{arm64,x86_64}/libsession-util.a -output "$pkg_dir"/lib/libsession-util.a
+lipo -create build-macos/{arm64,x86_64}/libbchat-util.a -output "$pkg_dir"/lib/libbchat-util.a
 
 # Copy the headers over
-cp -rv include/session "$pkg_dir/include"
+cp -rv include/bchat "$pkg_dir/include"
 
 (cd build-macos && tar cvJf "$archive" "$pkg")
 

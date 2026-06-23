@@ -1,0 +1,635 @@
+#pragma once
+
+#include <chrono>
+#include <cstddef>
+#include <iterator>
+#include <memory>
+#include <bchat/config.hpp>
+
+#include "base.hpp"
+#include "community.hpp"
+#include "expiring.hpp"
+#include "namespaces.hpp"
+#include "notify.hpp"
+#include "pro.hpp"
+#include "profile_pic.hpp"
+
+extern "C" struct contacts_contact;
+extern "C" struct contacts_blinded_contact;
+
+using namespace std::literals;
+
+namespace bchat::config {
+
+/// keys used in this config, either currently or in the past (so that we don't reuse):
+///
+/// c - dict of contacts; within this dict each key is the bchat pubkey (binary, 33 bytes) and
+///     value is a dict containing keys:
+///
+///     n - contact name (string).  This is always serialized, even if empty (but empty indicates
+///         no name) so that we always have at least one key set (required to keep the dict value
+///         alive as empty dicts get pruned).
+///     N - contact nickname (string)
+///     p - profile url (string)
+///     q - profile decryption key (binary)
+///     a - 1 if approved, omitted otherwise (int)
+///     A - 1 if remote has approved me, omitted otherwise (int)
+///     b - 1 if contact is blocked, omitted otherwise
+///     @ - notification setting (int).  Omitted = use default setting; 1 = all; 2 = disabled.
+///     ! - mute timestamp: if this is set then notifications are to be muted until the given unix
+///         timestamp (seconds, not milliseconds).
+///     + - the conversation priority; -1 means hidden; omitted means not pinned; otherwise an
+///         integer value >0, where a higher priority means the conversation is meant to appear
+///         earlier in the pinned conversation list.
+///     e - Disappearing messages expiration type.  Omitted if disappearing messages are not enabled
+///         for the conversation with this contact; 1 for delete-after-send, and 2 for
+///         delete-after-read.
+///     E - Disappearing message timer, in seconds.  Omitted when `e` is omitted.
+///     j - Unix timestamp (seconds) when the contact was created ("j" to match user_groups
+///         equivalent "j"oined field). Omitted if 0.
+///     t - The `profile_updated` unix timestamp (seconds) for this contacts profile information.
+///     f - bchat pro profile features bitset for this contact
+///
+/// b - dict of blinded contacts.  This is a nested dict where the outer keys are the BASE_URL of
+///     the community the blinded contact originated from and the outer value is a dict containing:
+///
+///     `#` - the 32-byte server pubkey
+///     `R` - dict of blinded contacts from the server; each key is the blinded bchat pubkey
+///     without the prefix ("R" to match user_groups equivalent "R"oom field, and to make use of
+///     existing community iterators, binary, 32 bytes), value is a dict containing keys:
+///
+///       n - contact name (string).  This is always serialized, even if empty (but empty indicates
+///           no name) so that we always have at least one key set (required to keep the dict value
+///           alive as empty dicts get pruned).
+///       p - profile url (string)
+///       q - profile decryption key (binary)
+///       t - The `profile_updated` unix timestamp (seconds) for this contacts profile information.
+///       + - the conversation priority; -1 means hidden; omitted means not pinned; otherwise an
+///           integer value >0, where a higher priority means the conversation is meant to appear
+///           earlier in the pinned conversation list.
+///       j - Unix timestamp (seconds) when the contact was created ("j" to match user_groups
+///           equivalent "j"oined field). Omitted if 0.
+///       y - flag indicating whether the blinded message request is using legac"y" blinding.
+///       f - bchat pro profile features bitset for this blinded contact
+
+struct contact_info {
+    static constexpr size_t MAX_NAME_LENGTH = 100;
+
+    std::string bchat_id;  // in hex
+    std::string name;
+    std::string nickname;
+    profile_pic profile_picture;
+    std::chrono::sys_seconds profile_updated{};  /// The unix timestamp (seconds) that this
+                                                 /// profile information was last updated.
+    bool approved = false;
+    bool approved_me = false;
+    bool blocked = false;
+    int priority = 0;  // If >0 then this message is pinned; higher values mean higher priority
+                       // (i.e. pinned earlier in the pinned list).  If negative then this
+                       // conversation is hidden.  Otherwise (0) this is a regular, unpinned
+                       // conversation.
+    notify_mode notifications = notify_mode::defaulted;
+    int64_t mute_until = 0;  // If non-zero, disable notifications until the given unix timestamp
+                             // (seconds, overriding whatever the current `notifications` value is
+                             // until the timestamp expires).
+    expiration_mode exp_mode = expiration_mode::none;  // The expiry time; none if not expiring.
+    std::chrono::seconds exp_timer{0};                 // The expiration timer (in seconds)
+    int64_t created = 0;  // Unix timestamp (seconds) when this contact was added
+
+    ProProfileBitset profile_bitset = {};
+
+    explicit contact_info(std::string sid);
+
+    // Internal ctor/method for C API implementations:
+    contact_info(const struct contacts_contact& c);  // From c struct
+                                                     //
+    /// API: contacts/contact_info::into
+    ///
+    /// converts the contact info into a c struct
+    ///
+    /// Inputs:
+    /// - `c` -- Return Parameter that will be filled with data in contact_info
+    void into(contacts_contact& c) const;
+
+    /// API: contacts/contact_info::set_name
+    ///
+    /// Sets a name or nickname; this is exactly the same as assigning to .name/.nickname directly,
+    /// except that we throw an exception if the given name is longer than MAX_NAME_LENGTH.
+    ///
+    /// Inputs:
+    /// - `name` -- Name to assign to the contact
+    void set_name(std::string name);
+    void set_nickname(std::string nickname);
+    void set_nickname_truncated(std::string nickname);
+
+  private:
+    friend class Contacts;
+    void load(const dict& info_dict);
+};
+
+struct blinded_contact_info {
+    const std::string bchat_id() const;  // in hex
+    std::string name;
+    profile_pic profile_picture;
+    std::chrono::sys_seconds profile_updated{};  /// The unix timestamp (seconds) that this
+                                                 /// profile information was last updated.
+    int priority = 0;  // If >0 then this message is pinned; higher values mean higher priority
+                       // (i.e. pinned earlier in the pinned list).  If negative then this
+                       // conversation is hidden.  Otherwise (0) this is a regular, unpinned
+                       // conversation.
+
+    bool legacy_blinding;
+    std::chrono::sys_seconds created{};  // Unix timestamp (seconds) when this contact was added
+
+    ProProfileBitset profile_bitset = {};
+
+    blinded_contact_info() = default;
+    explicit blinded_contact_info(
+            std::string_view community_base_url,
+            std::span<const unsigned char> community_pubkey,
+            std::string_view blinded_id);
+
+    // Internal ctor/method for C API implementations:
+    blinded_contact_info(const struct contacts_blinded_contact& c);  // From c struct
+
+    /// API: contacts/blinded_contact_info::into
+    ///
+    /// converts the contact info into a c struct
+    ///
+    /// Inputs:
+    /// - `c` -- Return Parameter that will be filled with data in blinded_contact_info
+    void into(contacts_blinded_contact& c) const;
+
+    /// API: contacts/blinded_contact_info::set_name
+    ///
+    /// Sets a name; this is exactly the same as assigning to .name directly,
+    /// except that we throw an exception if the given name is longer than MAX_NAME_LENGTH.
+    ///
+    /// Inputs:
+    /// - `name` -- Name to assign to the contact
+    void set_name(std::string name);
+
+    /// API: contacts/blinded_contact_info::community_base_url
+    ///
+    /// Accesses the base url for the community (i.e. not including room or pubkey). Always
+    /// lower-case/normalized.
+    ///
+    /// Inputs: None
+    ///
+    /// Outputs:
+    /// - `const std::string&` -- Returns the base url
+    const std::string& community_base_url() const { return comm.base_url(); }
+
+    /// API: contacts/blinded_contact_info::community_pubkey
+    ///
+    /// Accesses the community server pubkey (32 bytes).
+    ///
+    /// Inputs: None
+    ///
+    /// Outputs:
+    /// - `const std::vector<unsigned char>&` -- Returns the pubkey
+    const std::vector<unsigned char>& community_pubkey() const { return comm.pubkey(); }
+
+    /// API: contacts/blinded_contact_info::community_pubkey_hex
+    ///
+    /// Accesses the community server pubkey as hex (64 hex digits).
+    ///
+    /// Inputs: None
+    ///
+    /// Outputs:
+    /// - `std::string` -- Returns the pubkey
+    std::string community_pubkey_hex() const { return comm.pubkey_hex(); }
+
+  private:
+    friend class Contacts;
+    friend struct bchat::config::comm_iterator_helper;
+
+    community comm;
+
+    void load(const dict& info_dict);
+
+    /// These functions are here so we can use the `comm_iterator_helper` for loading data
+    /// into this struct
+    void set_base_url(std::string_view base_url);
+    void set_room(std::string_view room);
+    void set_pubkey(std::span<const unsigned char> pubkey);
+    void set_pubkey(std::string_view pubkey);
+};
+
+class Contacts : public ConfigBase {
+
+  public:
+    // No default constructor
+    Contacts() = delete;
+
+    /// API: contacts/Contacts::Contacts
+    ///
+    /// Constructs a contact list from existing data (stored from `dump()`) and the user's secret
+    /// key for generating the data encryption key.  To construct a blank list (i.e. with no
+    /// pre-existing dumped data to load) pass `std::nullopt` as the second argument.
+    ///
+    /// Inputs:
+    /// - `ed25519_secretkey` -- contains the libsodium secret key used to encrypt/decrypt the
+    /// data when pushing/pulling from the swarm.  This can either be the full 64-byte value (which
+    /// is technically the 32-byte seed followed by the 32-byte pubkey), or just the 32-byte seed of
+    /// the secret key.
+    /// - `dumped` -- either `std::nullopt` to construct a new, empty object; or binary state data
+    /// that was previously dumped from an instance of this class by calling `dump()`.
+    ///
+    /// Outputs:
+    /// - `Contact` - Constructor
+    Contacts(
+            std::span<const unsigned char> ed25519_secretkey,
+            std::optional<std::span<const unsigned char>> dumped);
+
+    /// API: contacts/Contacts::storage_namespace
+    ///
+    /// Returns the Contacts namespace. Is constant, will always return 3
+    ///
+    /// Inputs: None
+    ///
+    /// Outputs:
+    /// - `Namespace` - Will return 3
+    Namespace storage_namespace() const override { return Namespace::Contacts; }
+
+    /// API: contacts/Contacts::encryption_domain
+    ///
+    /// Returns the domain. Is constant, will always return "Contacts"
+    ///
+    /// Inputs: None
+    ///
+    /// Outputs:
+    /// - `const char*` - Will return "Contacts"
+    const char* encryption_domain() const override { return "Contacts"; }
+
+    /// API: contacts/Contacts::get
+    ///
+    /// Looks up and returns a contact by bchat ID (hex).  Returns nullopt if the bchat ID was
+    /// not found, otherwise returns a filled out `contact_info`.
+    ///
+    /// Inputs:
+    /// - `pubkey_hex` -- hex string of the bchat id
+    ///
+    /// Outputs:
+    /// - `std::optional<contact_info>` - Returns nullopt if bchat ID was not found, otherwise a
+    /// filled out contact_info
+    std::optional<contact_info> get(std::string_view pubkey_hex) const;
+
+    /// API: contacts/Contacts::get_or_construct
+    ///
+    /// Similar to get(), but if the bchat ID does not exist this returns a filled-out
+    /// contact_info containing the bchat_id (all other fields will be empty/defaulted).  This is
+    /// intended to be combined with `set` to set-or-create a record.
+    ///
+    /// NB: calling this does *not* add the bchat id to the contact list when called: that
+    /// requires also calling `set` with this value.
+    ///
+    /// Inputs:
+    /// - `pubkey_hex` -- hex string of the bchat id
+    ///
+    /// Outputs:
+    /// - `contact_info` - Returns a filled out contact_info
+    contact_info get_or_construct(std::string_view pubkey_hex) const;
+
+    /// API: contacts/contacts::set
+    ///
+    /// Sets or updates multiple contact info values at once with the given info.  The usual use is
+    /// to access the current info, change anything desired, then pass it back into set_contact,
+    /// e.g.:
+    ///
+    ///```cpp
+    ///     auto c = contacts.get_or_construct(pubkey);
+    ///     c.name = "BChat User 42";
+    ///     c.nickname = "BFF";
+    ///     contacts.set(c);
+    ///```
+    ///
+    /// Inputs:
+    /// - `contact` -- contact_info value to set
+    void set(const contact_info& contact);
+
+    /// API: contacts/contacts::set_name
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `name` -- string of the contacts name
+    void set_name(std::string_view bchat_id, std::string name);
+
+    /// API: contacts/contacts::set_nickname
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `nickname` -- string of the contacts nickname
+    void set_nickname(std::string_view bchat_id, std::string nickname);
+
+    /// API: contacts/contacts::set_nickname_truncated
+    ///
+    /// Alternative to `set()` for setting a single field. The same as `set_name` except truncates
+    /// the value when it's too long.  (If setting multiple fields at once you should use `set()`
+    /// instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `nickname` -- string of the contacts nickname
+    void set_nickname_truncated(std::string_view bchat_id, std::string nickname);
+
+    /// API: contacts/contacts::set_profile_pic
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `profile_pic` -- profile pic of the contact
+    void set_profile_pic(std::string_view bchat_id, profile_pic pic);
+
+    /// API: contacts/contacts::set_profile_updated
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `profile_updated` -- profile updated unix timestamp (seconds) of the contact.  (To convert
+    ///   a raw s/ms/µs integer value, use bchat::to_sys_seconds).
+    void set_profile_updated(std::string_view bchat_id, std::chrono::sys_seconds profile_updated);
+
+    /// API: contacts/contacts::set_approved
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `approved` -- boolean on whether the contact is approved by me (to send messages to me)
+    void set_approved(std::string_view bchat_id, bool approved);
+
+    /// API: contacts/contacts::set_approved_me
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `approved_me` -- boolean on whether the contact has approved the user (so we can send
+    /// messages to them)
+    void set_approved_me(std::string_view bchat_id, bool approved_me);
+
+    /// API: contacts/contacts::set_blocked
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `blocked` -- boolean on whether the contact is blocked by us
+    void set_blocked(std::string_view bchat_id, bool blocked);
+
+    /// API: contacts/contacts::set_priority
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `priority` -- numerical value on the contacts priority (pinned, normal, hidden etc)
+    void set_priority(std::string_view bchat_id, int priority);
+
+    /// API: contacts/contacts::set_notifications
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `notifications` -- detail on notifications
+    void set_notifications(std::string_view bchat_id, notify_mode notifications);
+
+    /// API: contacts/contacts::set_expiry
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `exp_mode` -- detail on expirations
+    /// - `expiration_timer` -- how long the expiration timer should be, defaults to zero
+    void set_expiry(
+            std::string_view bchat_id,
+            expiration_mode exp_mode,
+            std::chrono::seconds expiration_timer = 0min);
+
+    /// API: contacts/contacts::set_created
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `timestamp` -- standard unix timestamp of the time contact was created
+    void set_created(std::string_view bchat_id, int64_t timestamp);
+
+    /// API: contacts/contacts::set_pro_features
+    ///
+    /// Alternative to `set()` for setting a single field.  (If setting multiple fields at once you
+    /// should use `set()` instead).
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    /// - `features` -- The updated profile features to use
+    void set_pro_features(std::string_view bchat_id, ProProfileBitset features);
+
+    /// API: contacts/contacts::erase
+    ///
+    /// Removes a contact, if present.  Returns true if it was found and removed, false otherwise.
+    /// Note that this removes all fields related to a contact, even fields we do not know about.
+    ///
+    /// Inputs:
+    /// - `bchat_id` -- hex string of the bchat id
+    ///
+    /// Outputs:
+    /// - `bool` - Returns true if contact was found and removed, false otherwise
+    bool erase(std::string_view bchat_id);
+
+    /// API: contacts/contacts::size
+    ///
+    /// Returns the number of contacts.
+    ///
+    /// Inputs: None
+    ///
+    /// Outputs:
+    /// - `size_t` - Returns the number of contacts
+    size_t size() const;
+
+    /// API: contacts/contacts::empty
+    ///
+    /// Returns true if the contact list is empty.
+    ///
+    /// Inputs: None
+    ///
+    /// Outputs:
+    /// - `bool` - Returns true if the contact list is empty
+    bool empty() const { return size() == 0; }
+
+    bool accepts_protobuf() const override { return true; }
+
+  protected:
+    // Drills into the nested dicts to access community details
+    DictFieldProxy blinded_contact_field(
+            const blinded_contact_info& bc,
+            std::span<const unsigned char>* get_pubkey = nullptr) const;
+
+  public:
+    /// API: contacts/Contacts::blinded
+    ///
+    /// Retrieves a list of all known blinded contacts.
+    ///
+    /// Inputs: None
+    ///
+    /// Outputs:
+    /// - `std::vector<blinded_contact_info>` - Returns a list of blinded_contact_info
+    std::vector<blinded_contact_info> blinded() const;
+
+    /// API: contacts/Contacts::get_blinded
+    ///
+    /// Looks up and returns a blinded contact by blinded bchat ID (hex).  Returns nullopt if the
+    /// blinded bchat ID was not found, otherwise returns a filled out `blinded_contact_info`.
+    ///
+    /// Inputs:
+    /// - `blinded_id_hex` -- hex string of the bchat id
+    ///
+    /// Outputs:
+    /// - `std::optional<blinded_contact_info>` - Returns nullopt if blinded bchat ID was not
+    /// found, otherwise a filled out blinded_contact_info
+    std::optional<blinded_contact_info> get_blinded(std::string_view blinded_id_hex) const;
+
+    /// API: contacts/Contacts::get_or_construct_blinded
+    ///
+    /// Similar to get_blinded(), but if the blinded ID does not exist this returns a filled-out
+    /// blinded_contact_info containing the blinded_id, community info and legacy_blinded flag (all
+    /// other fields will be empty/defaulted).  This is intended to be combined with `set_blinded`
+    /// to set-or-create a record.
+    ///
+    /// NB: calling this does *not* add the blinded id to the blinded list when called: that
+    /// requires also calling `set_blinded` with this value.
+    ///
+    /// Inputs:
+    /// - `community_base_url` -- String of the base URL for the community this blinded id
+    /// originates from
+    /// - `community_pubkey_hex` -- Hex string of the public key for the community this blinded id
+    /// originates from
+    /// - `blinded_id_hex` -- hex string of the blinded id
+    ///
+    /// Outputs:
+    /// - `blinded_contact_info` - Returns a filled out blinded_contact_info
+    blinded_contact_info get_or_construct_blinded(
+            std::string_view community_base_url,
+            std::string_view community_pubkey_hex,
+            std::string_view blinded_id_hex);
+
+    /// API: contacts/contacts::set_blinded
+    ///
+    /// Sets or updates multiple blinded contact info values at once with the given info.  The usual
+    /// use is to access the current info, change anything desired, then pass it back into
+    /// set_blinded, e.g.:
+    ///
+    ///```cpp
+    ///     auto c = contacts.get_blinded(pubkey, legacy_blinding);
+    ///     c.name = "BChat User 42";
+    ///     contacts.set_blinded(c);
+    ///```
+    ///
+    /// Inputs:
+    /// - `bc` -- set_blinded value to set
+    void set_blinded(const blinded_contact_info& bc);
+
+    /// API: contacts/contacts::erase_blinded
+    ///
+    /// Removes a blinded contact, if present.  Returns true if it was found and removed, false
+    /// otherwise. Note that this removes all fields related to a blinded contact, even fields we do
+    /// not know about.
+    ///
+    /// Inputs:
+    /// - `base_url` -- the base url for the community this blinded contact originated from
+    /// - `blinded_id` -- hex string of the blinded id
+    ///
+    /// Outputs:
+    /// - `bool` - Returns true if contact was found and removed, false otherwise
+    bool erase_blinded(std::string_view base_url, std::string_view blinded_id);
+
+    struct iterator;
+    /// API: contacts/contacts::begin
+    ///
+    /// Iterators for iterating through all contacts.  Typically you access this implicit via a for
+    /// loop over the `Contacts` object:
+    ///
+    ///```cpp
+    ///     for (auto& contact : contacts) {
+    ///         // use contact.bchat_id, contact.name, etc.
+    ///     }
+    ///```
+    ///
+    /// This iterates in sorted order through the bchat_ids.
+    ///
+    /// It is NOT permitted to add/modify/remove records while iterating; instead such modifications
+    /// require two passes: an iterator loop to collect the required modifications, then a second
+    /// pass to apply the modifications.
+    ///
+    /// Inputs: None
+    ///
+    /// Outputs:
+    /// - `iterator` - Returns an iterator for the beginning of the contacts
+    iterator begin() const { return iterator{data["c"].dict()}; }
+
+    /// API: contacts/contacts::end
+    ///
+    /// Iterator for passing the end of the contacts
+    ///
+    /// Inputs: None
+    ///
+    /// Outputs:
+    /// - `iterator` - Returns an iterator for the end of the contacts
+    iterator end() const { return iterator{nullptr}; }
+
+    using iterator_category = std::input_iterator_tag;
+    using value_type = contact_info;
+    using reference = value_type&;
+    using pointer = value_type*;
+    using difference_type = std::ptrdiff_t;
+
+    struct iterator {
+      private:
+        std::shared_ptr<contact_info> _val;
+        dict::const_iterator _it;
+        const dict* _contacts;
+        void _load_info();
+        iterator(const dict* contacts) : _contacts{contacts} {
+            if (_contacts) {
+                _it = _contacts->begin();
+                _load_info();
+            }
+        }
+        friend class Contacts;
+
+      public:
+        bool operator==(const iterator& other) const;
+        bool operator!=(const iterator& other) const { return !(*this == other); }
+        bool done() const;  // Equivalent to comparing against the end iterator
+        contact_info& operator*() const { return *_val; }
+        contact_info* operator->() const { return _val.get(); }
+        iterator& operator++();
+        iterator operator++(int) {
+            auto copy{*this};
+            ++*this;
+            return copy;
+        }
+    };
+};
+
+}  // namespace bchat::config

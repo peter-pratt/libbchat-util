@@ -1,4 +1,4 @@
-#include "session/logging.hpp"
+#include "bchat/logging.hpp"
 
 #include <spdlog/common.h>
 
@@ -7,9 +7,9 @@
 #include <oxen/log/formatted_callback_sink.hpp>
 
 #include "oxen/log/level.hpp"
-#include "session/export.h"
+#include "bchat/export.h"
 
-namespace session {
+namespace bchat {
 
 namespace log = oxen::log;
 
@@ -55,22 +55,22 @@ void clear_loggers() {
     log::clear_sinks();
 }
 
-}  // namespace session
+}  // namespace bchat
 
 extern "C" {
 
-LIBSESSION_C_API void session_add_logger_simple(void (*callback)(const char* msg, size_t msglen)) {
+LIBBCHAT_C_API void bchat_add_logger_simple(void (*callback)(const char* msg, size_t msglen)) {
     assert(callback);
-    session::add_logger(
+    bchat::add_logger(
             [cb = std::move(callback)](std::string_view msg) { cb(msg.data(), msg.size()); });
 }
 
-LIBSESSION_C_API void session_add_logger_full(void (*callback)(
+LIBBCHAT_C_API void bchat_add_logger_full(void (*callback)(
         const char* msg, size_t msglen, const char* cat, size_t cat_len, LOG_LEVEL level)) {
     assert(callback);
-    session::add_logger(
+    bchat::add_logger(
             [cb = std::move(callback)](
-                    std::string_view msg, std::string_view category, session::LogLevel level) {
+                    std::string_view msg, std::string_view category, bchat::LogLevel level) {
                 cb(msg.data(),
                    msg.size(),
                    category.data(),
@@ -79,28 +79,28 @@ LIBSESSION_C_API void session_add_logger_full(void (*callback)(
             });
 }
 
-LIBSESSION_C_API void session_logger_reset_level(LOG_LEVEL level) {
+LIBBCHAT_C_API void bchat_logger_reset_level(LOG_LEVEL level) {
     oxen::log::reset_level(static_cast<oxen::log::Level>(level));
 }
-LIBSESSION_C_API void session_logger_set_level_default(LOG_LEVEL level) {
+LIBBCHAT_C_API void bchat_logger_set_level_default(LOG_LEVEL level) {
     oxen::log::set_level_default(static_cast<oxen::log::Level>(level));
 }
-LIBSESSION_C_API LOG_LEVEL session_logger_get_level_default() {
+LIBBCHAT_C_API LOG_LEVEL bchat_logger_get_level_default() {
     return static_cast<LOG_LEVEL>(oxen::log::get_level_default());
 }
-LIBSESSION_C_API void session_logger_set_level(const char* cat_name, LOG_LEVEL level) {
+LIBBCHAT_C_API void bchat_logger_set_level(const char* cat_name, LOG_LEVEL level) {
     oxen::log::set_level(cat_name, static_cast<oxen::log::Level>(level));
 }
-LIBSESSION_C_API LOG_LEVEL session_logger_get_level(const char* cat_name) {
+LIBBCHAT_C_API LOG_LEVEL bchat_logger_get_level(const char* cat_name) {
     return static_cast<LOG_LEVEL>(oxen::log::get_level(cat_name));
 }
 
-LIBSESSION_C_API void session_manual_log(const char* msg) {
-    session::manual_log(msg);
+LIBBCHAT_C_API void bchat_manual_log(const char* msg) {
+    bchat::manual_log(msg);
 }
 
-LIBSESSION_C_API void session_clear_loggers() {
-    session::clear_loggers();
+LIBBCHAT_C_API void bchat_clear_loggers() {
+    bchat::clear_loggers();
 }
 
 }  // extern "C"

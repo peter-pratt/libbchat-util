@@ -1,4 +1,4 @@
-#include "session/ed25519.hpp"
+#include "bchat/ed25519.hpp"
 
 #include <sodium/crypto_generichash_blake2b.h>
 #include <sodium/crypto_sign.h>
@@ -6,8 +6,8 @@
 
 #include <stdexcept>
 
-#include "session/export.h"
-#include "session/sodium_array.hpp"
+#include "bchat/export.h"
+#include "bchat/sodium_array.hpp"
 
 template <size_t N>
 using uc32 = std::array<unsigned char, 32>;
@@ -22,7 +22,7 @@ uc64 derived_ed25519_privkey(std::span<const unsigned char> ed25519_seed, std::s
     // Construct seed for derived key
     //   new_seed = Blake2b32(ed25519_seed, key=<key>)
     //   b/B      = Ed25519FromSeed(new_seed)
-    session::cleared_uc32 s2 = {};
+    bchat::cleared_uc32 s2 = {};
     int hash_result = crypto_generichash_blake2b(
             s2.data(),
             s2.size(),
@@ -32,12 +32,12 @@ uc64 derived_ed25519_privkey(std::span<const unsigned char> ed25519_seed, std::s
             key.size());
     assert(hash_result == 0);  // This function can't return 0 unless misused
 
-    auto [pubkey, privkey] = session::ed25519::ed25519_key_pair(s2);
+    auto [pubkey, privkey] = bchat::ed25519::ed25519_key_pair(s2);
     return privkey;
 }
 }  // namespace
 
-namespace session::ed25519 {
+namespace bchat::ed25519 {
 
 std::pair<std::array<unsigned char, 32>, std::array<unsigned char, 64>> ed25519_key_pair() {
     std::array<unsigned char, 32> ed_pk;
@@ -111,17 +111,17 @@ bool verify(
 
 std::array<unsigned char, 64> ed25519_pro_privkey_for_ed25519_seed(
         std::span<const unsigned char> ed25519_seed) {
-    auto result = derived_ed25519_privkey(ed25519_seed, "SessionProRandom");
+    auto result = derived_ed25519_privkey(ed25519_seed, "BChatProRandom");
     return result;
 }
-}  // namespace session::ed25519
+}  // namespace bchat::ed25519
 
-using namespace session;
+using namespace bchat;
 
-LIBSESSION_C_API bool session_ed25519_key_pair(
+LIBBCHAT_C_API bool bchat_ed25519_key_pair(
         unsigned char* ed25519_pk_out, unsigned char* ed25519_sk_out) {
     try {
-        auto result = session::ed25519::ed25519_key_pair();
+        auto result = bchat::ed25519::ed25519_key_pair();
         auto [ed_pk, ed_sk] = result;
         std::memcpy(ed25519_pk_out, ed_pk.data(), ed_pk.size());
         std::memcpy(ed25519_sk_out, ed_sk.data(), ed_sk.size());
@@ -131,12 +131,12 @@ LIBSESSION_C_API bool session_ed25519_key_pair(
     }
 }
 
-LIBSESSION_C_API bool session_ed25519_key_pair_seed(
+LIBBCHAT_C_API bool bchat_ed25519_key_pair_seed(
         const unsigned char* ed25519_seed,
         unsigned char* ed25519_pk_out,
         unsigned char* ed25519_sk_out) {
     try {
-        auto result = session::ed25519::ed25519_key_pair(
+        auto result = bchat::ed25519::ed25519_key_pair(
                 std::span<const unsigned char>{ed25519_seed, 32});
         auto [ed_pk, ed_sk] = result;
         std::memcpy(ed25519_pk_out, ed_pk.data(), ed_pk.size());
@@ -147,10 +147,10 @@ LIBSESSION_C_API bool session_ed25519_key_pair_seed(
     }
 }
 
-LIBSESSION_C_API bool session_seed_for_ed_privkey(
+LIBBCHAT_C_API bool bchat_seed_for_ed_privkey(
         const unsigned char* ed25519_privkey, unsigned char* ed25519_seed_out) {
     try {
-        auto result = session::ed25519::seed_for_ed_privkey(
+        auto result = bchat::ed25519::seed_for_ed_privkey(
                 std::span<const unsigned char>{ed25519_privkey, 64});
         std::memcpy(ed25519_seed_out, result.data(), result.size());
         return true;
@@ -159,13 +159,13 @@ LIBSESSION_C_API bool session_seed_for_ed_privkey(
     }
 }
 
-LIBSESSION_C_API bool session_ed25519_sign(
+LIBBCHAT_C_API bool bchat_ed25519_sign(
         const unsigned char* ed25519_privkey,
         const unsigned char* msg,
         size_t msg_len,
         unsigned char* ed25519_sig_out) {
     try {
-        auto result = session::ed25519::sign(
+        auto result = bchat::ed25519::sign(
                 std::span<const unsigned char>{ed25519_privkey, 64},
                 std::span<const unsigned char>{msg, msg_len});
         std::memcpy(ed25519_sig_out, result.data(), result.size());
@@ -175,22 +175,22 @@ LIBSESSION_C_API bool session_ed25519_sign(
     }
 }
 
-LIBSESSION_C_API bool session_ed25519_verify(
+LIBBCHAT_C_API bool bchat_ed25519_verify(
         const unsigned char* sig,
         const unsigned char* pubkey,
         const unsigned char* msg,
         size_t msg_len) {
-    return session::ed25519::verify(
+    return bchat::ed25519::verify(
             std::span<const unsigned char>{sig, 64},
             std::span<const unsigned char>{pubkey, 32},
             std::span<const unsigned char>{msg, msg_len});
 }
 
-LIBSESSION_C_API bool session_ed25519_pro_privkey_for_ed25519_seed(
+LIBBCHAT_C_API bool bchat_ed25519_pro_privkey_for_ed25519_seed(
         const unsigned char* ed25519_seed, unsigned char* ed25519_sk_out) {
     try {
         auto seed = std::span<const unsigned char>(ed25519_seed, 32);
-        uc64 sk = session::ed25519::ed25519_pro_privkey_for_ed25519_seed(seed);
+        uc64 sk = bchat::ed25519::ed25519_pro_privkey_for_ed25519_seed(seed);
         std::memcpy(ed25519_sk_out, sk.data(), sk.size());
         return true;
     } catch (...) {

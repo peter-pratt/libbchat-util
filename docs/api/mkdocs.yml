@@ -1,11 +1,11 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
-site_name: Libsession Utils API Functions
-repo_url: https://github.com/session-foundation/libsession-util
-copyright: Copyright &copy; 2025 - Session Technology Foundation (Session Technology Stiftung)
+site_name: Libbchat Utils API Functions
+repo_url: https://github.com/bchat-foundation/libbchat-util
+copyright: Copyright &copy; 2025 - BChat Technology Foundation (BChat Technology Stiftung)
 extra:
   social:
     - icon: fontawesome/brands/github 
-      link: https://github.com/session-foundation/libsession-util
+      link: https://github.com/bchat-foundation/libbchat-util
 extra_css:
   - stylesheets/extra.css
   - https://unpkg.com/katex@0/dist/katex.min.css

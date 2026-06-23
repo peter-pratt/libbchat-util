@@ -12,31 +12,31 @@
 
 using namespace oxen::log::literals;
 
-namespace session::config {
+namespace bchat::config {
 
 namespace {
 
-    constexpr std::array all_session_id_prefixes = {
-            session::SessionIDPrefix::standard,
-            session::SessionIDPrefix::group,
-            session::SessionIDPrefix::community_blinded_legacy,
-            session::SessionIDPrefix::community_blinded,
-            session::SessionIDPrefix::version_blinded,
-            session::SessionIDPrefix::unblinded};
+    constexpr std::array all_bchat_id_prefixes = {
+            bchat::BChatIDPrefix::standard,
+            bchat::BChatIDPrefix::group,
+            bchat::BChatIDPrefix::community_blinded_legacy,
+            bchat::BChatIDPrefix::community_blinded,
+            bchat::BChatIDPrefix::version_blinded,
+            bchat::BChatIDPrefix::unblinded};
 
 }  // namespace
 
-void check_session_id(std::string_view session_id, std::string_view prefix) {
-    if (!(session_id.size() == 64 + prefix.size() && oxenc::is_hex(session_id) &&
-          session_id.substr(0, prefix.size()) == prefix))
+void check_bchat_id(std::string_view bchat_id, std::string_view prefix) {
+    if (!(bchat_id.size() == 64 + prefix.size() && oxenc::is_hex(bchat_id) &&
+          bchat_id.substr(0, prefix.size()) == prefix))
         throw std::invalid_argument{
-                "Invalid session ID: expected 66 hex digits starting with " + std::string{prefix} +
-                "; got " + std::string{session_id}};
+                "Invalid bchat ID: expected 66 hex digits starting with " + std::string{prefix} +
+                "; got " + std::string{bchat_id}};
 }
 
-SessionIDPrefix get_session_id_prefix(std::string_view id) {
+BChatIDPrefix get_bchat_id_prefix(std::string_view id) {
     if (oxenc::is_hex(id) && id.size() == 66) {
-        for (auto prefix : all_session_id_prefixes) {
+        for (auto prefix : all_bchat_id_prefixes) {
             auto prefix_str = to_string(prefix);
 
             if ((id.size() == 64 + prefix_str.size() &&
@@ -47,21 +47,21 @@ SessionIDPrefix get_session_id_prefix(std::string_view id) {
 
     // If we get here then the id wasn't any of the currently defined prefixes
     throw std::invalid_argument{fmt::format(
-            "Invalid session ID: expected 66 hex digits starting with one of [{}]; got {}",
-            fmt::join(all_session_id_prefixes, ", "),
+            "Invalid bchat ID: expected 66 hex digits starting with one of [{}]; got {}",
+            fmt::join(all_bchat_id_prefixes, ", "),
             id)};
 }
 
-std::string session_id_to_bytes(std::string_view session_id, std::string_view prefix) {
-    check_session_id(session_id, prefix);
-    return oxenc::from_hex(session_id);
+std::string bchat_id_to_bytes(std::string_view bchat_id, std::string_view prefix) {
+    check_bchat_id(bchat_id, prefix);
+    return oxenc::from_hex(bchat_id);
 }
 
-std::array<unsigned char, 32> session_id_pk(std::string_view session_id, std::string_view prefix) {
-    check_session_id(session_id, prefix);
+std::array<unsigned char, 32> bchat_id_pk(std::string_view bchat_id, std::string_view prefix) {
+    check_bchat_id(bchat_id, prefix);
     std::array<unsigned char, 32> pk;
-    session_id.remove_prefix(2);
-    oxenc::from_hex(session_id.begin(), session_id.end(), pk.begin());
+    bchat_id.remove_prefix(2);
+    oxenc::from_hex(bchat_id.begin(), bchat_id.end(), pk.begin());
     return pk;
 }
 
@@ -93,34 +93,34 @@ void make_lc(std::string& s) {
 }
 
 template <typename Scalar>
-const Scalar* maybe_scalar(const session::config::dict& d, const char* key) {
+const Scalar* maybe_scalar(const bchat::config::dict& d, const char* key) {
     if (auto it = d.find(key); it != d.end())
-        if (auto* sc = std::get_if<session::config::scalar>(&it->second))
+        if (auto* sc = std::get_if<bchat::config::scalar>(&it->second))
             if (auto* i = std::get_if<Scalar>(sc))
                 return i;
     return nullptr;
 }
 
-const session::config::set* maybe_set(const session::config::dict& d, const char* key) {
+const bchat::config::set* maybe_set(const bchat::config::dict& d, const char* key) {
     if (auto it = d.find(key); it != d.end())
-        if (auto* s = std::get_if<session::config::set>(&it->second))
+        if (auto* s = std::get_if<bchat::config::set>(&it->second))
             return s;
     return nullptr;
 }
 
-std::optional<int64_t> maybe_int(const session::config::dict& d, const char* key) {
+std::optional<int64_t> maybe_int(const bchat::config::dict& d, const char* key) {
     if (auto* i = maybe_scalar<int64_t>(d, key))
         return *i;
     return std::nullopt;
 }
 
-int64_t int_or_0(const session::config::dict& d, const char* key) {
+int64_t int_or_0(const bchat::config::dict& d, const char* key) {
     if (auto* i = maybe_scalar<int64_t>(d, key))
         return *i;
     return 0;
 }
 
-std::optional<std::chrono::sys_seconds> maybe_ts(const session::config::dict& d, const char* key) {
+std::optional<std::chrono::sys_seconds> maybe_ts(const bchat::config::dict& d, const char* key) {
     std::optional<std::chrono::sys_seconds> result;
     if (auto* i = maybe_scalar<int64_t>(d, key))
         result.emplace(std::chrono::seconds{*i});
@@ -128,26 +128,26 @@ std::optional<std::chrono::sys_seconds> maybe_ts(const session::config::dict& d,
 }
 
 std::optional<std::chrono::sys_time<std::chrono::milliseconds>> maybe_ts_ms(
-        const session::config::dict& d, const char* key) {
+        const bchat::config::dict& d, const char* key) {
     std::optional<std::chrono::sys_time<std::chrono::milliseconds>> result;
     if (auto* i = maybe_scalar<int64_t>(d, key))
         result.emplace(std::chrono::milliseconds{*i});
     return result;
 }
 
-std::chrono::sys_seconds ts_or_epoch(const session::config::dict& d, const char* key) {
+std::chrono::sys_seconds ts_or_epoch(const bchat::config::dict& d, const char* key) {
     if (auto* i = maybe_scalar<int64_t>(d, key))
         return std::chrono::sys_seconds{std::chrono::seconds{*i}};
     return std::chrono::sys_seconds{};
 }
 
-std::optional<std::string> maybe_string(const session::config::dict& d, const char* key) {
+std::optional<std::string> maybe_string(const bchat::config::dict& d, const char* key) {
     if (auto* s = maybe_scalar<std::string>(d, key))
         return *s;
     return std::nullopt;
 }
 
-uint64_t bitset_from_set_of_int64_or_0(const session::config::set& s) {
+uint64_t bitset_from_set_of_int64_or_0(const bchat::config::set& s) {
     uint64_t result = 0;
     constexpr size_t bits_available = sizeof(result) * 8;
     for (auto& v : s) {
@@ -169,26 +169,26 @@ void set_int64_set_from_bitset(ConfigBase::DictFieldProxy&& field, uint64_t bits
     }
 }
 
-std::string string_or_empty(const session::config::dict& d, const char* key) {
+std::string string_or_empty(const bchat::config::dict& d, const char* key) {
     if (auto* s = maybe_scalar<std::string>(d, key))
         return *s;
     return ""s;
 }
 
-std::optional<std::string_view> maybe_sv(const session::config::dict& d, const char* key) {
+std::optional<std::string_view> maybe_sv(const bchat::config::dict& d, const char* key) {
     if (auto* s = maybe_scalar<std::string>(d, key))
         return *s;
     return std::nullopt;
 }
 
-std::string_view sv_or_empty(const session::config::dict& d, const char* key) {
+std::string_view sv_or_empty(const bchat::config::dict& d, const char* key) {
     if (auto* s = maybe_scalar<std::string>(d, key))
         return *s;
     return ""sv;
 }
 
 std::optional<std::vector<unsigned char>> maybe_vector(
-        const session::config::dict& d, const char* key) {
+        const bchat::config::dict& d, const char* key) {
     std::optional<std::vector<unsigned char>> result;
     if (auto* s = maybe_scalar<std::string>(d, key))
         result.emplace(
@@ -271,4 +271,4 @@ void load_unknowns(
             throw oxenc::bt_deserialize_invalid{"invalid bencoded value type"};
     }
 }
-}  // namespace session::config
+}  // namespace bchat::config

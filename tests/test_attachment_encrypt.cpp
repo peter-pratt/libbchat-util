@@ -5,13 +5,13 @@
 #include <catch2/matchers/catch_matchers_exception.hpp>
 #include <filesystem>
 #include <fstream>
-#include <session/attachments.hpp>
+#include <bchat/attachments.hpp>
 
 #include "utils.hpp"
 
-using namespace session::config;
+using namespace bchat::config;
 
-namespace attachment = session::attachment;
+namespace attachment = bchat::attachment;
 
 static std::vector<std::byte> make_data(size_t len) {
     std::vector<std::byte> v;
@@ -203,7 +203,7 @@ struct temp_data_file {
     inline static int i = 1;
     std::filesystem::path path =
             std::filesystem::temp_directory_path() /
-            std::filesystem::path{"libsession-util-attachment-test-{}"_format(i++)};
+            std::filesystem::path{"libbchat-util-attachment-test-{}"_format(i++)};
 
     ~temp_data_file() {
         if (std::filesystem::exists(path))

@@ -1,14 +1,14 @@
-#include "session/curve25519.hpp"
+#include "bchat/curve25519.hpp"
 
 #include <sodium/crypto_box.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <stdexcept>
 
-#include "session/export.h"
-#include "session/util.hpp"
+#include "bchat/export.h"
+#include "bchat/util.hpp"
 
-namespace session::curve25519 {
+namespace bchat::curve25519 {
 
 std::pair<std::array<unsigned char, 32>, std::array<unsigned char, 32>> curve25519_key_pair() {
     std::array<unsigned char, 32> curve_pk;
@@ -47,14 +47,14 @@ std::array<unsigned char, 32> to_curve25519_seckey(std::span<const unsigned char
     return curve_sk;
 }
 
-}  // namespace session::curve25519
+}  // namespace bchat::curve25519
 
-using namespace session;
+using namespace bchat;
 
-LIBSESSION_C_API bool session_curve25519_key_pair(
+LIBBCHAT_C_API bool bchat_curve25519_key_pair(
         unsigned char* curve25519_pk_out, unsigned char* curve25519_sk_out) {
     try {
-        auto result = session::curve25519::curve25519_key_pair();
+        auto result = bchat::curve25519::curve25519_key_pair();
         auto [curve_pk, curve_sk] = result;
         std::memcpy(curve25519_pk_out, curve_pk.data(), curve_pk.size());
         std::memcpy(curve25519_sk_out, curve_sk.data(), curve_sk.size());
@@ -64,10 +64,10 @@ LIBSESSION_C_API bool session_curve25519_key_pair(
     }
 }
 
-LIBSESSION_C_API bool session_to_curve25519_pubkey(
+LIBBCHAT_C_API bool bchat_to_curve25519_pubkey(
         const unsigned char* ed25519_pubkey, unsigned char* curve25519_pk_out) {
     try {
-        auto curve_pk = session::curve25519::to_curve25519_pubkey(
+        auto curve_pk = bchat::curve25519::to_curve25519_pubkey(
                 std::span<const unsigned char>{ed25519_pubkey, 32});
         std::memcpy(curve25519_pk_out, curve_pk.data(), curve_pk.size());
         return true;
@@ -76,10 +76,10 @@ LIBSESSION_C_API bool session_to_curve25519_pubkey(
     }
 }
 
-LIBSESSION_C_API bool session_to_curve25519_seckey(
+LIBBCHAT_C_API bool bchat_to_curve25519_seckey(
         const unsigned char* ed25519_seckey, unsigned char* curve25519_sk_out) {
     try {
-        auto curve_sk = session::curve25519::to_curve25519_seckey(
+        auto curve_sk = bchat::curve25519::to_curve25519_seckey(
                 std::span<const unsigned char>{ed25519_seckey, 64});
         std::memcpy(curve25519_sk_out, curve_sk.data(), curve_sk.size());
         return true;

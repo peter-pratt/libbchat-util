@@ -1,11 +1,11 @@
 #include <assert.h>
-#include <session/util.h>
+#include <bchat/util.h>
 #include <simdutf.h>
 #include <zstd.h>
 
 #include <charconv>
 #include <memory>
-#include <session/util.hpp>
+#include <bchat/util.hpp>
 #include <system_error>
 
 #ifndef _WIN32
@@ -14,7 +14,7 @@ extern "C" {
 }
 #endif
 
-namespace session {
+namespace bchat {
 
 std::vector<std::string_view> split(std::string_view str, const std::string_view delim, bool trim) {
     std::vector<std::string_view> results;
@@ -230,16 +230,16 @@ size_t utf16_count(std::span<const char16_t> utf16_string) {
     return simdutf::count_utf16(utf16_string.data(), utf16_string.size());
 }
 
-}  // namespace session
+}  // namespace bchat
 
-LIBSESSION_C_API size_t utf16_count_truncated_to_codepoints(
+LIBBCHAT_C_API size_t utf16_count_truncated_to_codepoints(
         const uint16_t* utf16_string, size_t utf16_string_len, size_t codepoint_len) {
-    return session::utf16_count_truncated_to_codepoints(
+    return bchat::utf16_count_truncated_to_codepoints(
             {reinterpret_cast<const char16_t*>(utf16_string), utf16_string_len}, codepoint_len);
 }
 
-LIBSESSION_C_API size_t utf16_count(const uint16_t* utf16_string, size_t utf16_string_len) {
-    return session::utf16_count(
+LIBBCHAT_C_API size_t utf16_count(const uint16_t* utf16_string, size_t utf16_string_len) {
+    return bchat::utf16_count(
             {reinterpret_cast<const char16_t*>(utf16_string), utf16_string_len});
 }
 

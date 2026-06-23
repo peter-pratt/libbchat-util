@@ -1,6 +1,6 @@
-#include "session/attachments.hpp"
+#include "bchat/attachments.hpp"
 
-#include <session/attachments.h>
+#include <bchat/attachments.h>
 #include <sodium/crypto_core_hchacha20.h>
 #include <sodium/crypto_generichash_blake2b.h>
 #include <sodium/crypto_secretstream_xchacha20poly1305.h>
@@ -12,13 +12,13 @@
 #include <limits>
 #include <oxen/log.hpp>
 #include <oxen/log/format.hpp>
-#include <session/util.hpp>
+#include <bchat/util.hpp>
 #include <stdexcept>
 #include <type_traits>
 
 #include "internal-util.hpp"
 
-namespace session::attachment {
+namespace bchat::attachment {
 
 using namespace oxen::log::literals;
 
@@ -893,25 +893,25 @@ void decrypt(
     }
 }
 
-}  // namespace session::attachment
+}  // namespace bchat::attachment
 
 extern "C" {
 
-using namespace session;
+using namespace bchat;
 
 const size_t ATTACHMENT_ENCRYPT_KEY_SIZE = attachment::ENCRYPT_KEY_SIZE;
 const size_t ATTACHMENT_MAX_REGULAR_SIZE = attachment::MAX_REGULAR_SIZE;
 
-LIBSESSION_C_API size_t session_attachment_encrypted_size(size_t plaintext_len) {
+LIBBCHAT_C_API size_t bchat_attachment_encrypted_size(size_t plaintext_len) {
     return attachment::encrypted_size(plaintext_len);
 }
 
-LIBSESSION_C_API size_t session_attachment_decrypted_max_size(size_t encrypted_len) {
+LIBBCHAT_C_API size_t bchat_attachment_decrypted_max_size(size_t encrypted_len) {
     return attachment::decrypted_max_size(encrypted_len)
             .value_or(std::numeric_limits<size_t>::max());
 }
 
-LIBSESSION_C_API bool session_attachment_encrypt(
+LIBBCHAT_C_API bool bchat_attachment_encrypt(
         const unsigned char* seed,
         const unsigned char* data,
         size_t datalen,
@@ -934,7 +934,7 @@ LIBSESSION_C_API bool session_attachment_encrypt(
     }
 }
 
-LIBSESSION_C_API bool session_attachment_decrypt(
+LIBBCHAT_C_API bool bchat_attachment_decrypt(
         const unsigned char* data,
         size_t datalen,
         const unsigned char* key,
@@ -958,7 +958,7 @@ LIBSESSION_C_API bool session_attachment_decrypt(
     }
 }
 
-LIBSESSION_C_API bool session_attachment_decrypt_alloc(
+LIBBCHAT_C_API bool bchat_attachment_decrypt_alloc(
         const unsigned char* data,
         size_t datalen,
         const unsigned char* key,
@@ -986,7 +986,7 @@ LIBSESSION_C_API bool session_attachment_decrypt_alloc(
     }
 }
 
-LIBSESSION_C_API size_t session_attachment_encrypt_file(
+LIBBCHAT_C_API size_t bchat_attachment_encrypt_file(
         const unsigned char* seed,
         const char* filename,
         ATTACHMENT_DOMAIN domain,
@@ -1021,7 +1021,7 @@ LIBSESSION_C_API size_t session_attachment_encrypt_file(
     }
 }
 
-LIBSESSION_C_API size_t session_attachment_decrypt_file(
+LIBBCHAT_C_API size_t bchat_attachment_decrypt_file(
         const char* file_in,
         const unsigned char* key,
         unsigned char* (*make_buffer)(size_t, void* ctx),
@@ -1046,7 +1046,7 @@ LIBSESSION_C_API size_t session_attachment_decrypt_file(
     }
 }
 
-LIBSESSION_C_API bool session_attachment_decrypt_to_file(
+LIBBCHAT_C_API bool bchat_attachment_decrypt_to_file(
         const unsigned char* data,
         size_t datalen,
         const unsigned char* key,
@@ -1065,7 +1065,7 @@ LIBSESSION_C_API bool session_attachment_decrypt_to_file(
     }
 }
 
-LIBSESSION_C_API bool session_attachment_decrypt_file_to_file(
+LIBBCHAT_C_API bool bchat_attachment_decrypt_file_to_file(
         const char* file_in, const unsigned char* key, const char* file_out, char* error) {
 
     try {

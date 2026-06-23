@@ -1,14 +1,14 @@
 #include <oxenc/endian.h>
 #include <oxenc/hex.h>
-#include <session/config/contacts.h>
-#include <session/bchat_protocol.h>
+#include <bchat/config/contacts.h>
+#include <bchat/bchat_protocol.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <random>
-#include <session/config/contacts.hpp>
-#include <session/util.hpp>
+#include <bchat/config/contacts.hpp>
+#include <bchat/util.hpp>
 #include <string_view>
 #include <thread>
 
@@ -33,7 +33,7 @@ TEST_CASE("Contacts", "[config][contacts]") {
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::Contacts contacts{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::Contacts contacts{std::span<const unsigned char>{seed}, std::nullopt};
 
     constexpr auto definitely_real_id =
             "050000000000000000000000000000000000000000000000000000000000000000"sv;
@@ -57,7 +57,7 @@ TEST_CASE("Contacts", "[config][contacts]") {
     CHECK_FALSE(c.blocked);
     CHECK_FALSE(c.profile_picture);
     CHECK(c.created == 0);
-    CHECK(c.notifications == session::config::notify_mode::defaulted);
+    CHECK(c.notifications == bchat::config::notify_mode::defaulted);
     CHECK(c.mute_until == 0);
 
     CHECK_FALSE(contacts.needs_push());
@@ -70,7 +70,7 @@ TEST_CASE("Contacts", "[config][contacts]") {
     c.approved = true;
     c.approved_me = true;
     c.created = created_ts * 1'000;
-    c.notifications = session::config::notify_mode::all;
+    c.notifications = bchat::config::notify_mode::all;
     c.mute_until = (now + 1800) * 1'000'000;
 
     contacts.set(c);
@@ -84,7 +84,7 @@ TEST_CASE("Contacts", "[config][contacts]") {
     CHECK(contacts.get(definitely_real_id)->approved_me);
     CHECK_FALSE(contacts.get(definitely_real_id)->profile_picture);
     CHECK_FALSE(contacts.get(definitely_real_id)->blocked);
-    CHECK(contacts.get(definitely_real_id)->session_id == definitely_real_id);
+    CHECK(contacts.get(definitely_real_id)->bchat_id == definitely_real_id);
 
     CHECK(contacts.needs_push());
     CHECK(contacts.needs_dump());
@@ -101,7 +101,7 @@ TEST_CASE("Contacts", "[config][contacts]") {
     // NB: Not going to check encrypted data and decryption here because that's general (not
     // specific to contacts) and is covered already in the user profile tests.
 
-    session::config::Contacts contacts2{seed, contacts.dump()};
+    bchat::config::Contacts contacts2{seed, contacts.dump()};
     CHECK_FALSE(contacts2.needs_push());
     CHECK_FALSE(contacts2.needs_dump());
     CHECK(std::get<seqno_t>(contacts2.push()) == 1);
@@ -118,12 +118,12 @@ TEST_CASE("Contacts", "[config][contacts]") {
     CHECK_FALSE(x->profile_picture);
     CHECK_FALSE(x->blocked);
     CHECK(x->created == created_ts);
-    CHECK(x->notifications == session::config::notify_mode::all);
+    CHECK(x->notifications == bchat::config::notify_mode::all);
     CHECK(x->mute_until == now + 1800);
 
     auto another_id = "051111111111111111111111111111111111111111111111111111111111111111"sv;
     auto c2 = contacts2.get_or_construct(another_id);
-    // We're not setting any fields, but we should still keep a record of the session id
+    // We're not setting any fields, but we should still keep a record of the bchat id
     contacts2.set(c2);
 
     CHECK(contacts2.needs_push());
@@ -142,21 +142,21 @@ TEST_CASE("Contacts", "[config][contacts]") {
     CHECK(std::get<seqno_t>(contacts.push()) == seqno);
 
     // Iterate through and make sure we got everything we expected
-    std::vector<std::string> session_ids;
+    std::vector<std::string> bchat_ids;
     std::vector<std::string> nicknames;
     std::vector<std::chrono::sys_seconds> profile_updateds;
     CHECK(contacts.size() == 2);
     CHECK_FALSE(contacts.empty());
     for (const auto& cc : contacts) {
-        session_ids.push_back(cc.session_id);
+        bchat_ids.push_back(cc.bchat_id);
         nicknames.emplace_back(cc.nickname.empty() ? "(N/A)" : cc.nickname);
         profile_updateds.emplace_back(cc.profile_updated);
     }
 
-    REQUIRE(session_ids.size() == 2);
-    REQUIRE(session_ids.size() == contacts.size());
-    CHECK(session_ids[0] == definitely_real_id);
-    CHECK(session_ids[1] == another_id);
+    REQUIRE(bchat_ids.size() == 2);
+    REQUIRE(bchat_ids.size() == contacts.size());
+    CHECK(bchat_ids[0] == definitely_real_id);
+    CHECK(bchat_ids[1] == another_id);
     CHECK(nicknames[0] == "Joey");
     CHECK(nicknames[1] == "(N/A)");
     CHECK(profile_updateds[0].time_since_epoch() == 1s);
@@ -170,11 +170,11 @@ TEST_CASE("Contacts", "[config][contacts]") {
     // Client 2 adds a new friend:
     auto third_id = "052222222222222222222222222222222222222222222222222222222222222222"sv;
     contacts2.set_nickname(third_id, "Nickname 3");
-    contacts2.set_profile_updated(third_id, session::to_sys_seconds(2));
+    contacts2.set_profile_updated(third_id, bchat::to_sys_seconds(2));
     contacts2.set_approved(third_id, true);
     contacts2.set_blocked(third_id, true);
 
-    session::config::profile_pic p;
+    bchat::config::profile_pic p;
     {
         // These don't stay alive, so we use set_key/set_url to make a local copy:
         std::vector<unsigned char> key = "qwerty78901234567890123456789012"_bytes;
@@ -226,17 +226,17 @@ TEST_CASE("Contacts", "[config][contacts]") {
     CHECK_FALSE(contacts.needs_push());
     CHECK_FALSE(contacts2.needs_push());
 
-    session_ids.clear();
+    bchat_ids.clear();
     nicknames.clear();
     profile_updateds.clear();
     for (const auto& cc : contacts) {
-        session_ids.push_back(cc.session_id);
+        bchat_ids.push_back(cc.bchat_id);
         nicknames.emplace_back(cc.nickname.empty() ? "(N/A)" : cc.nickname);
         profile_updateds.emplace_back(cc.profile_updated);
     }
-    REQUIRE(session_ids.size() == 2);
-    CHECK(session_ids[0] == another_id);
-    CHECK(session_ids[1] == third_id);
+    REQUIRE(bchat_ids.size() == 2);
+    CHECK(bchat_ids[0] == another_id);
+    CHECK(bchat_ids[1] == third_id);
     CHECK(nicknames[0] == "(N/A)");
     CHECK(nicknames[1] == "Nickname 3");
     CHECK(profile_updateds[0].time_since_epoch() == 0s);
@@ -292,7 +292,7 @@ TEST_CASE("Contacts (C API)", "[config][contacts][c]") {
 
     CHECK(contacts_get_or_construct(conf, &c, definitely_real_id));
 
-    CHECK(c.session_id == std::string_view{definitely_real_id});
+    CHECK(c.bchat_id == std::string_view{definitely_real_id});
     CHECK(strlen(c.name) == 0);
     CHECK(strlen(c.nickname) == 0);
     CHECK(c.profile_updated == 0);
@@ -391,7 +391,7 @@ TEST_CASE("Contacts (C API)", "[config][contacts][c]") {
     free(to_push);
 
     // Iterate through and make sure we got everything we expected
-    std::vector<std::string> session_ids;
+    std::vector<std::string> bchat_ids;
     std::vector<std::string> nicknames;
     std::vector<int64_t> profile_updateds;
 
@@ -399,15 +399,15 @@ TEST_CASE("Contacts (C API)", "[config][contacts][c]") {
     contacts_iterator* it = contacts_iterator_new(conf);
     contacts_contact ci;
     for (; !contacts_iterator_done(it, &ci); contacts_iterator_advance(it)) {
-        session_ids.push_back(ci.session_id);
+        bchat_ids.push_back(ci.bchat_id);
         nicknames.emplace_back(strlen(ci.nickname) ? ci.nickname : "(N/A)");
         profile_updateds.emplace_back(ci.profile_updated);
     }
     contacts_iterator_free(it);
 
-    REQUIRE(session_ids.size() == 2);
-    CHECK(session_ids[0] == definitely_real_id);
-    CHECK(session_ids[1] == another_id);
+    REQUIRE(bchat_ids.size() == 2);
+    CHECK(bchat_ids[0] == definitely_real_id);
+    CHECK(bchat_ids[1] == another_id);
     CHECK(nicknames[0] == "Joey");
     CHECK(nicknames[1] == "(N/A)");
     CHECK(profile_updateds[0] == 1);
@@ -418,8 +418,8 @@ TEST_CASE("Contacts (C API)", "[config][contacts][c]") {
     int deletions = 0, non_deletions = 0;
     std::vector<std::string> contacts_to_remove;
     while (!contacts_iterator_done(it, &ci)) {
-        if (ci.session_id != std::string_view{definitely_real_id}) {
-            contacts_to_remove.push_back(ci.session_id);
+        if (ci.bchat_id != std::string_view{definitely_real_id}) {
+            contacts_to_remove.push_back(ci.bchat_id);
             deletions++;
         } else {
             non_deletions++;
@@ -455,16 +455,16 @@ TEST_CASE("huge contacts compression", "[config][compression][contacts]") {
     REQUIRE(oxenc::to_hex(curve_pk.begin(), curve_pk.end()) ==
             "d2ad010eeb72d72e561d9de7bd7b6989af77dcabffa03a5111a6c859ae5c3a72");
 
-    session::config::Contacts contacts{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::Contacts contacts{std::span<const unsigned char>{seed}, std::nullopt};
 
     for (uint16_t i = 0; i < 12000; i++) {
         char buf[2];
         oxenc::write_host_as_big(i, buf);
-        std::string session_id = "05000000000000000000000000000000000000000000000000000000000000";
-        session_id += oxenc::to_hex(buf, buf + 2);
-        REQUIRE(session_id.size() == 66);
+        std::string bchat_id = "05000000000000000000000000000000000000000000000000000000000000";
+        bchat_id += oxenc::to_hex(buf, buf + 2);
+        REQUIRE(bchat_id.size() == 66);
 
-        auto c = contacts.get_or_construct(session_id);
+        auto c = contacts.get_or_construct(bchat_id);
         c.nickname = "My friend {}"_format(i);
         c.approved = true;
         c.approved_me = true;
@@ -505,30 +505,30 @@ TEST_CASE("huger contacts with multipart messages", "[config][multipart][contact
     REQUIRE(oxenc::to_hex(curve_pk.begin(), curve_pk.end()) ==
             "d2ad010eeb72d72e561d9de7bd7b6989af77dcabffa03a5111a6c859ae5c3a72");
 
-    session::config::Contacts contacts{session::to_span(seed), std::nullopt};
+    bchat::config::Contacts contacts{bchat::to_span(seed), std::nullopt};
 
     std::string friend42;
 
     for (size_t i = 0; i < 12000; i++) {
-        // Unlike the above case where we have nearly identical Session IDs, here our session IDs
+        // Unlike the above case where we have nearly identical BChat IDs, here our bchat IDs
         // are randomly generated and thus not usefully compressible, which results in a much larger
         // (compressed) config.
         std::mt19937_64 rng{i};
-        std::array<unsigned char, 33> random_sessionid;
-        random_sessionid[0] = 0x05;
+        std::array<unsigned char, 33> random_bchatid;
+        random_bchatid[0] = 0x05;
         for (int i = 1; i < 33; i += 8)
-            oxenc::write_host_as_little(rng(), random_sessionid.data() + i);
+            oxenc::write_host_as_little(rng(), random_bchatid.data() + i);
 
-        std::string session_id = oxenc::to_hex(random_sessionid);
+        std::string bchat_id = oxenc::to_hex(random_bchatid);
 
-        auto c = contacts.get_or_construct(session_id);
+        auto c = contacts.get_or_construct(bchat_id);
         c.nickname = "My friend {}"_format(i);
         c.approved = true;
         c.approved_me = true;
         contacts.set(c);
 
         if (i == 42)
-            friend42 = std::move(session_id);
+            friend42 = std::move(bchat_id);
     }
 
     CHECK(contacts.needs_push());
@@ -575,7 +575,7 @@ TEST_CASE("huger contacts with multipart messages", "[config][multipart][contact
     dump = contacts.dump();
     CHECK(dump.size() == base_dump_size + 12 * 13);  // 12 x "10:fakehashNN"
 
-    auto c2 = std::make_unique<session::config::Contacts>(session::to_span(seed), std::nullopt);
+    auto c2 = std::make_unique<bchat::config::Contacts>(bchat::to_span(seed), std::nullopt);
 
     std::vector<std::pair<std::string, std::span<const unsigned char>>> merge_configs, merge_more;
     bool dump_load_in_between = false;
@@ -657,7 +657,7 @@ TEST_CASE("huger contacts with multipart messages", "[config][multipart][contact
 
         if (dump_load_in_between) {
             auto c2b =
-                    std::make_unique<session::config::Contacts>(session::to_span(seed), c2->dump());
+                    std::make_unique<bchat::config::Contacts>(bchat::to_span(seed), c2->dump());
             CHECK_FALSE(c2b->needs_dump());
             c2 = std::move(c2b);
             CHECK_FALSE(c2->needs_dump());
@@ -700,13 +700,13 @@ TEST_CASE("multipart message expiry", "[config][multipart][contacts][expiry]") {
     REQUIRE(oxenc::to_hex(curve_pk.begin(), curve_pk.end()) ==
             "d2ad010eeb72d72e561d9de7bd7b6989af77dcabffa03a5111a6c859ae5c3a72");
 
-    session::config::Contacts contacts{session::to_span(seed), std::nullopt};
+    bchat::config::Contacts contacts{bchat::to_span(seed), std::nullopt};
 
     std::string friend42;
 
     std::array<unsigned char, 32> seedi = {0};
     for (uint16_t i = 0; i < 2000; i++) {
-        // Unlike the above case where we have nearly identical Session IDs, here our session IDs
+        // Unlike the above case where we have nearly identical BChat IDs, here our bchat IDs
         // are randomly generated from fixed seeds and thus not usefully compressible, which results
         // in a much larger (compressed) config.
         seedi[0] = i % 256;
@@ -718,16 +718,16 @@ TEST_CASE("multipart message expiry", "[config][multipart][contacts][expiry]") {
                 i_ed_sk.data(),
                 reinterpret_cast<const unsigned char*>(seedi.data()));
         rc = crypto_sign_ed25519_pk_to_curve25519(i_curve_pk.data(), i_ed_pk.data());
-        std::string session_id = "05" + oxenc::to_hex(i_curve_pk.begin(), i_curve_pk.end());
+        std::string bchat_id = "05" + oxenc::to_hex(i_curve_pk.begin(), i_curve_pk.end());
 
-        auto c = contacts.get_or_construct(session_id);
+        auto c = contacts.get_or_construct(bchat_id);
         c.nickname = "My friend {:04d}"_format(i);
         c.approved = true;
         c.approved_me = true;
         contacts.set(c);
 
         if (i == 42)
-            friend42 = std::move(session_id);
+            friend42 = std::move(bchat_id);
     }
 
     CHECK(contacts.needs_push());
@@ -742,7 +742,7 @@ TEST_CASE("multipart message expiry", "[config][multipart][contacts][expiry]") {
 
     contacts.confirm_pushed(seqno, {"fakehash0", "fakehash1"});
 
-    auto c2 = std::make_unique<session::config::Contacts>(session::to_span(seed), std::nullopt);
+    auto c2 = std::make_unique<bchat::config::Contacts>(bchat::to_span(seed), std::nullopt);
 
     c2->MULTIPART_MAX_WAIT = 200ms;
     c2->MULTIPART_MAX_REMEMBER = 600ms;
@@ -801,7 +801,7 @@ TEST_CASE("multipart message expiry", "[config][multipart][contacts][expiry]") {
     CHECK(full_size < 266300);
     // Go look for the 1:* where we store multipart info, and make sure it's within the last 100
     // bytes of the dump (to make sure that we don't have cached data stored inside it):
-    auto pattern = session::to_span("1:*");
+    auto pattern = bchat::to_span("1:*");
     auto it = std::find_end(dump.begin(), dump.end(), pattern.begin(), pattern.end());
     REQUIRE(it != dump.end());
     auto x = std::distance(dump.begin(), it);
@@ -858,7 +858,7 @@ TEST_CASE("needs_dump bug", "[config][needs_dump]") {
 
     const auto seed = "0123456789abcdef0123456789abcdef00000000000000000000000000000000"_hexbytes;
 
-    session::config::Contacts contacts{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::Contacts contacts{std::span<const unsigned char>{seed}, std::nullopt};
 
     CHECK_FALSE(contacts.needs_dump());
 
@@ -905,7 +905,7 @@ TEST_CASE("Contacts", "[config][blinded_contacts]") {
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::Contacts contacts{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::Contacts contacts{std::span<const unsigned char>{seed}, std::nullopt};
 
     constexpr auto definitely_real_id =
             "150000000000000000000000000000000000000000000000000000000000000000"sv;
@@ -924,7 +924,7 @@ TEST_CASE("Contacts", "[config][blinded_contacts]") {
 
     auto c = contacts.get_or_construct_blinded(comm_base_url, comm_pubkey_hex, definitely_real_id);
 
-    CHECK(c.session_id() == "150000000000000000000000000000000000000000000000000000000000000000");
+    CHECK(c.bchat_id() == "150000000000000000000000000000000000000000000000000000000000000000");
     CHECK(c.name.empty());
     CHECK_FALSE(c.profile_picture);
     CHECK(c.profile_updated == std::chrono::sys_seconds{});
@@ -938,7 +938,7 @@ TEST_CASE("Contacts", "[config][blinded_contacts]") {
 
     c.set_name("Joe");
     c.profile_updated = std::chrono::sys_seconds{1s};
-    c.created = session::to_sys_seconds(created_ts * 1'000);
+    c.created = bchat::to_sys_seconds(created_ts * 1'000);
     c.priority = 1;
     contacts.set_blinded(c);
 
@@ -949,7 +949,7 @@ TEST_CASE("Contacts", "[config][blinded_contacts]") {
     CHECK(contacts.get_blinded(definitely_real_id)->profile_updated.time_since_epoch() == 1s);
     CHECK(contacts.get_blinded(definitely_real_id)->priority == 1);
     CHECK(contacts.get_blinded(definitely_real_id)->legacy_blinding);
-    CHECK(contacts.get_blinded(definitely_real_id)->session_id() == definitely_real_id);
+    CHECK(contacts.get_blinded(definitely_real_id)->bchat_id() == definitely_real_id);
 
     CHECK(contacts.needs_push());
     CHECK(contacts.needs_dump());
@@ -965,7 +965,7 @@ TEST_CASE("Contacts", "[config][blinded_contacts]") {
 
     // NB: Not going to check encrypted data and decryption here because that's general (not
     // specific to contacts) and is covered already in the user profile tests.
-    session::config::Contacts contacts2{seed, contacts.dump()};
+    bchat::config::Contacts contacts2{seed, contacts.dump()};
     CHECK_FALSE(contacts2.needs_push());
     CHECK_FALSE(contacts2.needs_dump());
     CHECK(std::get<seqno_t>(contacts2.push()) == 1);
@@ -983,7 +983,7 @@ TEST_CASE("Contacts", "[config][blinded_contacts]") {
 
     auto another_id = "251111111111111111111111111111111111111111111111111111111111111111"sv;
     auto c2 = contacts2.get_or_construct_blinded(comm_base_url, comm_pubkey_hex, another_id);
-    // We're not setting any fields, but we should still keep a record of the session id
+    // We're not setting any fields, but we should still keep a record of the bchat id
     contacts2.set_blinded(c2);
 
     CHECK(contacts2.needs_push());
@@ -1003,22 +1003,22 @@ TEST_CASE("Contacts", "[config][blinded_contacts]") {
 
     // Iterate through and make sure we got everything we expected
     auto blinded = contacts.blinded();
-    std::vector<std::string> session_ids;
+    std::vector<std::string> bchat_ids;
     std::vector<std::string> names;
     std::vector<std::chrono::sys_seconds> profile_updateds;
     std::vector<bool> legacy_blindings;
     CHECK(blinded.size() == 2);
     for (const auto& cc : blinded) {
-        session_ids.push_back(cc.session_id());
+        bchat_ids.push_back(cc.bchat_id());
         names.emplace_back(cc.name.empty() ? "(N/A)" : cc.name);
         profile_updateds.emplace_back(cc.profile_updated);
         legacy_blindings.emplace_back(cc.legacy_blinding);
     }
 
-    REQUIRE(session_ids.size() == 2);
-    REQUIRE(session_ids.size() == blinded.size());
-    CHECK(session_ids[0] == definitely_real_id);
-    CHECK(session_ids[1] == another_id);
+    REQUIRE(bchat_ids.size() == 2);
+    REQUIRE(bchat_ids.size() == blinded.size());
+    CHECK(bchat_ids[0] == definitely_real_id);
+    CHECK(bchat_ids[1] == another_id);
     CHECK(names[0] == "Joe");
     CHECK(names[1] == "(N/A)");
     CHECK(profile_updateds[0].time_since_epoch() == 1s);
@@ -1036,7 +1036,7 @@ TEST_CASE("Contacts", "[config][blinded_contacts]") {
     auto c3 = contacts2.get_or_construct_blinded(comm_base_url, comm_pubkey_hex, third_id);
     c3.set_name("Name 3");
 
-    session::config::profile_pic p;
+    bchat::config::profile_pic p;
     {
         // These don't stay alive, so we use set_key/set_url to make a local copy:
         std::vector<unsigned char> key = "qwerty78901234567890123456789012"_bytes;
@@ -1091,19 +1091,19 @@ TEST_CASE("Contacts", "[config][blinded_contacts]") {
     CHECK_FALSE(contacts2.needs_push());
 
     auto blinded2 = contacts.blinded();
-    session_ids.clear();
+    bchat_ids.clear();
     names.clear();
     profile_updateds.clear();
     legacy_blindings.clear();
     for (const auto& cc : blinded2) {
-        session_ids.push_back(cc.session_id());
+        bchat_ids.push_back(cc.bchat_id());
         names.emplace_back(cc.name.empty() ? "(N/A)" : cc.name);
         profile_updateds.emplace_back(cc.profile_updated);
         legacy_blindings.emplace_back(cc.legacy_blinding);
     }
-    REQUIRE(session_ids.size() == 2);
-    CHECK(session_ids[0] == another_id);
-    CHECK(session_ids[1] == third_id);
+    REQUIRE(bchat_ids.size() == 2);
+    CHECK(bchat_ids[0] == another_id);
+    CHECK(bchat_ids[1] == third_id);
     CHECK(names[0] == "(N/A)");
     CHECK(names[1] == "Name 3");
     CHECK(profile_updateds[0].time_since_epoch() == 0s);
@@ -1122,7 +1122,7 @@ TEST_CASE("Contacts Pro Storage", "[config][contacts][pro]") {
 
     const auto seed = "0123456789abcdef0123456789abcdef00000000000000000000000000000000"_hexbytes;
 
-    session::config::Contacts contacts{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::Contacts contacts{std::span<const unsigned char>{seed}, std::nullopt};
 
     REQUIRE(contacts.is_clean());
 
@@ -1132,27 +1132,27 @@ TEST_CASE("Contacts Pro Storage", "[config][contacts][pro]") {
                 "050000000000000000000000000000000000000000000000000000000000000000"sv);
         CHECK(c.profile_bitset.data == 0);
 
-        c.profile_bitset.set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE);
+        c.profile_bitset.set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE);
         contacts.set(c);
 
         CHECK(contacts.is_dirty());
 
         c = contacts.get_or_construct(
                 "050000000000000000000000000000000000000000000000000000000000000000"sv);
-        CHECK(c.profile_bitset.is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
+        CHECK(c.profile_bitset.is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
 
         contacts.set(c);
         c = contacts.get_or_construct(
                 "050000000000000000000000000000000000000000000000000000000000000000"sv);
-        CHECK_FALSE(c.profile_bitset.is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
+        CHECK_FALSE(c.profile_bitset.is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
 
-        c.profile_bitset.set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR);
+        c.profile_bitset.set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR);
         contacts.set(c);
         c = contacts.get_or_construct(
                 "050000000000000000000000000000000000000000000000000000000000000000"sv);
 
-        CHECK(c.profile_bitset.is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
-        CHECK(c.profile_bitset.is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
+        CHECK(c.profile_bitset.is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
+        CHECK(c.profile_bitset.is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
     }
 
     // Set and unset the bitset from the profile on a new contact
@@ -1161,19 +1161,19 @@ TEST_CASE("Contacts Pro Storage", "[config][contacts][pro]") {
                 "050000000000000000000000000000000000000000000000000000000000000001"sv);
         CHECK(c.profile_bitset.data == 0);
 
-        c.profile_bitset.set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE);
+        c.profile_bitset.set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE);
         contacts.set(c);
 
         c = contacts.get_or_construct(
                 "050000000000000000000000000000000000000000000000000000000000000001"sv);
-        CHECK(c.profile_bitset.is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
+        CHECK(c.profile_bitset.is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
 
-        c.profile_bitset.unset(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE);
+        c.profile_bitset.unset(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE);
         contacts.set(c);
 
         c = contacts.get_or_construct(
                 "050000000000000000000000000000000000000000000000000000000000000001"sv);
-        CHECK(!c.profile_bitset.is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
+        CHECK(!c.profile_bitset.is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
     }
 
     CHECK(contacts.needs_push());
@@ -1191,8 +1191,8 @@ TEST_CASE("Contacts Pro Storage", "[config][contacts][pro]") {
     {
         auto c = contacts.get_or_construct(
                 "050000000000000000000000000000000000000000000000000000000000000000"sv);
-        CHECK(c.profile_bitset.is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
-        CHECK(c.profile_bitset.is_set(SESSION_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
+        CHECK(c.profile_bitset.is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE));
+        CHECK(c.profile_bitset.is_set(BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR));
         // This previously exposed a bug in set_erase_impl where the contact was being dirtied even
         // when nothing was actually being removed.
         contacts.set(c);

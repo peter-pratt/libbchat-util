@@ -1,4 +1,4 @@
-#include "session/config/convo_info_volatile.hpp"
+#include "bchat/config/convo_info_volatile.hpp"
 
 #include <oxenc/base32z.h>
 #include <oxenc/base64.h>
@@ -12,25 +12,25 @@
 #include <variant>
 
 #include "internal.hpp"
-#include "session/config/convo_info_volatile.h"
-#include "session/config/error.h"
-#include "session/export.h"
-#include "session/types.hpp"
-#include "session/util.hpp"
+#include "bchat/config/convo_info_volatile.h"
+#include "bchat/config/error.h"
+#include "bchat/export.h"
+#include "bchat/types.hpp"
+#include "bchat/util.hpp"
 using namespace std::literals;
 
-namespace session::config {
+namespace bchat::config {
 
 namespace convo {
 
-    one_to_one::one_to_one(std::string&& sid) : session_id{std::move(sid)} {
-        check_session_id(session_id);
+    one_to_one::one_to_one(std::string&& sid) : bchat_id{std::move(sid)} {
+        check_bchat_id(bchat_id);
     }
-    one_to_one::one_to_one(std::string_view sid) : session_id{sid} {
-        check_session_id(session_id);
+    one_to_one::one_to_one(std::string_view sid) : bchat_id{sid} {
+        check_bchat_id(bchat_id);
     }
     one_to_one::one_to_one(const convo_info_volatile_1to1& c) :
-            pro_base(c.last_read, c.unread), session_id{c.session_id, 66} {
+            pro_base(c.last_read, c.unread), bchat_id{c.bchat_id, 66} {
         if (c.has_pro_gen_index_hash) {
             pro_gen_index_hash.emplace();
             std::memcpy(
@@ -43,7 +43,7 @@ namespace convo {
     }
 
     void one_to_one::into(convo_info_volatile_1to1& c) const {
-        std::memcpy(c.session_id, session_id.data(), 67);
+        std::memcpy(c.bchat_id, bchat_id.data(), 67);
         c.last_read = last_read;
         c.unread = unread;
 
@@ -76,10 +76,10 @@ namespace convo {
     }
 
     group::group(std::string&& cgid) : id{std::move(cgid)} {
-        check_session_id(id, "03");
+        check_bchat_id(id, "03");
     }
     group::group(std::string_view cgid) : id{cgid} {
-        check_session_id(id, "03");
+        check_bchat_id(id, "03");
     }
     group::group(const convo_info_volatile_group& c) :
             base(c.last_read, c.unread), id{c.group_id, 66} {}
@@ -91,10 +91,10 @@ namespace convo {
     }
 
     legacy_group::legacy_group(std::string&& cgid) : id{std::move(cgid)} {
-        check_session_id(id);
+        check_bchat_id(id);
     }
     legacy_group::legacy_group(std::string_view cgid) : id{cgid} {
-        check_session_id(id);
+        check_bchat_id(id);
     }
     legacy_group::legacy_group(const convo_info_volatile_legacy_group& c) :
             base(c.last_read, c.unread), id{c.group_id, 66} {}
@@ -105,27 +105,27 @@ namespace convo {
         c.unread = unread;
     }
 
-    blinded_one_to_one::blinded_one_to_one(std::string&& sid) : blinded_session_id{std::move(sid)} {
-        auto prefix = get_session_id_prefix(blinded_session_id);
-        legacy_blinding = (prefix == session::SessionIDPrefix::community_blinded_legacy);
+    blinded_one_to_one::blinded_one_to_one(std::string&& sid) : blinded_bchat_id{std::move(sid)} {
+        auto prefix = get_bchat_id_prefix(blinded_bchat_id);
+        legacy_blinding = (prefix == bchat::BChatIDPrefix::community_blinded_legacy);
 
-        if (prefix != session::SessionIDPrefix::community_blinded &&
-            prefix != session::SessionIDPrefix::community_blinded_legacy)
+        if (prefix != bchat::BChatIDPrefix::community_blinded &&
+            prefix != bchat::BChatIDPrefix::community_blinded_legacy)
             throw std::invalid_argument{
-                    "Invalid blinded ID: Expected '15' or '25' prefix; got " + blinded_session_id};
+                    "Invalid blinded ID: Expected '15' or '25' prefix; got " + blinded_bchat_id};
     }
-    blinded_one_to_one::blinded_one_to_one(std::string_view sid) : blinded_session_id{sid} {
-        auto prefix = get_session_id_prefix(blinded_session_id);
-        legacy_blinding = (prefix == session::SessionIDPrefix::community_blinded_legacy);
+    blinded_one_to_one::blinded_one_to_one(std::string_view sid) : blinded_bchat_id{sid} {
+        auto prefix = get_bchat_id_prefix(blinded_bchat_id);
+        legacy_blinding = (prefix == bchat::BChatIDPrefix::community_blinded_legacy);
 
-        if (prefix != session::SessionIDPrefix::community_blinded &&
-            prefix != session::SessionIDPrefix::community_blinded_legacy)
+        if (prefix != bchat::BChatIDPrefix::community_blinded &&
+            prefix != bchat::BChatIDPrefix::community_blinded_legacy)
             throw std::invalid_argument{
-                    "Invalid blinded ID: Expected '15' or '25' prefix; got " + blinded_session_id};
+                    "Invalid blinded ID: Expected '15' or '25' prefix; got " + blinded_bchat_id};
     }
     blinded_one_to_one::blinded_one_to_one(const convo_info_volatile_blinded_1to1& c) :
             pro_base(c.last_read, c.unread),
-            blinded_session_id{c.blinded_session_id, 66},
+            blinded_bchat_id{c.blinded_bchat_id, 66},
             legacy_blinding{c.legacy_blinding} {
         if (c.has_pro_gen_index_hash) {
             pro_gen_index_hash.emplace();
@@ -139,7 +139,7 @@ namespace convo {
     }
 
     void blinded_one_to_one::into(convo_info_volatile_blinded_1to1& c) const {
-        std::memcpy(c.blinded_session_id, blinded_session_id.data(), 67);
+        std::memcpy(c.blinded_bchat_id, blinded_bchat_id.data(), 67);
         c.last_read = last_read;
         c.unread = unread;
         c.legacy_blinding = legacy_blinding;
@@ -189,7 +189,7 @@ ConvoInfoVolatile::ConvoInfoVolatile(
 }
 
 std::optional<convo::one_to_one> ConvoInfoVolatile::get_1to1(std::string_view pubkey_hex) const {
-    std::string pubkey = session_id_to_bytes(pubkey_hex);
+    std::string pubkey = bchat_id_to_bytes(pubkey_hex);
 
     auto* info_dict = data["1"][pubkey].dict();
     if (!info_dict)
@@ -266,7 +266,7 @@ convo::community ConvoInfoVolatile::get_or_construct_community(
 }
 
 std::optional<convo::group> ConvoInfoVolatile::get_group(std::string_view pubkey_hex) const {
-    std::string pubkey = session_id_to_bytes(pubkey_hex, "03");
+    std::string pubkey = bchat_id_to_bytes(pubkey_hex, "03");
 
     auto* info_dict = data["g"][pubkey].dict();
     if (!info_dict)
@@ -286,7 +286,7 @@ convo::group ConvoInfoVolatile::get_or_construct_group(std::string_view pubkey_h
 
 std::optional<convo::legacy_group> ConvoInfoVolatile::get_legacy_group(
         std::string_view pubkey_hex) const {
-    std::string pubkey = session_id_to_bytes(pubkey_hex);
+    std::string pubkey = bchat_id_to_bytes(pubkey_hex);
 
     auto* info_dict = data["C"][pubkey].dict();
     if (!info_dict)
@@ -307,14 +307,14 @@ convo::legacy_group ConvoInfoVolatile::get_or_construct_legacy_group(
 
 std::optional<convo::blinded_one_to_one> ConvoInfoVolatile::get_blinded_1to1(
         std::string_view pubkey_hex) const {
-    auto prefix = get_session_id_prefix(pubkey_hex);
+    auto prefix = get_bchat_id_prefix(pubkey_hex);
 
-    if (prefix != session::SessionIDPrefix::community_blinded &&
-        prefix != session::SessionIDPrefix::community_blinded_legacy)
+    if (prefix != bchat::BChatIDPrefix::community_blinded &&
+        prefix != bchat::BChatIDPrefix::community_blinded_legacy)
         throw std::invalid_argument{
                 "Invalid blinded ID: Expected '15' or '25' prefix; got " + std::string{pubkey_hex}};
 
-    std::string pubkey = session_id_to_bytes(pubkey_hex, to_string(prefix));
+    std::string pubkey = bchat_id_to_bytes(pubkey_hex, to_string(prefix));
 
     auto* info_dict = data["b"][pubkey].dict();
     if (!info_dict)
@@ -334,7 +334,7 @@ convo::blinded_one_to_one ConvoInfoVolatile::get_or_construct_blinded_1to1(
 }
 
 void ConvoInfoVolatile::set(const convo::one_to_one& c) {
-    auto info = data["1"][session_id_to_bytes(c.session_id)];
+    auto info = data["1"][bchat_id_to_bytes(c.bchat_id)];
     set_base(c, info);
 
     auto pro_expiry = epoch_ms(c.pro_expiry_unix_ts);
@@ -376,7 +376,7 @@ void ConvoInfoVolatile::prune_stale(std::chrono::milliseconds prune) {
     std::vector<std::string> stale;
     for (auto it = begin_1to1(); it != end(); ++it)
         if (is_stale(*it, cutoff))
-            stale.push_back(it->session_id);
+            stale.push_back(it->bchat_id);
 
     for (const auto& sid : stale)
         erase_1to1(sid);
@@ -391,7 +391,7 @@ void ConvoInfoVolatile::prune_stale(std::chrono::milliseconds prune) {
     stale.clear();
     for (auto it = begin_blinded_1to1(); it != end(); ++it)
         if (is_stale(*it, cutoff))
-            stale.push_back(it->blinded_session_id);
+            stale.push_back(it->blinded_bchat_id);
     for (const auto& id : stale)
         erase_blinded_1to1(id);
 
@@ -426,17 +426,17 @@ void ConvoInfoVolatile::set(const convo::community& c) {
 }
 
 void ConvoInfoVolatile::set(const convo::group& c) {
-    auto info = data["g"][session_id_to_bytes(c.id, "03")];
+    auto info = data["g"][bchat_id_to_bytes(c.id, "03")];
     set_base(c, info);
 }
 
 void ConvoInfoVolatile::set(const convo::legacy_group& c) {
-    auto info = data["C"][session_id_to_bytes(c.id)];
+    auto info = data["C"][bchat_id_to_bytes(c.id)];
     set_base(c, info);
 }
 
 void ConvoInfoVolatile::set(const convo::blinded_one_to_one& c) {
-    std::string pubkey = session_id_to_bytes(c.blinded_session_id, c.legacy_blinding ? "15" : "25");
+    std::string pubkey = bchat_id_to_bytes(c.blinded_bchat_id, c.legacy_blinding ? "15" : "25");
 
     auto info = data["b"][pubkey];
     set_base(c, info);
@@ -458,7 +458,7 @@ static bool erase_impl(Field convo) {
 }
 
 bool ConvoInfoVolatile::erase(const convo::one_to_one& c) {
-    return erase_impl(data["1"][session_id_to_bytes(c.session_id)]);
+    return erase_impl(data["1"][bchat_id_to_bytes(c.bchat_id)]);
 }
 bool ConvoInfoVolatile::erase(const convo::community& c) {
     bool gone = erase_impl(community_field(c));
@@ -474,13 +474,13 @@ bool ConvoInfoVolatile::erase(const convo::community& c) {
     return gone;
 }
 bool ConvoInfoVolatile::erase(const convo::group& c) {
-    return erase_impl(data["g"][session_id_to_bytes(c.id, "03")]);
+    return erase_impl(data["g"][bchat_id_to_bytes(c.id, "03")]);
 }
 bool ConvoInfoVolatile::erase(const convo::legacy_group& c) {
-    return erase_impl(data["C"][session_id_to_bytes(c.id)]);
+    return erase_impl(data["C"][bchat_id_to_bytes(c.id)]);
 }
 bool ConvoInfoVolatile::erase(const convo::blinded_one_to_one& c) {
-    std::string pubkey = session_id_to_bytes(c.blinded_session_id, c.legacy_blinding ? "15" : "25");
+    std::string pubkey = bchat_id_to_bytes(c.blinded_bchat_id, c.legacy_blinding ? "15" : "25");
 
     return erase_impl(data["b"][pubkey]);
 }
@@ -488,8 +488,8 @@ bool ConvoInfoVolatile::erase(const convo::blinded_one_to_one& c) {
 bool ConvoInfoVolatile::erase(const convo::any& c) {
     return std::visit([this](const auto& c) { return erase(c); }, c);
 }
-bool ConvoInfoVolatile::erase_1to1(std::string_view session_id) {
-    return erase(convo::one_to_one{session_id});
+bool ConvoInfoVolatile::erase_1to1(std::string_view bchat_id) {
+    return erase(convo::one_to_one{bchat_id});
 }
 bool ConvoInfoVolatile::erase_community(std::string_view base_url, std::string_view room) {
     return erase(convo::community{base_url, room});
@@ -500,8 +500,8 @@ bool ConvoInfoVolatile::erase_group(std::string_view id) {
 bool ConvoInfoVolatile::erase_legacy_group(std::string_view id) {
     return erase(convo::legacy_group{id});
 }
-bool ConvoInfoVolatile::erase_blinded_1to1(std::string_view blinded_session_id) {
-    return erase(convo::blinded_one_to_one{blinded_session_id});
+bool ConvoInfoVolatile::erase_blinded_1to1(std::string_view blinded_bchat_id) {
+    return erase(convo::blinded_one_to_one{blinded_bchat_id});
 }
 
 size_t ConvoInfoVolatile::size_1to1() const {
@@ -669,9 +669,9 @@ ConvoInfoVolatile::iterator& ConvoInfoVolatile::iterator::operator++() {
     return *this;
 }
 
-}  // namespace session::config
+}  // namespace bchat::config
 
-using namespace session::config;
+using namespace bchat::config;
 
 extern "C" {
 struct convo_info_volatile_iterator {
@@ -679,7 +679,7 @@ struct convo_info_volatile_iterator {
 };
 }
 
-LIBSESSION_C_API
+LIBBCHAT_C_API
 int convo_info_volatile_init(
         config_object** conf,
         const unsigned char* ed25519_secretkey_bytes,
@@ -690,12 +690,12 @@ int convo_info_volatile_init(
             conf, ed25519_secretkey_bytes, dumpstr, dumplen, error);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_get_1to1(
-        config_object* conf, convo_info_volatile_1to1* convo, const char* session_id) {
+LIBBCHAT_C_API bool convo_info_volatile_get_1to1(
+        config_object* conf, convo_info_volatile_1to1* convo, const char* bchat_id) {
     return wrap_exceptions(
             conf,
             [&] {
-                if (auto c = unbox<ConvoInfoVolatile>(conf)->get_1to1(session_id)) {
+                if (auto c = unbox<ConvoInfoVolatile>(conf)->get_1to1(bchat_id)) {
                     c->into(*convo);
                     return true;
                 }
@@ -704,18 +704,18 @@ LIBSESSION_C_API bool convo_info_volatile_get_1to1(
             false);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_get_or_construct_1to1(
-        config_object* conf, convo_info_volatile_1to1* convo, const char* session_id) {
+LIBBCHAT_C_API bool convo_info_volatile_get_or_construct_1to1(
+        config_object* conf, convo_info_volatile_1to1* convo, const char* bchat_id) {
     return wrap_exceptions(
             conf,
             [&] {
-                unbox<ConvoInfoVolatile>(conf)->get_or_construct_1to1(session_id).into(*convo);
+                unbox<ConvoInfoVolatile>(conf)->get_or_construct_1to1(bchat_id).into(*convo);
                 return true;
             },
             false);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_get_community(
+LIBBCHAT_C_API bool convo_info_volatile_get_community(
         config_object* conf,
         convo_info_volatile_community* og,
         const char* base_url,
@@ -731,7 +731,7 @@ LIBSESSION_C_API bool convo_info_volatile_get_community(
             },
             false);
 }
-LIBSESSION_C_API bool convo_info_volatile_get_or_construct_community(
+LIBBCHAT_C_API bool convo_info_volatile_get_or_construct_community(
         config_object* conf,
         convo_info_volatile_community* convo,
         const char* base_url,
@@ -749,7 +749,7 @@ LIBSESSION_C_API bool convo_info_volatile_get_or_construct_community(
             false);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_get_group(
+LIBBCHAT_C_API bool convo_info_volatile_get_group(
         config_object* conf, convo_info_volatile_group* convo, const char* id) {
     return wrap_exceptions(
             conf,
@@ -763,7 +763,7 @@ LIBSESSION_C_API bool convo_info_volatile_get_group(
             false);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_get_or_construct_group(
+LIBBCHAT_C_API bool convo_info_volatile_get_or_construct_group(
         config_object* conf, convo_info_volatile_group* convo, const char* id) {
     return wrap_exceptions(
             conf,
@@ -774,7 +774,7 @@ LIBSESSION_C_API bool convo_info_volatile_get_or_construct_group(
             false);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_get_legacy_group(
+LIBBCHAT_C_API bool convo_info_volatile_get_legacy_group(
         config_object* conf, convo_info_volatile_legacy_group* convo, const char* id) {
     return wrap_exceptions(
             conf,
@@ -788,7 +788,7 @@ LIBSESSION_C_API bool convo_info_volatile_get_legacy_group(
             false);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_get_or_construct_legacy_group(
+LIBBCHAT_C_API bool convo_info_volatile_get_or_construct_legacy_group(
         config_object* conf, convo_info_volatile_legacy_group* convo, const char* id) {
     return wrap_exceptions(
             conf,
@@ -799,14 +799,14 @@ LIBSESSION_C_API bool convo_info_volatile_get_or_construct_legacy_group(
             false);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_get_blinded_1to1(
+LIBBCHAT_C_API bool convo_info_volatile_get_blinded_1to1(
         config_object* conf,
         convo_info_volatile_blinded_1to1* convo,
-        const char* blinded_session_id) {
+        const char* blinded_bchat_id) {
     return wrap_exceptions(
             conf,
             [&] {
-                if (auto c = unbox<ConvoInfoVolatile>(conf)->get_blinded_1to1(blinded_session_id)) {
+                if (auto c = unbox<ConvoInfoVolatile>(conf)->get_blinded_1to1(blinded_bchat_id)) {
                     c->into(*convo);
                     return true;
                 }
@@ -815,22 +815,22 @@ LIBSESSION_C_API bool convo_info_volatile_get_blinded_1to1(
             false);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_get_or_construct_blinded_1to1(
+LIBBCHAT_C_API bool convo_info_volatile_get_or_construct_blinded_1to1(
         config_object* conf,
         convo_info_volatile_blinded_1to1* convo,
-        const char* blinded_session_id) {
+        const char* blinded_bchat_id) {
     return wrap_exceptions(
             conf,
             [&] {
                 unbox<ConvoInfoVolatile>(conf)
-                        ->get_or_construct_blinded_1to1(blinded_session_id)
+                        ->get_or_construct_blinded_1to1(blinded_bchat_id)
                         .into(*convo);
                 return true;
             },
             false);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_set_1to1(
+LIBBCHAT_C_API bool convo_info_volatile_set_1to1(
         config_object* conf, const convo_info_volatile_1to1* convo) {
     return wrap_exceptions(
             conf,
@@ -840,7 +840,7 @@ LIBSESSION_C_API bool convo_info_volatile_set_1to1(
             },
             false);
 }
-LIBSESSION_C_API bool convo_info_volatile_set_community(
+LIBBCHAT_C_API bool convo_info_volatile_set_community(
         config_object* conf, const convo_info_volatile_community* convo) {
     return wrap_exceptions(
             conf,
@@ -850,7 +850,7 @@ LIBSESSION_C_API bool convo_info_volatile_set_community(
             },
             false);
 }
-LIBSESSION_C_API bool convo_info_volatile_set_group(
+LIBBCHAT_C_API bool convo_info_volatile_set_group(
         config_object* conf, const convo_info_volatile_group* convo) {
     return wrap_exceptions(
             conf,
@@ -860,7 +860,7 @@ LIBSESSION_C_API bool convo_info_volatile_set_group(
             },
             false);
 }
-LIBSESSION_C_API bool convo_info_volatile_set_legacy_group(
+LIBBCHAT_C_API bool convo_info_volatile_set_legacy_group(
         config_object* conf, const convo_info_volatile_legacy_group* convo) {
     return wrap_exceptions(
             conf,
@@ -871,7 +871,7 @@ LIBSESSION_C_API bool convo_info_volatile_set_legacy_group(
             false);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_set_blinded_1to1(
+LIBBCHAT_C_API bool convo_info_volatile_set_blinded_1to1(
         config_object* conf, const convo_info_volatile_blinded_1to1* convo) {
     return wrap_exceptions(
             conf,
@@ -882,90 +882,90 @@ LIBSESSION_C_API bool convo_info_volatile_set_blinded_1to1(
             false);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_erase_1to1(config_object* conf, const char* session_id) {
+LIBBCHAT_C_API bool convo_info_volatile_erase_1to1(config_object* conf, const char* bchat_id) {
     return wrap_exceptions(
-            conf, [&] { return unbox<ConvoInfoVolatile>(conf)->erase_1to1(session_id); }, false);
+            conf, [&] { return unbox<ConvoInfoVolatile>(conf)->erase_1to1(bchat_id); }, false);
 }
-LIBSESSION_C_API bool convo_info_volatile_erase_community(
+LIBBCHAT_C_API bool convo_info_volatile_erase_community(
         config_object* conf, const char* base_url, const char* room) {
     return wrap_exceptions(
             conf,
             [&] { return unbox<ConvoInfoVolatile>(conf)->erase_community(base_url, room); },
             false);
 }
-LIBSESSION_C_API bool convo_info_volatile_erase_group(config_object* conf, const char* group_id) {
+LIBBCHAT_C_API bool convo_info_volatile_erase_group(config_object* conf, const char* group_id) {
     return wrap_exceptions(
             conf, [&] { return unbox<ConvoInfoVolatile>(conf)->erase_group(group_id); }, false);
 }
-LIBSESSION_C_API bool convo_info_volatile_erase_legacy_group(
+LIBBCHAT_C_API bool convo_info_volatile_erase_legacy_group(
         config_object* conf, const char* group_id) {
     return wrap_exceptions(
             conf,
             [&] { return unbox<ConvoInfoVolatile>(conf)->erase_legacy_group(group_id); },
             false);
 }
-LIBSESSION_C_API bool convo_info_volatile_erase_blinded_1to1(
-        config_object* conf, const char* blinded_session_id) {
+LIBBCHAT_C_API bool convo_info_volatile_erase_blinded_1to1(
+        config_object* conf, const char* blinded_bchat_id) {
     return wrap_exceptions(
             conf,
-            [&] { return unbox<ConvoInfoVolatile>(conf)->erase_blinded_1to1(blinded_session_id); },
+            [&] { return unbox<ConvoInfoVolatile>(conf)->erase_blinded_1to1(blinded_bchat_id); },
             false);
 }
 
-LIBSESSION_C_API size_t convo_info_volatile_size(const config_object* conf) {
+LIBBCHAT_C_API size_t convo_info_volatile_size(const config_object* conf) {
     return unbox<ConvoInfoVolatile>(conf)->size();
 }
-LIBSESSION_C_API size_t convo_info_volatile_size_1to1(const config_object* conf) {
+LIBBCHAT_C_API size_t convo_info_volatile_size_1to1(const config_object* conf) {
     return unbox<ConvoInfoVolatile>(conf)->size_1to1();
 }
-LIBSESSION_C_API size_t convo_info_volatile_size_communities(const config_object* conf) {
+LIBBCHAT_C_API size_t convo_info_volatile_size_communities(const config_object* conf) {
     return unbox<ConvoInfoVolatile>(conf)->size_communities();
 }
-LIBSESSION_C_API size_t convo_info_volatile_size_groups(const config_object* conf) {
+LIBBCHAT_C_API size_t convo_info_volatile_size_groups(const config_object* conf) {
     return unbox<ConvoInfoVolatile>(conf)->size_groups();
 }
-LIBSESSION_C_API size_t convo_info_volatile_size_legacy_groups(const config_object* conf) {
+LIBBCHAT_C_API size_t convo_info_volatile_size_legacy_groups(const config_object* conf) {
     return unbox<ConvoInfoVolatile>(conf)->size_legacy_groups();
 }
-LIBSESSION_C_API size_t convo_info_volatile_size_blinded_1to1(const config_object* conf) {
+LIBBCHAT_C_API size_t convo_info_volatile_size_blinded_1to1(const config_object* conf) {
     return unbox<ConvoInfoVolatile>(conf)->size_blinded_1to1();
 }
 
-LIBSESSION_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new(
+LIBBCHAT_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new(
         const config_object* conf) {
     auto* it = new convo_info_volatile_iterator{};
     it->_internals = new ConvoInfoVolatile::iterator{unbox<ConvoInfoVolatile>(conf)->begin()};
     return it;
 }
 
-LIBSESSION_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new_1to1(
+LIBBCHAT_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new_1to1(
         const config_object* conf) {
     auto* it = new convo_info_volatile_iterator{};
     it->_internals = new ConvoInfoVolatile::iterator{unbox<ConvoInfoVolatile>(conf)->begin_1to1()};
     return it;
 }
-LIBSESSION_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new_communities(
+LIBBCHAT_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new_communities(
         const config_object* conf) {
     auto* it = new convo_info_volatile_iterator{};
     it->_internals =
             new ConvoInfoVolatile::iterator{unbox<ConvoInfoVolatile>(conf)->begin_communities()};
     return it;
 }
-LIBSESSION_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new_groups(
+LIBBCHAT_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new_groups(
         const config_object* conf) {
     auto* it = new convo_info_volatile_iterator{};
     it->_internals =
             new ConvoInfoVolatile::iterator{unbox<ConvoInfoVolatile>(conf)->begin_groups()};
     return it;
 }
-LIBSESSION_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new_legacy_groups(
+LIBBCHAT_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new_legacy_groups(
         const config_object* conf) {
     auto* it = new convo_info_volatile_iterator{};
     it->_internals =
             new ConvoInfoVolatile::iterator{unbox<ConvoInfoVolatile>(conf)->begin_legacy_groups()};
     return it;
 }
-LIBSESSION_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new_blinded_1to1(
+LIBBCHAT_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new_blinded_1to1(
         const config_object* conf) {
     auto* it = new convo_info_volatile_iterator{};
     it->_internals =
@@ -973,17 +973,17 @@ LIBSESSION_C_API convo_info_volatile_iterator* convo_info_volatile_iterator_new_
     return it;
 }
 
-LIBSESSION_C_API void convo_info_volatile_iterator_free(convo_info_volatile_iterator* it) {
+LIBBCHAT_C_API void convo_info_volatile_iterator_free(convo_info_volatile_iterator* it) {
     delete static_cast<ConvoInfoVolatile::iterator*>(it->_internals);
     delete it;
 }
 
-LIBSESSION_C_API bool convo_info_volatile_iterator_done(convo_info_volatile_iterator* it) {
+LIBBCHAT_C_API bool convo_info_volatile_iterator_done(convo_info_volatile_iterator* it) {
     auto& real = *static_cast<ConvoInfoVolatile::iterator*>(it->_internals);
     return real.done();
 }
 
-LIBSESSION_C_API void convo_info_volatile_iterator_advance(convo_info_volatile_iterator* it) {
+LIBBCHAT_C_API void convo_info_volatile_iterator_advance(convo_info_volatile_iterator* it) {
     ++*static_cast<ConvoInfoVolatile::iterator*>(it->_internals);
 }
 
@@ -999,27 +999,27 @@ bool convo_info_volatile_it_is_impl(convo_info_volatile_iterator* it, C* c) {
 }
 }  // namespace
 
-LIBSESSION_C_API bool convo_info_volatile_it_is_1to1(
+LIBBCHAT_C_API bool convo_info_volatile_it_is_1to1(
         convo_info_volatile_iterator* it, convo_info_volatile_1to1* c) {
     return convo_info_volatile_it_is_impl<convo::one_to_one>(it, c);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_it_is_community(
+LIBBCHAT_C_API bool convo_info_volatile_it_is_community(
         convo_info_volatile_iterator* it, convo_info_volatile_community* c) {
     return convo_info_volatile_it_is_impl<convo::community>(it, c);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_it_is_group(
+LIBBCHAT_C_API bool convo_info_volatile_it_is_group(
         convo_info_volatile_iterator* it, convo_info_volatile_group* c) {
     return convo_info_volatile_it_is_impl<convo::group>(it, c);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_it_is_legacy_group(
+LIBBCHAT_C_API bool convo_info_volatile_it_is_legacy_group(
         convo_info_volatile_iterator* it, convo_info_volatile_legacy_group* c) {
     return convo_info_volatile_it_is_impl<convo::legacy_group>(it, c);
 }
 
-LIBSESSION_C_API bool convo_info_volatile_it_is_blinded_1to1(
+LIBBCHAT_C_API bool convo_info_volatile_it_is_blinded_1to1(
         convo_info_volatile_iterator* it, convo_info_volatile_blinded_1to1* c) {
     return convo_info_volatile_it_is_impl<convo::blinded_one_to_one>(it, c);
 }

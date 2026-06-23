@@ -1,18 +1,18 @@
 #include <catch2/catch_test_macros.hpp>
-#include <session/network/key_types.hpp>
-#include <session/network/service_node.hpp>
-#include <session/network/swarm.hpp>
+#include <bchat/network/key_types.hpp>
+#include <bchat/network/master_node.hpp>
+#include <bchat/network/swarm.hpp>
 #include <tuple>
 
 #include "utils.hpp"
 
-using namespace session;
-using namespace session::network;
-using namespace session::network::swarm;
+using namespace bchat;
+using namespace bchat::network;
+using namespace bchat::network::swarm;
 
 swarm_id_t get_swarm_id(
         std::string swarm_pubkey_hex,
-        std::vector<std::pair<swarm_id_t, std::vector<service_node>>> swarms) {
+        std::vector<std::pair<swarm_id_t, std::vector<master_node>>> swarms) {
     if (swarm_pubkey_hex.size() == 66)
         swarm_pubkey_hex = swarm_pubkey_hex.substr(2);
 
@@ -59,7 +59,7 @@ TEST_CASE("Swarm", "[network][swarm][pubkey_to_swarm_space]") {
 }
 
 TEST_CASE("Swarm", "[network][swarm][get_swarm]") {
-    std::vector<std::pair<swarm_id_t, std::vector<service_node>>> swarms = {
+    std::vector<std::pair<swarm_id_t, std::vector<master_node>>> swarms = {
             {100, {}}, {200, {}}, {300, {}}, {399, {}}, {498, {}}, {596, {}}, {694, {}}};
 
     // Exact matches:

@@ -1,4 +1,4 @@
-#include "session/config/user_groups.hpp"
+#include "bchat/config/user_groups.hpp"
 
 #include <oxenc/base32z.h>
 #include <oxenc/base64.h>
@@ -12,16 +12,16 @@
 #include <variant>
 
 #include "internal.hpp"
-#include "session/config/error.h"
-#include "session/config/user_groups.h"
-#include "session/export.h"
-#include "session/types.hpp"
-#include "session/util.hpp"
+#include "bchat/config/error.h"
+#include "bchat/config/user_groups.h"
+#include "bchat/export.h"
+#include "bchat/types.hpp"
+#include "bchat/util.hpp"
 
 using namespace std::literals;
 
-LIBSESSION_C_API const size_t GROUP_NAME_MAX_LENGTH =
-        session::config::legacy_group_info::NAME_MAX_LENGTH;
+LIBBCHAT_C_API const size_t GROUP_NAME_MAX_LENGTH =
+        bchat::config::legacy_group_info::NAME_MAX_LENGTH;
 
 namespace {
 struct ugroups_internals {
@@ -29,7 +29,7 @@ struct ugroups_internals {
 };
 }  // namespace
 
-namespace session::config {
+namespace bchat::config {
 
 template <typename T>
 static void base_into(const base_group_info& self, T& c) {
@@ -50,11 +50,11 @@ static void base_from(base_group_info& self, const T& c) {
 }
 
 group_info::group_info(std::string sid) : id{std::move(sid)} {
-    check_session_id(id, "03");
+    check_bchat_id(id, "03");
 }
 
-legacy_group_info::legacy_group_info(std::string sid) : session_id{std::move(sid)} {
-    check_session_id(session_id);
+legacy_group_info::legacy_group_info(std::string sid) : bchat_id{std::move(sid)} {
+    check_bchat_id(bchat_id);
 }
 
 community_info::community_info(const ugroups_community_info& c) :
@@ -75,7 +75,7 @@ static_assert(sizeof(ugroups_legacy_group_info::name) == base_group_info::NAME_M
 static_assert(sizeof(ugroups_group_info::name) == base_group_info::NAME_MAX_LENGTH + 1);
 
 legacy_group_info::legacy_group_info(const ugroups_legacy_group_info& c, impl_t) :
-        session_id{c.session_id, 66}, disappearing_timer{c.disappearing_timer} {
+        bchat_id{c.bchat_id, 66}, disappearing_timer{c.disappearing_timer} {
     name = c.name;
     assert(name.size() <= NAME_MAX_LENGTH);  // Otherwise the caller messed up
     base_from(*this, c);
@@ -101,9 +101,9 @@ legacy_group_info::legacy_group_info(ugroups_legacy_group_info&& c) : legacy_gro
 }
 
 void legacy_group_info::into(ugroups_legacy_group_info& c, impl_t) const {
-    assert(session_id.size() == 66);
+    assert(bchat_id.size() == 66);
     base_into(*this, c);
-    copy_c_str(c.session_id, session_id);
+    copy_c_str(c.bchat_id, bchat_id);
     copy_c_str(c.name, name);
     c.have_enc_keys = enc_pubkey.size() == 32 && enc_seckey.size() == 32;
     if (c.have_enc_keys) {
@@ -181,9 +181,9 @@ std::pair<size_t, size_t> legacy_group_info::counts() const {
     return counts;
 }
 
-bool legacy_group_info::insert(std::string session_id, bool admin) {
-    check_session_id(session_id);
-    auto [it, inserted] = members_.emplace(std::move(session_id), admin);
+bool legacy_group_info::insert(std::string bchat_id, bool admin) {
+    check_bchat_id(bchat_id);
+    auto [it, inserted] = members_.emplace(std::move(bchat_id), admin);
     if (inserted)
         return true;
     if (it->second != admin) {
@@ -193,8 +193,8 @@ bool legacy_group_info::insert(std::string session_id, bool admin) {
     return false;
 }
 
-bool legacy_group_info::erase(const std::string& session_id) {
-    return members_.erase(session_id);
+bool legacy_group_info::erase(const std::string& bchat_id) {
+    return members_.erase(bchat_id);
 }
 
 group_info::group_info(const ugroups_group_info& c) : id{c.id, 66} {
@@ -345,7 +345,7 @@ community_info UserGroups::get_or_construct_community(std::string_view full_url)
 }
 
 std::optional<legacy_group_info> UserGroups::get_legacy_group(std::string_view pubkey_hex) const {
-    std::string pubkey = session_id_to_bytes(pubkey_hex);
+    std::string pubkey = bchat_id_to_bytes(pubkey_hex);
 
     auto* info_dict = data["C"][pubkey].dict();
     if (!info_dict)
@@ -364,7 +364,7 @@ legacy_group_info UserGroups::get_or_construct_legacy_group(std::string_view pub
 }
 
 std::optional<group_info> UserGroups::get_group(std::string_view pubkey_hex) const {
-    std::string pubkey = session_id_to_bytes(pubkey_hex, "03");
+    std::string pubkey = bchat_id_to_bytes(pubkey_hex, "03");
 
     auto* info_dict = data["g"][pubkey].dict();
     if (!info_dict)
@@ -414,7 +414,7 @@ void UserGroups::set_base(const base_group_info& bg, DictFieldProxy& info) const
 }
 
 void UserGroups::set(const legacy_group_info& g) {
-    auto info = data["C"][session_id_to_bytes(g.session_id)];
+    auto info = data["C"][bchat_id_to_bytes(g.bchat_id)];
     set_base(g, info);
     info["n"] = std::string_view{g.name}.substr(0, legacy_group_info::NAME_MAX_LENGTH);
 
@@ -436,7 +436,7 @@ void UserGroups::set(const legacy_group_info& g) {
 }
 
 void UserGroups::set(const group_info& g) {
-    auto pk_bytes = session_id_to_bytes(g.id, "03");
+    auto pk_bytes = bchat_id_to_bytes(g.id, "03");
     auto info = data["g"][pk_bytes];
     set_base(g, info);
 
@@ -482,10 +482,10 @@ bool UserGroups::erase(const community_info& c) {
     return gone;
 }
 bool UserGroups::erase(const group_info& c) {
-    return erase_impl(data["g"][session_id_to_bytes(c.id, "03")]);
+    return erase_impl(data["g"][bchat_id_to_bytes(c.id, "03")]);
 }
 bool UserGroups::erase(const legacy_group_info& c) {
-    return erase_impl(data["C"][session_id_to_bytes(c.session_id)]);
+    return erase_impl(data["C"][bchat_id_to_bytes(c.bchat_id)]);
 }
 
 bool UserGroups::erase(const any_group_info& c) {
@@ -624,9 +624,9 @@ UserGroups::iterator& UserGroups::iterator::operator++() {
     return *this;
 }
 
-}  // namespace session::config
+}  // namespace bchat::config
 
-using namespace session::config;
+using namespace bchat::config;
 
 extern "C" {
 struct user_groups_iterator {
@@ -634,7 +634,7 @@ struct user_groups_iterator {
 };
 }
 
-LIBSESSION_C_API
+LIBBCHAT_C_API
 int user_groups_init(
         config_object** conf,
         const unsigned char* ed25519_secretkey_bytes,
@@ -644,7 +644,7 @@ int user_groups_init(
     return c_wrapper_init<UserGroups>(conf, ed25519_secretkey_bytes, dumpstr, dumplen, error);
 }
 
-LIBSESSION_C_API bool user_groups_get_community(
+LIBBCHAT_C_API bool user_groups_get_community(
         config_object* conf, ugroups_community_info* comm, const char* base_url, const char* room) {
     return wrap_exceptions(
             conf,
@@ -657,7 +657,7 @@ LIBSESSION_C_API bool user_groups_get_community(
             },
             false);
 }
-LIBSESSION_C_API bool user_groups_get_or_construct_community(
+LIBBCHAT_C_API bool user_groups_get_or_construct_community(
         config_object* conf,
         ugroups_community_info* comm,
         const char* base_url,
@@ -674,7 +674,7 @@ LIBSESSION_C_API bool user_groups_get_or_construct_community(
             },
             false);
 }
-LIBSESSION_C_API bool user_groups_get_group(
+LIBBCHAT_C_API bool user_groups_get_group(
         config_object* conf, ugroups_group_info* group, const char* group_id) {
     return wrap_exceptions(
             conf,
@@ -687,7 +687,7 @@ LIBSESSION_C_API bool user_groups_get_group(
             },
             false);
 }
-LIBSESSION_C_API bool user_groups_get_or_construct_group(
+LIBBCHAT_C_API bool user_groups_get_or_construct_group(
         config_object* conf, ugroups_group_info* group, const char* group_id) {
     return wrap_exceptions(
             conf,
@@ -698,14 +698,14 @@ LIBSESSION_C_API bool user_groups_get_or_construct_group(
             false);
 }
 
-LIBSESSION_C_API void ugroups_legacy_group_free(ugroups_legacy_group_info* group) {
+LIBBCHAT_C_API void ugroups_legacy_group_free(ugroups_legacy_group_info* group) {
     if (group && group->_internal) {
         delete static_cast<ugroups_internals*>(group->_internal);
         group->_internal = nullptr;
     }
 }
 
-LIBSESSION_C_API ugroups_legacy_group_info* user_groups_get_legacy_group(
+LIBBCHAT_C_API ugroups_legacy_group_info* user_groups_get_legacy_group(
         config_object* conf, const char* id) {
     return wrap_exceptions(conf, [&] {
         auto group = std::make_unique<ugroups_legacy_group_info>();
@@ -718,7 +718,7 @@ LIBSESSION_C_API ugroups_legacy_group_info* user_groups_get_legacy_group(
     });
 }
 
-LIBSESSION_C_API ugroups_legacy_group_info* user_groups_get_or_construct_legacy_group(
+LIBBCHAT_C_API ugroups_legacy_group_info* user_groups_get_or_construct_legacy_group(
         config_object* conf, const char* id) {
     return wrap_exceptions(conf, [&] {
         auto group = std::make_unique<ugroups_legacy_group_info>();
@@ -728,11 +728,11 @@ LIBSESSION_C_API ugroups_legacy_group_info* user_groups_get_or_construct_legacy_
     });
 }
 
-LIBSESSION_C_API void user_groups_set_community(
+LIBBCHAT_C_API void user_groups_set_community(
         config_object* conf, const ugroups_community_info* comm) {
     unbox<UserGroups>(conf)->set(community_info{*comm});
 }
-LIBSESSION_C_API bool user_groups_set_group(config_object* conf, const ugroups_group_info* group) {
+LIBBCHAT_C_API bool user_groups_set_group(config_object* conf, const ugroups_group_info* group) {
     return wrap_exceptions(
             conf,
             [&] {
@@ -741,7 +741,7 @@ LIBSESSION_C_API bool user_groups_set_group(config_object* conf, const ugroups_g
             },
             false);
 }
-LIBSESSION_C_API bool user_groups_set_legacy_group(
+LIBBCHAT_C_API bool user_groups_set_legacy_group(
         config_object* conf, const ugroups_legacy_group_info* group) {
     return wrap_exceptions(
             conf,
@@ -751,7 +751,7 @@ LIBSESSION_C_API bool user_groups_set_legacy_group(
             },
             false);
 }
-LIBSESSION_C_API bool user_groups_set_free_legacy_group(
+LIBBCHAT_C_API bool user_groups_set_free_legacy_group(
         config_object* conf, ugroups_legacy_group_info* group) {
     return wrap_exceptions(
             conf,
@@ -762,7 +762,7 @@ LIBSESSION_C_API bool user_groups_set_free_legacy_group(
             false);
 }
 
-LIBSESSION_C_API bool user_groups_erase_community(
+LIBBCHAT_C_API bool user_groups_erase_community(
         config_object* conf, const char* base_url, const char* room) {
     try {
         return unbox<UserGroups>(conf)->erase_community(base_url, room);
@@ -770,14 +770,14 @@ LIBSESSION_C_API bool user_groups_erase_community(
         return false;
     }
 }
-LIBSESSION_C_API bool user_groups_erase_group(config_object* conf, const char* group_id) {
+LIBBCHAT_C_API bool user_groups_erase_group(config_object* conf, const char* group_id) {
     try {
         return unbox<UserGroups>(conf)->erase_group(group_id);
     } catch (...) {
         return false;
     }
 }
-LIBSESSION_C_API bool user_groups_erase_legacy_group(config_object* conf, const char* group_id) {
+LIBBCHAT_C_API bool user_groups_erase_legacy_group(config_object* conf, const char* group_id) {
     try {
         return unbox<UserGroups>(conf)->erase_legacy_group(group_id);
     } catch (...) {
@@ -785,29 +785,29 @@ LIBSESSION_C_API bool user_groups_erase_legacy_group(config_object* conf, const 
     }
 }
 
-LIBSESSION_C_API void ugroups_group_set_invited(ugroups_group_info* group) {
+LIBBCHAT_C_API void ugroups_group_set_invited(ugroups_group_info* group) {
     if (group->removed_status == KICKED_FROM_GROUP) {
         group->removed_status = NOT_REMOVED;
     }
 }
 
-LIBSESSION_C_API void ugroups_group_set_kicked(ugroups_group_info* group) {
+LIBBCHAT_C_API void ugroups_group_set_kicked(ugroups_group_info* group) {
     assert(group);
     group->have_auth_data = false;
     group->have_secretkey = false;
     group->removed_status = KICKED_FROM_GROUP;
 }
-LIBSESSION_C_API bool ugroups_group_is_kicked(const ugroups_group_info* group) {
+LIBBCHAT_C_API bool ugroups_group_is_kicked(const ugroups_group_info* group) {
     return group->removed_status == KICKED_FROM_GROUP;
 }
 
-LIBSESSION_C_API void ugroups_group_set_destroyed(ugroups_group_info* group) {
+LIBBCHAT_C_API void ugroups_group_set_destroyed(ugroups_group_info* group) {
     assert(group);
     group->have_auth_data = false;
     group->have_secretkey = false;
     group->removed_status = GROUP_DESTROYED;
 }
-LIBSESSION_C_API bool ugroups_group_is_destroyed(const ugroups_group_info* group) {
+LIBBCHAT_C_API bool ugroups_group_is_destroyed(const ugroups_group_info* group) {
     return group->removed_status == GROUP_DESTROYED;
 }
 
@@ -818,48 +818,48 @@ struct ugroups_legacy_members_iterator {
     bool need_advance = false;
 };
 
-LIBSESSION_C_API ugroups_legacy_members_iterator* ugroups_legacy_members_begin(
+LIBBCHAT_C_API ugroups_legacy_members_iterator* ugroups_legacy_members_begin(
         ugroups_legacy_group_info* group) {
     return new ugroups_legacy_members_iterator{
             static_cast<ugroups_internals*>(group->_internal)->members};
 }
 
-LIBSESSION_C_API bool ugroups_legacy_members_next(
-        ugroups_legacy_members_iterator* it, const char** session_id, bool* admin) {
+LIBBCHAT_C_API bool ugroups_legacy_members_next(
+        ugroups_legacy_members_iterator* it, const char** bchat_id, bool* admin) {
     if (it->need_advance)
         ++it->it;
     else
         it->need_advance = true;
 
     if (it->it != it->members.end()) {
-        *session_id = it->it->first.data();
+        *bchat_id = it->it->first.data();
         *admin = it->it->second;
         return true;
     }
     return false;
 }
 
-LIBSESSION_C_API
+LIBBCHAT_C_API
 void ugroups_legacy_members_erase(ugroups_legacy_members_iterator* it) {
     it->it = it->members.erase(it->it);
     it->need_advance = false;
 }
 
-LIBSESSION_C_API
+LIBBCHAT_C_API
 void ugroups_legacy_members_free(ugroups_legacy_members_iterator* it) {
     delete it;
 }
 
-LIBSESSION_C_API
+LIBBCHAT_C_API
 bool ugroups_legacy_member_add(
-        ugroups_legacy_group_info* group, const char* session_id, bool admin) {
+        ugroups_legacy_group_info* group, const char* bchat_id, bool admin) {
     try {
-        check_session_id(session_id);
+        check_bchat_id(bchat_id);
     } catch (...) {
         return false;
     }
     auto [it, ins] =
-            static_cast<ugroups_internals*>(group->_internal)->members.emplace(session_id, admin);
+            static_cast<ugroups_internals*>(group->_internal)->members.emplace(bchat_id, admin);
     if (ins)
         return true;
     if (it->second == admin)
@@ -869,12 +869,12 @@ bool ugroups_legacy_member_add(
     return true;
 }
 
-LIBSESSION_C_API
-bool ugroups_legacy_member_remove(ugroups_legacy_group_info* group, const char* session_id) {
-    return static_cast<ugroups_internals*>(group->_internal)->members.erase(session_id);
+LIBBCHAT_C_API
+bool ugroups_legacy_member_remove(ugroups_legacy_group_info* group, const char* bchat_id) {
+    return static_cast<ugroups_internals*>(group->_internal)->members.erase(bchat_id);
 }
 
-LIBSESSION_C_API size_t ugroups_legacy_members_count(
+LIBBCHAT_C_API size_t ugroups_legacy_members_count(
         const ugroups_legacy_group_info* group, size_t* members, size_t* admins) {
     const auto& mems = static_cast<const ugroups_internals*>(group->_internal)->members;
     if (members || admins) {
@@ -895,44 +895,44 @@ LIBSESSION_C_API size_t ugroups_legacy_members_count(
     return mems.size();
 }
 
-LIBSESSION_C_API size_t user_groups_size(const config_object* conf) {
+LIBBCHAT_C_API size_t user_groups_size(const config_object* conf) {
     return unbox<UserGroups>(conf)->size();
 }
-LIBSESSION_C_API size_t user_groups_size_communities(const config_object* conf) {
+LIBBCHAT_C_API size_t user_groups_size_communities(const config_object* conf) {
     return unbox<UserGroups>(conf)->size_communities();
 }
-LIBSESSION_C_API size_t user_groups_size_groups(const config_object* conf) {
+LIBBCHAT_C_API size_t user_groups_size_groups(const config_object* conf) {
     return unbox<UserGroups>(conf)->size_groups();
 }
-LIBSESSION_C_API size_t user_groups_size_legacy_groups(const config_object* conf) {
+LIBBCHAT_C_API size_t user_groups_size_legacy_groups(const config_object* conf) {
     return unbox<UserGroups>(conf)->size_legacy_groups();
 }
 
-LIBSESSION_C_API user_groups_iterator* user_groups_iterator_new(const config_object* conf) {
+LIBBCHAT_C_API user_groups_iterator* user_groups_iterator_new(const config_object* conf) {
     return new user_groups_iterator{{unbox<UserGroups>(conf)->begin()}};
 }
 
-LIBSESSION_C_API user_groups_iterator* user_groups_iterator_new_communities(
+LIBBCHAT_C_API user_groups_iterator* user_groups_iterator_new_communities(
         const config_object* conf) {
     return new user_groups_iterator{{unbox<UserGroups>(conf)->begin_communities()}};
 }
-LIBSESSION_C_API user_groups_iterator* user_groups_iterator_new_groups(const config_object* conf) {
+LIBBCHAT_C_API user_groups_iterator* user_groups_iterator_new_groups(const config_object* conf) {
     return new user_groups_iterator{{unbox<UserGroups>(conf)->begin_groups()}};
 }
-LIBSESSION_C_API user_groups_iterator* user_groups_iterator_new_legacy_groups(
+LIBBCHAT_C_API user_groups_iterator* user_groups_iterator_new_legacy_groups(
         const config_object* conf) {
     return new user_groups_iterator{{unbox<UserGroups>(conf)->begin_legacy_groups()}};
 }
 
-LIBSESSION_C_API void user_groups_iterator_free(user_groups_iterator* it) {
+LIBBCHAT_C_API void user_groups_iterator_free(user_groups_iterator* it) {
     delete it;
 }
 
-LIBSESSION_C_API bool user_groups_iterator_done(user_groups_iterator* it) {
+LIBBCHAT_C_API bool user_groups_iterator_done(user_groups_iterator* it) {
     return it->it.done();
 }
 
-LIBSESSION_C_API void user_groups_iterator_advance(user_groups_iterator* it) {
+LIBBCHAT_C_API void user_groups_iterator_advance(user_groups_iterator* it) {
     ++it->it;
 }
 
@@ -948,16 +948,16 @@ bool user_groups_it_is_impl(user_groups_iterator* it, C* c) {
 }
 }  // namespace
 
-LIBSESSION_C_API bool user_groups_it_is_community(
+LIBBCHAT_C_API bool user_groups_it_is_community(
         user_groups_iterator* it, ugroups_community_info* c) {
     return user_groups_it_is_impl<community_info>(it, c);
 }
 
-LIBSESSION_C_API bool user_groups_it_is_group(user_groups_iterator* it, ugroups_group_info* g) {
+LIBBCHAT_C_API bool user_groups_it_is_group(user_groups_iterator* it, ugroups_group_info* g) {
     return user_groups_it_is_impl<group_info>(it, g);
 }
 
-LIBSESSION_C_API bool user_groups_it_is_legacy_group(
+LIBBCHAT_C_API bool user_groups_it_is_legacy_group(
         user_groups_iterator* it, ugroups_legacy_group_info* g) {
     return user_groups_it_is_impl<legacy_group_info>(it, g);
 }

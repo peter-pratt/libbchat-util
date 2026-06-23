@@ -5,12 +5,12 @@
 #include <string>
 #include <vector>
 
-#include "session/network/service_node.hpp"
+#include "bchat/network/master_node.hpp"
 
-namespace session::network::detail {
+namespace bchat::network::detail {
 
-session_request_params* convert_cpp_request_to_c(const session::network::Request& req) {
-    size_t total_size = sizeof(session_request_params);
+bchat_request_params* convert_cpp_request_to_c(const bchat::network::Request& req) {
+    size_t total_size = sizeof(bchat_request_params);
     size_t string_data_size = 0;
 
     // Calculate the expected size
@@ -24,8 +24,8 @@ session_request_params* convert_cpp_request_to_c(const session::network::Request
 
     std::visit(
             [&]<typename T>(const T& arg) {
-                if constexpr (std::is_same_v<T, service_node>) {
-                    total_size += sizeof(network_service_node);
+                if constexpr (std::is_same_v<T, master_node>) {
+                    total_size += sizeof(network_master_node);
                 } else if constexpr (std::is_same_v<T, ServerDestination>) {
                     total_size += sizeof(network_server_destination);
                     add_string_size(arg.protocol);
@@ -44,7 +44,7 @@ session_request_params* convert_cpp_request_to_c(const session::network::Request
                         }
                     }
                 } else if constexpr (std::is_same_v<T, oxen::quic::RemoteAddress>) {
-                    total_size += sizeof(session_remote_address);
+                    total_size += sizeof(bchat_remote_address);
                 }
             },
             req.destination);
@@ -57,8 +57,8 @@ session_request_params* convert_cpp_request_to_c(const session::network::Request
     if (!buffer)
         return nullptr;
 
-    auto* c_params = reinterpret_cast<session_request_params*>(buffer);
-    unsigned char* current_ptr = buffer + sizeof(session_request_params);
+    auto* c_params = reinterpret_cast<bchat_request_params*>(buffer);
+    unsigned char* current_ptr = buffer + sizeof(bchat_request_params);
 
     auto copy_string = [&](const std::string& s) -> const char* {
         if (s.empty())
@@ -69,11 +69,11 @@ session_request_params* convert_cpp_request_to_c(const session::network::Request
         return dest;
     };
 
-    new (c_params) session_request_params{};
+    new (c_params) bchat_request_params{};
     c_params->request_id = copy_string(req.request_id);
     c_params->endpoint = copy_string(req.endpoint);
 
-    c_params->category = static_cast<SESSION_NETWORK_REQUEST_CATEGORY>(req.category);
+    c_params->category = static_cast<BCHAT_NETWORK_REQUEST_CATEGORY>(req.category);
     c_params->request_timeout_ms = req.request_timeout.count();
     c_params->overall_timeout_ms = (req.overall_timeout ? req.overall_timeout->count() : 0);
 
@@ -86,11 +86,11 @@ session_request_params* convert_cpp_request_to_c(const session::network::Request
 
     std::visit(
             [&]<typename T>(const T& arg) {
-                if constexpr (std::is_same_v<T, service_node>) {
-                    auto* c_snode = reinterpret_cast<network_service_node*>(current_ptr);
-                    arg.into(*c_snode);
-                    c_params->snode_dest = c_snode;
-                    current_ptr += sizeof(network_service_node);
+                if constexpr (std::is_same_v<T, master_node>) {
+                    auto* c_mnode = reinterpret_cast<network_master_node*>(current_ptr);
+                    arg.into(*c_mnode);
+                    c_params->mnode_dest = c_mnode;
+                    current_ptr += sizeof(network_master_node);
                 } else if constexpr (std::is_same_v<T, ServerDestination>) {
                     auto* c_server_dest =
                             reinterpret_cast<network_server_destination*>(current_ptr);
@@ -118,10 +118,10 @@ session_request_params* convert_cpp_request_to_c(const session::network::Request
                         c_headers_array[i] = nullptr;  // Null terminator for safety
                     }
                 } else if constexpr (std::is_same_v<T, oxen::quic::RemoteAddress>) {
-                    auto* c_remote = reinterpret_cast<session_remote_address*>(current_ptr);
-                    new (c_remote) session_remote_address{};
+                    auto* c_remote = reinterpret_cast<bchat_remote_address*>(current_ptr);
+                    new (c_remote) bchat_remote_address{};
                     c_params->remote_addr_dest = c_remote;
-                    current_ptr += sizeof(session_remote_address);
+                    current_ptr += sizeof(bchat_remote_address);
 
                     auto ed25519_pubkey_hex = oxenc::to_hex(arg.view_remote_key());
                     oxen::quic::ipv4 ip = arg.to_ipv4();
@@ -149,4 +149,4 @@ session_request_params* convert_cpp_request_to_c(const session::network::Request
     return c_params;
 }
 
-}  // namespace session::network::detail
+}  // namespace bchat::network::detail

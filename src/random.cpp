@@ -1,4 +1,4 @@
-#include "session/random.hpp"
+#include "bchat/random.hpp"
 
 #include <fmt/ranges.h>
 #include <sodium/randombytes.h>
@@ -6,10 +6,10 @@
 #include <algorithm>
 #include <atomic>
 
-#include "session/export.h"
-#include "session/util.hpp"
+#include "bchat/export.h"
+#include "bchat/util.hpp"
 
-namespace session::random {
+namespace bchat::random {
 
 std::vector<unsigned char> random(size_t size) {
     std::vector<unsigned char> result;
@@ -45,12 +45,12 @@ std::string unique_id(std::string_view prefix) {
             "{}-{}-{}", prefix, counter.fetch_add(1, std::memory_order_relaxed), random_base32(4));
 }
 
-}  // namespace session::random
+}  // namespace bchat::random
 
 extern "C" {
 
-LIBSESSION_C_API unsigned char* session_random(size_t size) {
-    auto result = session::random::random(size);
+LIBBCHAT_C_API unsigned char* bchat_random(size_t size) {
+    auto result = bchat::random::random(size);
     auto* ret = static_cast<unsigned char*>(malloc(size));
     std::memcpy(ret, result.data(), result.size());
     return ret;

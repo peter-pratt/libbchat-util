@@ -1,19 +1,19 @@
 #include <oxenc/endian.h>
 #include <oxenc/hex.h>
-#include <session/config/contacts.h>
+#include <bchat/config/contacts.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
-#include <session/config/groups/info.hpp>
-#include <session/util.hpp>
+#include <bchat/config/groups/info.hpp>
+#include <bchat/util.hpp>
 #include <string_view>
 
 #include "utils.hpp"
 
 using namespace std::literals;
 using namespace oxenc::literals;
-using namespace session::config;
+using namespace bchat::config;
 
 TEST_CASE("Group Info settings", "[config][groups][info]") {
 
@@ -31,7 +31,7 @@ TEST_CASE("Group Info settings", "[config][groups][info]") {
     std::vector<std::vector<unsigned char>> enc_keys{
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"_hexbytes};
 
-    groups::Info ginfo1{session::to_span(ed_pk), session::to_span(ed_sk), std::nullopt};
+    groups::Info ginfo1{bchat::to_span(ed_pk), bchat::to_span(ed_sk), std::nullopt};
 
     // This is just for testing: normally you don't load keys manually but just make a groups::Keys
     // object that loads the keys into the Members object for you.
@@ -43,7 +43,7 @@ TEST_CASE("Group Info settings", "[config][groups][info]") {
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"_hexbytes);
     enc_keys.push_back("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"_hexbytes);
     enc_keys.push_back("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"_hexbytes);
-    groups::Info ginfo2{session::to_span(ed_pk), session::to_span(ed_sk), std::nullopt};
+    groups::Info ginfo2{bchat::to_span(ed_pk), bchat::to_span(ed_sk), std::nullopt};
 
     for (const auto& k : enc_keys)  // Just for testing, as above.
         ginfo2.add_key(k, false);
@@ -165,7 +165,7 @@ TEST_CASE("Verify-only Group Info", "[config][groups][verify-only]") {
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"_hexbytes);
 
     // This Info object has only the public key, not the priv key, and so cannot modify things:
-    groups::Info ginfo{session::to_span(ed_pk), std::nullopt, std::nullopt};
+    groups::Info ginfo{bchat::to_span(ed_pk), std::nullopt, std::nullopt};
 
     for (const auto& k : enc_keys1)  // Just for testing, as above.
         ginfo.add_key(k, false);
@@ -177,7 +177,7 @@ TEST_CASE("Verify-only Group Info", "[config][groups][verify-only]") {
     CHECK(!ginfo.is_dirty());
 
     // This one is good and has the right signature:
-    groups::Info ginfo_rw{session::to_span(ed_pk), session::to_span(ed_sk), std::nullopt};
+    groups::Info ginfo_rw{bchat::to_span(ed_pk), bchat::to_span(ed_sk), std::nullopt};
 
     for (const auto& k : enc_keys1)  // Just for testing, as above.
         ginfo_rw.add_key(k, false);
@@ -200,7 +200,7 @@ TEST_CASE("Verify-only Group Info", "[config][groups][verify-only]") {
     CHECK(ginfo.merge(merge_configs) == std::unordered_set{{"fakehash1"s}});
     CHECK_FALSE(ginfo.needs_push());
 
-    groups::Info ginfo_rw2{session::to_span(ed_pk), session::to_span(ed_sk), std::nullopt};
+    groups::Info ginfo_rw2{bchat::to_span(ed_pk), bchat::to_span(ed_sk), std::nullopt};
 
     for (const auto& k : enc_keys1)  // Just for testing, as above.
         ginfo_rw2.add_key(k, false);
@@ -227,13 +227,13 @@ TEST_CASE("Verify-only Group Info", "[config][groups][verify-only]") {
             ed_sk_bad1.data(),
             reinterpret_cast<const unsigned char*>(seed_bad1.data()));
 
-    groups::Info ginfo_bad1{session::to_span(ed_pk), session::to_span(ed_sk), std::nullopt};
+    groups::Info ginfo_bad1{bchat::to_span(ed_pk), bchat::to_span(ed_sk), std::nullopt};
 
     for (const auto& k : enc_keys1)  // Just for testing, as above.
         ginfo_bad1.add_key(k, false);
 
     ginfo_bad1.merge(merge_configs);
-    ginfo_bad1.set_sig_keys(session::to_span(ed_sk_bad1));
+    ginfo_bad1.set_sig_keys(bchat::to_span(ed_sk_bad1));
     ginfo_bad1.set_name("Bad name, BAD!");
     auto [s_bad, p_bad, o_bad] = ginfo_bad1.push();
 
@@ -310,7 +310,7 @@ TEST_CASE("Verify-only Group Info", "[config][groups][verify-only]") {
 
     CHECK(ginfo.needs_dump());
     auto dump = ginfo.dump();
-    groups::Info ginfo2{session::to_span(ed_pk), std::nullopt, dump};
+    groups::Info ginfo2{bchat::to_span(ed_pk), std::nullopt, dump};
 
     for (const auto& k : enc_keys1)  // Just for testing, as above.
         ginfo2.add_key(k, false);
@@ -328,7 +328,7 @@ TEST_CASE("Verify-only Group Info", "[config][groups][verify-only]") {
     CHECK(o5.empty());
 
     // This account has a different primary decryption key
-    groups::Info ginfo_rw3{session::to_span(ed_pk), session::to_span(ed_sk), std::nullopt};
+    groups::Info ginfo_rw3{bchat::to_span(ed_pk), bchat::to_span(ed_sk), std::nullopt};
 
     for (const auto& k : enc_keys2)  // Just for testing, as above.
         ginfo_rw3.add_key(k, false);

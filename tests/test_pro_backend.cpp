@@ -1,16 +1,16 @@
 #include <oxenc/hex.h>
-#include <session/pro_backend.h>
+#include <bchat/pro_backend.h>
 #include <sodium.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <cinttypes>
 #include <nlohmann/json.hpp>
-#include <session/pro_backend.hpp>
+#include <bchat/pro_backend.hpp>
 #include <string>
 
 #include "utils.hpp"
 
-using namespace session::pro_backend;
+using namespace bchat::pro_backend;
 
 // NOTE: This is defined in main.cpp because it accepts a value from the CLI
 extern std::string g_test_pro_backend_dev_server_url;
@@ -18,7 +18,7 @@ extern std::string g_test_pro_backend_dev_server_url;
 static bool string8_equals(string8 s8, std::string_view str) {
     return s8.size == str.size() && std::memcmp(s8.data, str.data(), s8.size) == 0;
 }
-[[maybe_unused]] static void dump_pro_proof_to_stderr(const session_protocol_pro_proof& proof) {
+[[maybe_unused]] static void dump_pro_proof_to_stderr(const bchat_protocol_pro_proof& proof) {
     fprintf(stderr, "proof.version: %u\n", proof.version);
     fprintf(stderr,
             "proof.gen_index_hash: %s\n",
@@ -34,7 +34,7 @@ static bool string8_equals(string8 s8, std::string_view str) {
 }
 
 [[maybe_unused]] static void dump_pro_payment_item(
-        const session_pro_backend_pro_payment_item& item) {
+        const bchat_pro_backend_pro_payment_item& item) {
     fprintf(stderr, "item.status: %d\n", item.status);
     fprintf(stderr, "item.plan: %d\n", item.plan);
     fprintf(stderr, "item.payment_provider: %d\n", item.payment_provider);
@@ -69,7 +69,7 @@ static bool string8_equals(string8 s8, std::string_view str) {
 }
 
 [[maybe_unused]] static void dump_pro_revocation(
-        const session_pro_backend_pro_revocation_item& item) {
+        const bchat_pro_backend_pro_revocation_item& item) {
     fprintf(stderr, "item.expiry_unix_ts: %" PRIu64 "zu\n", item.expiry_unix_ts_ms);
     fprintf(stderr,
             "item.gen_index_hash: %s\n",
@@ -96,8 +96,8 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
         randombytes_buf(fake_google_order_id.data(), fake_google_order_id.size());
         std::string fake_google_order_id_hex = "DEV." + oxenc::to_hex(fake_google_order_id);
 
-        session_pro_backend_add_pro_payment_user_transaction payment_tx = {};
-        payment_tx.provider = SESSION_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE;
+        bchat_pro_backend_add_pro_payment_user_transaction payment_tx = {};
+        payment_tx.provider = BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE;
         payment_tx.payment_id_count = fake_google_payment_token_hex.size();
         payment_tx.order_id_count = fake_google_order_id_hex.size();
         std::memcpy(
@@ -109,10 +109,10 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
 
         uint64_t unix_ts_ms = 1698765432ULL * 1000;  // Arbitrary timestamp
 
-        SECTION("session_pro_backend_add_pro_payment_request_build_sigs") {
+        SECTION("bchat_pro_backend_add_pro_payment_request_build_sigs") {
             // Valid inputs
-            session_pro_backend_master_rotating_signatures result =
-                    session_pro_backend_add_pro_payment_request_build_sigs(
+            bchat_pro_backend_master_rotating_signatures result =
+                    bchat_pro_backend_add_pro_payment_request_build_sigs(
                             /*version*/ 0,
                             master_privkey.data,
                             sizeof(master_privkey.data),
@@ -150,7 +150,7 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
                             sizeof(result.rotating_sig.data)) == 0);
 
             // Invalid master key size
-            result = session_pro_backend_add_pro_payment_request_build_sigs(
+            result = bchat_pro_backend_add_pro_payment_request_build_sigs(
                     0,
                     master_privkey.data,
                     sizeof(master_privkey.data) - 1,
@@ -165,11 +165,11 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             REQUIRE(result.error_count > 0);
         }
 
-        SECTION("session_pro_backend_generate_pro_proof_request_build_sigs") {
-            session_pro_backend_master_rotating_signatures result = {};
+        SECTION("bchat_pro_backend_generate_pro_proof_request_build_sigs") {
+            bchat_pro_backend_master_rotating_signatures result = {};
 
             // Valid inputs
-            result = session_pro_backend_generate_pro_proof_request_build_sigs(
+            result = bchat_pro_backend_generate_pro_proof_request_build_sigs(
                     0,
                     master_privkey.data,
                     sizeof(master_privkey.data),
@@ -196,7 +196,7 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
                             sizeof(result.rotating_sig.data)) == 0);
 
             // Invalid rotating key size
-            result = session_pro_backend_generate_pro_proof_request_build_sigs(
+            result = bchat_pro_backend_generate_pro_proof_request_build_sigs(
                     0,
                     master_privkey.data,
                     sizeof(master_privkey.data),
@@ -207,15 +207,15 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             REQUIRE(result.error_count > 0);
         }
 
-        SECTION("session_pro_backend_add_pro_payment_request_to_json") {
-            session_pro_backend_add_pro_payment_request request = {};
+        SECTION("bchat_pro_backend_add_pro_payment_request_to_json") {
+            bchat_pro_backend_add_pro_payment_request request = {};
             request.version = 0;
             request.master_pkey = master_pubkey;
             request.rotating_pkey = rotating_pubkey;
             request.payment_tx = payment_tx;
 
-            session_pro_backend_master_rotating_signatures sigs =
-                    session_pro_backend_add_pro_payment_request_build_sigs(
+            bchat_pro_backend_master_rotating_signatures sigs =
+                    bchat_pro_backend_add_pro_payment_request_build_sigs(
                             request.version,
                             master_privkey.data,
                             sizeof(master_privkey.data),
@@ -231,9 +231,9 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             request.rotating_sig = sigs.rotating_sig;
 
             // Valid request
-            auto result = session_pro_backend_add_pro_payment_request_to_json(&request);
+            auto result = bchat_pro_backend_add_pro_payment_request_to_json(&request);
             {
-                scope_exit result_free{[&]() { session_pro_backend_to_json_free(&result); }};
+                scope_exit result_free{[&]() { bchat_pro_backend_to_json_free(&result); }};
                 REQUIRE(result.success);
                 REQUIRE(result.json.data != nullptr);
                 REQUIRE(result.json.size > 0);
@@ -264,7 +264,7 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
                 REQUIRE(string8_equals(result.json, cpp_json));
 
                 // Verify that the helper one-shot-to-json function generates the same payload
-                auto one_shot = session_pro_backend_add_pro_payment_request_build_to_json(
+                auto one_shot = bchat_pro_backend_add_pro_payment_request_build_to_json(
                         request.version,
                         master_privkey.data,
                         sizeof(master_privkey.data),
@@ -286,21 +286,21 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             REQUIRE(result.json.size == 0);
 
             // Null request
-            result = session_pro_backend_add_pro_payment_request_to_json(nullptr);
+            result = bchat_pro_backend_add_pro_payment_request_to_json(nullptr);
             REQUIRE(!result.success);
             REQUIRE(result.json.data == nullptr);
             REQUIRE(result.json.size == 0);
         }
 
-        SECTION("session_pro_backend_generate_pro_proof_request_to_json") {
-            session_pro_backend_generate_pro_proof_request request = {};
+        SECTION("bchat_pro_backend_generate_pro_proof_request_to_json") {
+            bchat_pro_backend_generate_pro_proof_request request = {};
             request.version = 0;
             request.master_pkey = master_pubkey;
             request.rotating_pkey = rotating_pubkey;
             request.unix_ts_ms = unix_ts_ms;
 
-            session_pro_backend_master_rotating_signatures sigs =
-                    session_pro_backend_generate_pro_proof_request_build_sigs(
+            bchat_pro_backend_master_rotating_signatures sigs =
+                    bchat_pro_backend_generate_pro_proof_request_build_sigs(
                             request.version,
                             master_privkey.data,
                             sizeof(master_privkey.data),
@@ -312,9 +312,9 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             request.rotating_sig = sigs.rotating_sig;
 
             // Valid request
-            auto result = session_pro_backend_generate_pro_proof_request_to_json(&request);
+            auto result = bchat_pro_backend_generate_pro_proof_request_to_json(&request);
             {
-                scope_exit result_free{[&]() { session_pro_backend_to_json_free(&result); }};
+                scope_exit result_free{[&]() { bchat_pro_backend_to_json_free(&result); }};
                 REQUIRE(result.success);
                 REQUIRE(result.json.data != nullptr);
                 REQUIRE(result.json.size > 0);
@@ -339,7 +339,7 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
                 REQUIRE(string8_equals(result.json, cpp_json));
 
                 // Verify that the helper one-shot-to-json function generates the same payload
-                auto one_shot = session_pro_backend_generate_pro_proof_request_build_to_json(
+                auto one_shot = bchat_pro_backend_generate_pro_proof_request_build_to_json(
                         request.version,
                         master_privkey.data,
                         sizeof(master_privkey.data),
@@ -357,21 +357,21 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             REQUIRE(result.json.size == 0);
 
             // Null request
-            result = session_pro_backend_generate_pro_proof_request_to_json(nullptr);
+            result = bchat_pro_backend_generate_pro_proof_request_to_json(nullptr);
             REQUIRE(!result.success);
             REQUIRE(result.json.data == nullptr);
             REQUIRE(result.json.size == 0);
         }
 
-        SECTION("session_pro_backend_get_pro_revocations_request_to_json") {
-            session_pro_backend_get_pro_revocations_request request = {};
+        SECTION("bchat_pro_backend_get_pro_revocations_request_to_json") {
+            bchat_pro_backend_get_pro_revocations_request request = {};
             request.version = 0;
             request.ticket = 123;
 
             // Valid request
-            auto result = session_pro_backend_get_pro_revocations_request_to_json(&request);
+            auto result = bchat_pro_backend_get_pro_revocations_request_to_json(&request);
             {
-                scope_exit result_free{[&]() { session_pro_backend_to_json_free(&result); }};
+                scope_exit result_free{[&]() { bchat_pro_backend_to_json_free(&result); }};
                 REQUIRE(result.success);
                 REQUIRE(result.json.data != nullptr);
                 REQUIRE(result.json.size > 0);
@@ -389,21 +389,21 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             REQUIRE(result.json.size == 0);
 
             // Null request
-            result = session_pro_backend_get_pro_revocations_request_to_json(nullptr);
+            result = bchat_pro_backend_get_pro_revocations_request_to_json(nullptr);
             REQUIRE(!result.success);
             REQUIRE(result.json.data == nullptr);
             REQUIRE(result.json.size == 0);
         }
 
-        SECTION("session_pro_backend_get_pro_details_request_to_json") {
-            session_pro_backend_get_pro_details_request request = {};
+        SECTION("bchat_pro_backend_get_pro_details_request_to_json") {
+            bchat_pro_backend_get_pro_details_request request = {};
             request.version = 0;
             request.master_pkey = master_pubkey;
             request.unix_ts_ms = unix_ts_ms;
             request.count = 10'000;
 
-            session_pro_backend_signature sig =
-                    session_pro_backend_get_pro_details_request_build_sig(
+            bchat_pro_backend_signature sig =
+                    bchat_pro_backend_get_pro_details_request_build_sig(
                             request.version,
                             master_privkey.data,
                             sizeof(master_privkey.data),
@@ -413,9 +413,9 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             request.master_sig = sig.sig;
 
             // Valid request
-            auto result = session_pro_backend_get_pro_details_request_to_json(&request);
+            auto result = bchat_pro_backend_get_pro_details_request_to_json(&request);
             {
-                scope_exit result_free{[&]() { session_pro_backend_to_json_free(&result); }};
+                scope_exit result_free{[&]() { bchat_pro_backend_to_json_free(&result); }};
                 REQUIRE(result.success);
                 REQUIRE(result.json.data != nullptr);
                 REQUIRE(result.json.size > 0);
@@ -432,7 +432,7 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
                 REQUIRE(string8_equals(result.json, cpp_json));
 
                 // Verify that the helper one-shot-to-json function generates the same payload
-                auto one_shot = session_pro_backend_get_pro_details_request_build_to_json(
+                auto one_shot = bchat_pro_backend_get_pro_details_request_build_to_json(
                         request.version,
                         master_privkey.data,
                         sizeof(master_privkey.data),
@@ -449,18 +449,18 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             REQUIRE(result.json.size == 0);
 
             // Null request
-            result = session_pro_backend_get_pro_details_request_to_json(nullptr);
+            result = bchat_pro_backend_get_pro_details_request_to_json(nullptr);
             REQUIRE(!result.success);
             REQUIRE(result.json.data == nullptr);
             REQUIRE(result.json.size == 0);
         }
 
-        SECTION("session_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse") {
+        SECTION("bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse") {
             std::array<uint8_t, 32> fake_gen_index_hash;
             randombytes_buf(fake_gen_index_hash.data(), fake_gen_index_hash.size());
 
             nlohmann::json j;
-            j["status"] = SESSION_PRO_BACKEND_STATUS_SUCCESS;
+            j["status"] = BCHAT_PRO_BACKEND_STATUS_SUCCESS;
             j["result"] = {
                     {"version", 0},
                     {"expiry_unix_ts_ms", unix_ts_ms},
@@ -471,18 +471,18 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             std::string json = j.dump();
 
             // Valid JSON
-            session_pro_backend_add_pro_payment_or_generate_pro_proof_response result =
-                    session_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
+            bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response result =
+                    bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
                             json.data(), json.size());
             {
                 scope_exit result_free{[&]() {
-                    session_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(
+                    bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(
                             &result);
                 }};
 
                 for (size_t index = 0; index < result.header.errors_count; index++)
                     INFO(result.header.errors[index].data);
-                REQUIRE(result.header.status == SESSION_PRO_BACKEND_STATUS_SUCCESS);
+                REQUIRE(result.header.status == BCHAT_PRO_BACKEND_STATUS_SUCCESS);
                 REQUIRE(result.header.errors_count == 0);
                 REQUIRE(result.header.errors == nullptr);
                 REQUIRE(result.proof.expiry_unix_ts_ms == unix_ts_ms);
@@ -529,35 +529,35 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
 
             // Invalid JSON
             json = "{invalid}";
-            result = session_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
+            result = bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
                     json.data(), json.size());
             {
                 scope_exit result_free{[&]() {
-                    session_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(
+                    bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(
                             &result);
                 }};
-                REQUIRE(result.header.status != SESSION_PRO_BACKEND_STATUS_SUCCESS);
+                REQUIRE(result.header.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS);
                 REQUIRE(result.header.errors_count > 0);
                 REQUIRE(result.header.errors != nullptr);
             }
 
             // After freeing
-            session_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(&result);
+            bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(&result);
             REQUIRE(result.header.internal_arena_buf_ == nullptr);
 
             // Null JSON
-            result = session_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
+            result = bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
                     nullptr, 0);
-            REQUIRE(result.header.status != SESSION_PRO_BACKEND_STATUS_SUCCESS);
+            REQUIRE(result.header.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS);
             REQUIRE(result.header.errors_count == 1);
             REQUIRE(result.header.errors != nullptr);
 
             // No need to free, as errors point to static memory
         }
 
-        SECTION("session_pro_backend_get_pro_revocations_response_parse") {
+        SECTION("bchat_pro_backend_get_pro_revocations_response_parse") {
             nlohmann::json j;
-            j["status"] = SESSION_PRO_BACKEND_STATUS_SUCCESS;
+            j["status"] = BCHAT_PRO_BACKEND_STATUS_SUCCESS;
             j["result"]["ticket"] = 123;
             j["result"]["items"] = nlohmann::json::array();
 
@@ -572,14 +572,14 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             std::string json = j.dump();
 
             // Valid JSON
-            auto result = session_pro_backend_get_pro_revocations_response_parse(
+            auto result = bchat_pro_backend_get_pro_revocations_response_parse(
                     json.data(), json.size());
             {
                 scope_exit result_free{
-                        [&]() { session_pro_backend_get_pro_revocations_response_free(&result); }};
+                        [&]() { bchat_pro_backend_get_pro_revocations_response_free(&result); }};
                 for (size_t index = 0; index < result.header.errors_count; index++)
                     INFO(result.header.errors[index].data);
-                REQUIRE(result.header.status == SESSION_PRO_BACKEND_STATUS_SUCCESS);
+                REQUIRE(result.header.status == BCHAT_PRO_BACKEND_STATUS_SUCCESS);
                 REQUIRE(result.header.errors_count == 0);
                 REQUIRE(result.header.errors == nullptr);
                 REQUIRE(result.ticket == 123);
@@ -600,12 +600,12 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             // Invalid JSON
             json = "{invalid}";
             {
-                result = session_pro_backend_get_pro_revocations_response_parse(
+                result = bchat_pro_backend_get_pro_revocations_response_parse(
                         json.data(), json.size());
                 scope_exit result_free{
-                        [&]() { session_pro_backend_get_pro_revocations_response_free(&result); }};
+                        [&]() { bchat_pro_backend_get_pro_revocations_response_free(&result); }};
                 for (size_t index = 0; index < result.header.errors_count; index++)
-                    REQUIRE(result.header.status != SESSION_PRO_BACKEND_STATUS_SUCCESS);
+                    REQUIRE(result.header.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS);
                 REQUIRE(result.header.errors_count > 0);
                 REQUIRE(result.header.errors != nullptr);
             }
@@ -614,19 +614,19 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             REQUIRE(result.header.internal_arena_buf_ == nullptr);
 
             // Null JSON
-            result = session_pro_backend_get_pro_revocations_response_parse(nullptr, 0);
-            REQUIRE(result.header.status != SESSION_PRO_BACKEND_STATUS_SUCCESS);
+            result = bchat_pro_backend_get_pro_revocations_response_parse(nullptr, 0);
+            REQUIRE(result.header.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS);
             REQUIRE(result.header.errors_count == 1);
             REQUIRE(result.header.errors != nullptr);
         }
 
-        SECTION("session_pro_backend_get_pro_details_response_parse") {
+        SECTION("bchat_pro_backend_get_pro_details_response_parse") {
             nlohmann::json j;
-            j["status"] = SESSION_PRO_BACKEND_STATUS_SUCCESS;
+            j["status"] = BCHAT_PRO_BACKEND_STATUS_SUCCESS;
             j["result"] = {
-                    {"status", SESSION_PRO_BACKEND_USER_PRO_STATUS_EXPIRED},
+                    {"status", BCHAT_PRO_BACKEND_USER_PRO_STATUS_EXPIRED},
                     {"error_report",
-                     SESSION_PRO_BACKEND_GET_PRO_DETAILS_ERROR_REPORT_GENERIC_ERROR},
+                     BCHAT_PRO_BACKEND_GET_PRO_DETAILS_ERROR_REPORT_GENERIC_ERROR},
                     {"auto_renewing", true},
                     {"expiry_unix_ts_ms", unix_ts_ms + 2},
                     {"grace_period_duration_ms", 1000},
@@ -634,10 +634,10 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
                     {"payments_total", 3},
                     {"items",
                      nlohmann::json::array(
-                             {{{"status", SESSION_PRO_BACKEND_PAYMENT_STATUS_REDEEMED},
-                               {"plan", SESSION_PRO_BACKEND_PLAN_ONE_MONTH},
+                             {{{"status", BCHAT_PRO_BACKEND_PAYMENT_STATUS_REDEEMED},
+                               {"plan", BCHAT_PRO_BACKEND_PLAN_ONE_MONTH},
                                {"payment_provider",
-                                SESSION_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE},
+                                BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE},
                                {"auto_renewing", false},
                                {"unredeemed_unix_ts_ms", unix_ts_ms - 3600},
                                {"redeemed_unix_ts_ms", unix_ts_ms - 3600},
@@ -654,19 +654,19 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
 
             // Valid Google JSON
             auto result =
-                    session_pro_backend_get_pro_details_response_parse(json.data(), json.size());
+                    bchat_pro_backend_get_pro_details_response_parse(json.data(), json.size());
             {
                 scope_exit result_free{
-                        [&]() { session_pro_backend_get_pro_details_response_free(&result); }};
+                        [&]() { bchat_pro_backend_get_pro_details_response_free(&result); }};
                 for (size_t index = 0; index < result.header.errors_count; index++)
                     INFO(result.header.errors[index].data);
 
-                REQUIRE(result.header.status == SESSION_PRO_BACKEND_STATUS_SUCCESS);
+                REQUIRE(result.header.status == BCHAT_PRO_BACKEND_STATUS_SUCCESS);
                 REQUIRE(result.header.errors_count == 0);
                 REQUIRE(result.header.errors == nullptr);
-                REQUIRE(result.status == SESSION_PRO_BACKEND_USER_PRO_STATUS_EXPIRED);
+                REQUIRE(result.status == BCHAT_PRO_BACKEND_USER_PRO_STATUS_EXPIRED);
                 REQUIRE(result.error_report ==
-                        SESSION_PRO_BACKEND_GET_PRO_DETAILS_ERROR_REPORT_GENERIC_ERROR);
+                        BCHAT_PRO_BACKEND_GET_PRO_DETAILS_ERROR_REPORT_GENERIC_ERROR);
                 REQUIRE(result.items_count == 1);
                 REQUIRE(result.auto_renewing == true);
                 REQUIRE(result.grace_period_duration_ms == 1000);
@@ -674,10 +674,10 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
                 REQUIRE(result.refund_requested_unix_ts_ms == unix_ts_ms + 3602);
                 REQUIRE(result.payments_total == 3);
                 REQUIRE(result.items != nullptr);
-                REQUIRE(result.items[0].status == SESSION_PRO_BACKEND_PAYMENT_STATUS_REDEEMED);
-                REQUIRE(result.items[0].plan == SESSION_PRO_BACKEND_PLAN_ONE_MONTH);
+                REQUIRE(result.items[0].status == BCHAT_PRO_BACKEND_PAYMENT_STATUS_REDEEMED);
+                REQUIRE(result.items[0].plan == BCHAT_PRO_BACKEND_PLAN_ONE_MONTH);
                 REQUIRE(result.items[0].payment_provider ==
-                        SESSION_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE);
+                        BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE);
                 REQUIRE(result.items[0].unredeemed_unix_ts_ms == unix_ts_ms - 3600);
                 REQUIRE(result.items[0].redeemed_unix_ts_ms == unix_ts_ms - 3600);
                 REQUIRE(result.items[0].expiry_unix_ts_ms == unix_ts_ms);
@@ -699,7 +699,7 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
 
             // Tweak JSON for Rangeproof
             j["result"]["items"][0]["payment_provider"] =
-                    SESSION_PRO_BACKEND_PAYMENT_PROVIDER_RANGEPROOF;
+                    BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_RANGEPROOF;
             j["result"]["items"][0].erase("google_payment_token");
             j["result"]["items"][0].erase("google_order_id");
             j["result"]["items"][0]["rangeproof_order_id"] =
@@ -708,10 +708,10 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
 
             // Valid Rangeproof JSON
             auto result_rangeproof =
-                    session_pro_backend_get_pro_details_response_parse(json.data(), json.size());
+                    bchat_pro_backend_get_pro_details_response_parse(json.data(), json.size());
             {
                 scope_exit result_free{[&]() {
-                    session_pro_backend_get_pro_details_response_free(&result_rangeproof);
+                    bchat_pro_backend_get_pro_details_response_free(&result_rangeproof);
                 }};
                 for (size_t index = 0; index < result.header.errors_count; index++)
                     INFO(result_rangeproof.header.errors[index].data);
@@ -732,56 +732,56 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
 
             // Invalid JSON
             json = "{invalid}";
-            result = session_pro_backend_get_pro_details_response_parse(json.data(), json.size());
+            result = bchat_pro_backend_get_pro_details_response_parse(json.data(), json.size());
             {
                 scope_exit result_free{
-                        [&]() { session_pro_backend_get_pro_details_response_free(&result); }};
-                REQUIRE(result.header.status != SESSION_PRO_BACKEND_STATUS_SUCCESS);
+                        [&]() { bchat_pro_backend_get_pro_details_response_free(&result); }};
+                REQUIRE(result.header.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS);
                 REQUIRE(result.header.errors_count > 0);
                 REQUIRE(result.header.errors != nullptr);
             }
 
             // After freeing
-            session_pro_backend_get_pro_details_response_free(&result);
+            bchat_pro_backend_get_pro_details_response_free(&result);
             REQUIRE(result.header.internal_arena_buf_ == nullptr);
 
             // Null JSON
-            result = session_pro_backend_get_pro_details_response_parse(nullptr, 0);
-            REQUIRE(result.header.status != SESSION_PRO_BACKEND_STATUS_SUCCESS);
+            result = bchat_pro_backend_get_pro_details_response_parse(nullptr, 0);
+            REQUIRE(result.header.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS);
             REQUIRE(result.header.errors_count == 1);
             REQUIRE(result.header.errors != nullptr);
         }
 
         SECTION("Memory management edge cases") {
             // Test freeing null/empty structs
-            session_pro_backend_to_json to_json = {};
-            session_pro_backend_to_json_free(&to_json);
+            bchat_pro_backend_to_json to_json = {};
+            bchat_pro_backend_to_json_free(&to_json);
             REQUIRE(to_json.json.data == nullptr);
             REQUIRE(to_json.json.size == 0);
 
-            session_pro_backend_add_pro_payment_or_generate_pro_proof_response proof_response = {};
-            session_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(
+            bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response proof_response = {};
+            bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(
                     &proof_response);
             REQUIRE(proof_response.header.internal_arena_buf_ == nullptr);
 
-            session_pro_backend_get_pro_revocations_response rev_response = {};
-            session_pro_backend_get_pro_revocations_response_free(&rev_response);
+            bchat_pro_backend_get_pro_revocations_response rev_response = {};
+            bchat_pro_backend_get_pro_revocations_response_free(&rev_response);
             REQUIRE(rev_response.header.internal_arena_buf_ == nullptr);
 
-            session_pro_backend_get_pro_details_response pay_response = {};
-            session_pro_backend_get_pro_details_response_free(&pay_response);
+            bchat_pro_backend_get_pro_details_response pay_response = {};
+            bchat_pro_backend_get_pro_details_response_free(&pay_response);
             REQUIRE(pay_response.header.internal_arena_buf_ == nullptr);
         }
 
-        SECTION("session_pro_backend_set_payment_refund_requested_request_to_json") {
-            session_pro_backend_set_payment_refund_requested_request request = {};
+        SECTION("bchat_pro_backend_set_payment_refund_requested_request_to_json") {
+            bchat_pro_backend_set_payment_refund_requested_request request = {};
             request.version = 0;
             request.master_pkey = master_pubkey;
             request.unix_ts_ms = unix_ts_ms;
             request.refund_requested_unix_ts_ms = unix_ts_ms + 1;
 
-            session_pro_backend_signature sig =
-                    session_pro_backend_set_payment_refund_requested_request_build_sigs(
+            bchat_pro_backend_signature sig =
+                    bchat_pro_backend_set_payment_refund_requested_request_build_sigs(
                             request.version,
                             master_privkey.data,
                             sizeof(master_privkey.data),
@@ -797,9 +797,9 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
 
             // Valid request
             auto result =
-                    session_pro_backend_set_payment_refund_requested_request_to_json(&request);
+                    bchat_pro_backend_set_payment_refund_requested_request_to_json(&request);
             {
-                scope_exit result_free{[&]() { session_pro_backend_to_json_free(&result); }};
+                scope_exit result_free{[&]() { bchat_pro_backend_to_json_free(&result); }};
                 REQUIRE(result.success);
                 REQUIRE(result.json.data != nullptr);
                 REQUIRE(result.json.size > 0);
@@ -829,29 +829,29 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             REQUIRE(result.json.size == 0);
 
             // Null request
-            result = session_pro_backend_set_payment_refund_requested_request_to_json(nullptr);
+            result = bchat_pro_backend_set_payment_refund_requested_request_to_json(nullptr);
             REQUIRE(!result.success);
             REQUIRE(result.json.data == nullptr);
             REQUIRE(result.json.size == 0);
         }
 
-        SECTION("session_pro_backend_set_payment_refund_requested_response_parse") {
+        SECTION("bchat_pro_backend_set_payment_refund_requested_response_parse") {
             nlohmann::json j;
-            j["status"] = SESSION_PRO_BACKEND_STATUS_SUCCESS;
+            j["status"] = BCHAT_PRO_BACKEND_STATUS_SUCCESS;
             j["result"]["updated"] = true;
             j["result"]["version"] = 0;
             std::string json = j.dump();
 
             // Valid JSON
-            auto result = session_pro_backend_set_payment_refund_requested_response_parse(
+            auto result = bchat_pro_backend_set_payment_refund_requested_response_parse(
                     json.data(), json.size());
             {
                 scope_exit result_free{[&]() {
-                    session_pro_backend_set_payment_refund_requested_response_free(&result);
+                    bchat_pro_backend_set_payment_refund_requested_response_free(&result);
                 }};
                 for (size_t index = 0; index < result.header.errors_count; index++)
                     INFO(result.header.errors[index].data);
-                REQUIRE(result.header.status == SESSION_PRO_BACKEND_STATUS_SUCCESS);
+                REQUIRE(result.header.status == BCHAT_PRO_BACKEND_STATUS_SUCCESS);
                 REQUIRE(result.header.errors_count == 0);
                 REQUIRE(result.header.errors == nullptr);
                 REQUIRE(result.updated);
@@ -864,13 +864,13 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             // Invalid JSON
             json = "{invalid}";
             {
-                result = session_pro_backend_set_payment_refund_requested_response_parse(
+                result = bchat_pro_backend_set_payment_refund_requested_response_parse(
                         json.data(), json.size());
                 scope_exit result_free{[&]() {
-                    session_pro_backend_set_payment_refund_requested_response_free(&result);
+                    bchat_pro_backend_set_payment_refund_requested_response_free(&result);
                 }};
                 for (size_t index = 0; index < result.header.errors_count; index++)
-                    REQUIRE(result.header.status != SESSION_PRO_BACKEND_STATUS_SUCCESS);
+                    REQUIRE(result.header.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS);
                 REQUIRE(result.header.errors_count > 0);
                 REQUIRE(result.header.errors != nullptr);
             }
@@ -879,8 +879,8 @@ TEST_CASE("Pro Backend C API", "[pro_backend]") {
             REQUIRE(result.header.internal_arena_buf_ == nullptr);
 
             // Null JSON
-            result = session_pro_backend_set_payment_refund_requested_response_parse(nullptr, 0);
-            REQUIRE(result.header.status != SESSION_PRO_BACKEND_STATUS_SUCCESS);
+            result = bchat_pro_backend_set_payment_refund_requested_response_parse(nullptr, 0);
+            REQUIRE(result.header.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS);
             REQUIRE(result.header.errors_count == 1);
             REQUIRE(result.header.errors != nullptr);
         }
@@ -947,7 +947,7 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
     scope_exit curl_headers_free{[&]() { curl_slist_free_all(curl_headers); }};
 
     // Add pro payment
-    session_protocol_pro_proof first_pro_proof = {};
+    bchat_protocol_pro_proof first_pro_proof = {};
     {
         std::array<uint8_t, 8> fake_google_payment_token;
         randombytes_buf(fake_google_payment_token.data(), fake_google_payment_token.size());
@@ -958,8 +958,8 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
         randombytes_buf(fake_google_order_id.data(), fake_google_order_id.size());
         std::string fake_google_order_id_hex = "DEV." + oxenc::to_hex(fake_google_order_id);
 
-        session_pro_backend_add_pro_payment_user_transaction payment_tx = {};
-        payment_tx.provider = SESSION_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE;
+        bchat_pro_backend_add_pro_payment_user_transaction payment_tx = {};
+        payment_tx.provider = BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE;
         payment_tx.payment_id_count = fake_google_payment_token_hex.size();
         payment_tx.order_id_count = fake_google_order_id_hex.size();
         std::memcpy(
@@ -970,8 +970,8 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                 payment_tx.order_id, fake_google_order_id_hex.data(), payment_tx.order_id_count);
 
         // Build request
-        session_pro_backend_master_rotating_signatures add_pro_sigs =
-                session_pro_backend_add_pro_payment_request_build_sigs(
+        bchat_pro_backend_master_rotating_signatures add_pro_sigs =
+                bchat_pro_backend_add_pro_payment_request_build_sigs(
                         /*version*/ 0,
                         master_privkey.data,
                         sizeof(master_privkey.data),
@@ -983,7 +983,7 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                         reinterpret_cast<const uint8_t*>(payment_tx.order_id),
                         payment_tx.order_id_count);
 
-        session_pro_backend_add_pro_payment_request request = {};
+        bchat_pro_backend_add_pro_payment_request request = {};
         request.version = 0;
         request.master_pkey = master_pubkey;
         request.rotating_pkey = rotating_pubkey;
@@ -991,9 +991,9 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
         request.master_sig = add_pro_sigs.master_sig;
         request.rotating_sig = add_pro_sigs.rotating_sig;
 
-        session_pro_backend_to_json request_json =
-                session_pro_backend_add_pro_payment_request_to_json(&request);
-        scope_exit request_json_free{[&]() { session_pro_backend_to_json_free(&request_json); }};
+        bchat_pro_backend_to_json request_json =
+                bchat_pro_backend_add_pro_payment_request_to_json(&request);
+        scope_exit request_json_free{[&]() { bchat_pro_backend_to_json_free(&request_json); }};
 
         // Do curl request
         std::string response_json = curl_do_basic_blocking_post_request(
@@ -1003,11 +1003,11 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                 std::string_view(request_json.json.data, request_json.json.size));
 
         // Parse response
-        session_pro_backend_add_pro_payment_or_generate_pro_proof_response response =
-                session_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
+        bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response response =
+                bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
                         response_json.data(), response_json.size());
         scope_exit response_free{[&]() {
-            session_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(&response);
+            bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(&response);
         }};
 
         for (size_t index = 0; index < response.header.errors_count; index++) {
@@ -1021,7 +1021,7 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                                       first_pro_proof.sig.data, std::end(first_pro_proof.sig.data))
                            << ", backend pubkey: " << oxenc::to_hex(DEV_BACKEND_PUBKEY)
                            << ", response: " << response_json);
-        REQUIRE(session_protocol_pro_proof_verify_signature(
+        REQUIRE(bchat_protocol_pro_proof_verify_signature(
                 &first_pro_proof, DEV_BACKEND_PUBKEY.data(), DEV_BACKEND_PUBKEY.size()));
         REQUIRE(std::memcmp(
                         response.proof.rotating_pubkey.data,
@@ -1033,8 +1033,8 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
     {
         uint64_t now_unix_ts_ms = time(nullptr) * 1000;
         // Build request
-        session_pro_backend_master_rotating_signatures pro_sigs =
-                session_pro_backend_generate_pro_proof_request_build_sigs(
+        bchat_pro_backend_master_rotating_signatures pro_sigs =
+                bchat_pro_backend_generate_pro_proof_request_build_sigs(
                         /*version*/ 0,
                         master_privkey.data,
                         sizeof(master_privkey.data),
@@ -1042,7 +1042,7 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                         sizeof(rotating_privkey.data),
                         now_unix_ts_ms);
 
-        session_pro_backend_generate_pro_proof_request request = {};
+        bchat_pro_backend_generate_pro_proof_request request = {};
         request.version = 0;
         request.master_pkey = master_pubkey;
         request.rotating_pkey = rotating_pubkey;
@@ -1050,9 +1050,9 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
         request.master_sig = pro_sigs.master_sig;
         request.rotating_sig = pro_sigs.rotating_sig;
 
-        session_pro_backend_to_json request_json =
-                session_pro_backend_generate_pro_proof_request_to_json(&request);
-        scope_exit request_json_free{[&]() { session_pro_backend_to_json_free(&request_json); }};
+        bchat_pro_backend_to_json request_json =
+                bchat_pro_backend_generate_pro_proof_request_to_json(&request);
+        scope_exit request_json_free{[&]() { bchat_pro_backend_to_json_free(&request_json); }};
 
         // Do CURL request
         std::string response_json = curl_do_basic_blocking_post_request(
@@ -1062,11 +1062,11 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                 std::string_view(request_json.json.data, request_json.json.size));
 
         // Parse response
-        session_pro_backend_add_pro_payment_or_generate_pro_proof_response response =
-                session_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
+        bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response response =
+                bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
                         response_json.data(), response_json.size());
         scope_exit response_free{[&]() {
-            session_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(&response);
+            bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(&response);
         }};
 
         for (size_t index = 0; index < response.header.errors_count; index++) {
@@ -1076,31 +1076,31 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
             fprintf(stderr, "ERROR: %s\n", error.data);
         }
         REQUIRE(response.header.errors_count == 0);
-        REQUIRE(response.header.status == SESSION_PRO_BACKEND_STATUS_SUCCESS);
+        REQUIRE(response.header.status == BCHAT_PRO_BACKEND_STATUS_SUCCESS);
 
         // Verify response
-        session_protocol_pro_proof proof = response.proof;
-        REQUIRE(session_protocol_pro_proof_verify_signature(
+        bchat_protocol_pro_proof proof = response.proof;
+        REQUIRE(bchat_protocol_pro_proof_verify_signature(
                 &proof, DEV_BACKEND_PUBKEY.data(), DEV_BACKEND_PUBKEY.size()));
         REQUIRE(std::memcmp(
                         response.proof.rotating_pubkey.data,
                         request.rotating_pkey.data,
                         sizeof(request.rotating_pkey.data)) == 0);
 
-        session_pro_backend_to_json_free(&request_json);
-        session_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(&response);
+        bchat_pro_backend_to_json_free(&request_json);
+        bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(&response);
     }
 
     // Get pro status
     {
         // Build request
-        session_pro_backend_get_pro_details_request request = {};
+        bchat_pro_backend_get_pro_details_request request = {};
         request.version = 0;
         request.master_pkey = master_pubkey;
         request.unix_ts_ms = time(nullptr) * 1000;
         request.count = 10'000;
 
-        session_pro_backend_signature sig = session_pro_backend_get_pro_details_request_build_sig(
+        bchat_pro_backend_signature sig = bchat_pro_backend_get_pro_details_request_build_sig(
                 request.version,
                 master_privkey.data,
                 sizeof(master_privkey.data),
@@ -1110,9 +1110,9 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
         request.master_sig = sig.sig;
 
         // Do CURL request
-        session_pro_backend_to_json request_json =
-                session_pro_backend_get_pro_details_request_to_json(&request);
-        scope_exit request_json_free{[&]() { session_pro_backend_to_json_free(&request_json); }};
+        bchat_pro_backend_to_json request_json =
+                bchat_pro_backend_get_pro_details_request_to_json(&request);
+        scope_exit request_json_free{[&]() { bchat_pro_backend_to_json_free(&request_json); }};
 
         std::string response_json = curl_do_basic_blocking_post_request(
                 curl,
@@ -1121,11 +1121,11 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                 std::string_view(request_json.json.data, request_json.json.size));
 
         // Parse response
-        session_pro_backend_get_pro_details_response response =
-                session_pro_backend_get_pro_details_response_parse(
+        bchat_pro_backend_get_pro_details_response response =
+                bchat_pro_backend_get_pro_details_response_parse(
                         response_json.data(), response_json.size());
         scope_exit response_free{
-                [&]() { session_pro_backend_get_pro_details_response_free(&response); }};
+                [&]() { bchat_pro_backend_get_pro_details_response_free(&response); }};
 
         // Verify the response
         for (size_t index = 0; index < response.header.errors_count; index++) {
@@ -1135,20 +1135,20 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
             fprintf(stderr, "ERROR: %s\n", error.data);
         }
         REQUIRE(response.header.errors_count == 0);
-        REQUIRE(response.header.status == SESSION_PRO_BACKEND_STATUS_SUCCESS);
-        REQUIRE(response.status == SESSION_PRO_BACKEND_USER_PRO_STATUS_ACTIVE);
+        REQUIRE(response.header.status == BCHAT_PRO_BACKEND_STATUS_SUCCESS);
+        REQUIRE(response.status == BCHAT_PRO_BACKEND_USER_PRO_STATUS_ACTIVE);
         REQUIRE(response.items_count > 0);
     }
 
     // Get pro status without history
     {
         // Build request
-        session_pro_backend_get_pro_details_request request = {};
+        bchat_pro_backend_get_pro_details_request request = {};
         request.version = 0;
         request.master_pkey = master_pubkey;
         request.unix_ts_ms = time(nullptr) * 1000;
 
-        session_pro_backend_signature sig = session_pro_backend_get_pro_details_request_build_sig(
+        bchat_pro_backend_signature sig = bchat_pro_backend_get_pro_details_request_build_sig(
                 request.version,
                 master_privkey.data,
                 sizeof(master_privkey.data),
@@ -1158,9 +1158,9 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
         request.master_sig = sig.sig;
 
         // Do CURL request
-        session_pro_backend_to_json request_json =
-                session_pro_backend_get_pro_details_request_to_json(&request);
-        scope_exit request_json_free{[&]() { session_pro_backend_to_json_free(&request_json); }};
+        bchat_pro_backend_to_json request_json =
+                bchat_pro_backend_get_pro_details_request_to_json(&request);
+        scope_exit request_json_free{[&]() { bchat_pro_backend_to_json_free(&request_json); }};
 
         std::string response_json = curl_do_basic_blocking_post_request(
                 curl,
@@ -1169,11 +1169,11 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                 std::string_view(request_json.json.data, request_json.json.size));
 
         // Parse response
-        session_pro_backend_get_pro_details_response response =
-                session_pro_backend_get_pro_details_response_parse(
+        bchat_pro_backend_get_pro_details_response response =
+                bchat_pro_backend_get_pro_details_response_parse(
                         response_json.data(), response_json.size());
         scope_exit response_free{
-                [&]() { session_pro_backend_get_pro_details_response_free(&response); }};
+                [&]() { bchat_pro_backend_get_pro_details_response_free(&response); }};
 
         for (size_t index = 0; index < response.header.errors_count; index++) {
             if (index == 0)
@@ -1184,13 +1184,13 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
 
         // Verify the response
         REQUIRE(response.header.errors_count == 0);
-        REQUIRE(response.header.status == SESSION_PRO_BACKEND_STATUS_SUCCESS);
-        REQUIRE(response.status == SESSION_PRO_BACKEND_USER_PRO_STATUS_ACTIVE);
+        REQUIRE(response.header.status == BCHAT_PRO_BACKEND_STATUS_SUCCESS);
+        REQUIRE(response.status == BCHAT_PRO_BACKEND_USER_PRO_STATUS_ACTIVE);
         REQUIRE(response.items_count == 0);
     }
 
     // Add _another_ payment, same details
-    session_pro_backend_add_pro_payment_user_transaction another_payment_tx = {};
+    bchat_pro_backend_add_pro_payment_user_transaction another_payment_tx = {};
     {
         std::array<uint8_t, 8> fake_google_payment_token;
         randombytes_buf(fake_google_payment_token.data(), fake_google_payment_token.size());
@@ -1201,7 +1201,7 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
         randombytes_buf(fake_google_order_id.data(), fake_google_order_id.size());
         std::string fake_google_order_id_hex = "DEV." + oxenc::to_hex(fake_google_order_id);
 
-        another_payment_tx.provider = SESSION_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE;
+        another_payment_tx.provider = BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE;
         another_payment_tx.payment_id_count = fake_google_payment_token_hex.size();
         another_payment_tx.order_id_count = fake_google_order_id_hex.size();
         std::memcpy(
@@ -1214,8 +1214,8 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                 another_payment_tx.order_id_count);
 
         // Build request
-        session_pro_backend_master_rotating_signatures add_pro_sigs =
-                session_pro_backend_add_pro_payment_request_build_sigs(
+        bchat_pro_backend_master_rotating_signatures add_pro_sigs =
+                bchat_pro_backend_add_pro_payment_request_build_sigs(
                         /*version*/ 0,
                         master_privkey.data,
                         sizeof(master_privkey.data),
@@ -1227,7 +1227,7 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                         reinterpret_cast<const uint8_t*>(another_payment_tx.order_id),
                         another_payment_tx.order_id_count);
 
-        session_pro_backend_add_pro_payment_request request = {};
+        bchat_pro_backend_add_pro_payment_request request = {};
         request.version = 0;
         request.master_pkey = master_pubkey;
         request.rotating_pkey = rotating_pubkey;
@@ -1235,9 +1235,9 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
         request.master_sig = add_pro_sigs.master_sig;
         request.rotating_sig = add_pro_sigs.rotating_sig;
 
-        session_pro_backend_to_json request_json =
-                session_pro_backend_add_pro_payment_request_to_json(&request);
-        scope_exit request_json_free{[&]() { session_pro_backend_to_json_free(&request_json); }};
+        bchat_pro_backend_to_json request_json =
+                bchat_pro_backend_add_pro_payment_request_to_json(&request);
+        scope_exit request_json_free{[&]() { bchat_pro_backend_to_json_free(&request_json); }};
 
         // Do curl request
         std::string response_json = curl_do_basic_blocking_post_request(
@@ -1247,16 +1247,16 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                 std::string_view(request_json.json.data, request_json.json.size));
 
         // Parse response
-        session_pro_backend_add_pro_payment_or_generate_pro_proof_response response =
-                session_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
+        bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response response =
+                bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
                         response_json.data(), response_json.size());
         scope_exit response_free{[&]() {
-            session_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(&response);
+            bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(&response);
         }};
 
         // Verify response
-        session_protocol_pro_proof proof = response.proof;
-        REQUIRE(session_protocol_pro_proof_verify_signature(
+        bchat_protocol_pro_proof proof = response.proof;
+        REQUIRE(bchat_protocol_pro_proof_verify_signature(
                 &proof, DEV_BACKEND_PUBKEY.data(), DEV_BACKEND_PUBKEY.size()));
         REQUIRE(std::memcmp(
                         response.proof.rotating_pubkey.data,
@@ -1267,12 +1267,12 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
     // Get revocation list
     {
         // Build request
-        session_pro_backend_get_pro_revocations_request request = {};
+        bchat_pro_backend_get_pro_revocations_request request = {};
         request.version = 0;
 
-        session_pro_backend_to_json request_json =
-                session_pro_backend_get_pro_revocations_request_to_json(&request);
-        scope_exit request_json_free{[&]() { session_pro_backend_to_json_free(&request_json); }};
+        bchat_pro_backend_to_json request_json =
+                bchat_pro_backend_get_pro_revocations_request_to_json(&request);
+        scope_exit request_json_free{[&]() { bchat_pro_backend_to_json_free(&request_json); }};
 
         // Do curl request
         std::string response_json = curl_do_basic_blocking_post_request(
@@ -1282,11 +1282,11 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                 std::string_view(request_json.json.data, request_json.json.size));
 
         // Parse response
-        session_pro_backend_get_pro_revocations_response response =
-                session_pro_backend_get_pro_revocations_response_parse(
+        bchat_pro_backend_get_pro_revocations_response response =
+                bchat_pro_backend_get_pro_revocations_response_parse(
                         response_json.data(), response_json.size());
         scope_exit response_free{
-                [&]() { session_pro_backend_get_pro_revocations_response_free(&response); }};
+                [&]() { bchat_pro_backend_get_pro_revocations_response_free(&response); }};
 
         // Verify response
         INFO("ERROR: JSON response: " << response_json.c_str());
@@ -1297,7 +1297,7 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
 
         // Verify the response
         REQUIRE(response.header.errors_count == 0);
-        REQUIRE(response.header.status == SESSION_PRO_BACKEND_STATUS_SUCCESS);
+        REQUIRE(response.header.status == BCHAT_PRO_BACKEND_STATUS_SUCCESS);
         REQUIRE(response.ticket == 0);
         REQUIRE(response.items_count == 0);
     }
@@ -1306,8 +1306,8 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
     {
         // Build request
         uint64_t now_unix_ts_ms = time(nullptr) * 1000;
-        session_pro_backend_to_json request_json =
-                session_pro_backend_set_payment_refund_requested_request_build_to_json(
+        bchat_pro_backend_to_json request_json =
+                bchat_pro_backend_set_payment_refund_requested_request_build_to_json(
                         /*version*/ 0,
                         master_privkey.data,
                         sizeof(master_privkey.data),
@@ -1319,7 +1319,7 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                         reinterpret_cast<const uint8_t*>(another_payment_tx.order_id),
                         another_payment_tx.order_id_count);
 
-        scope_exit request_json_free{[&]() { session_pro_backend_to_json_free(&request_json); }};
+        scope_exit request_json_free{[&]() { bchat_pro_backend_to_json_free(&request_json); }};
 
         // Do curl request
         std::string response_json = curl_do_basic_blocking_post_request(
@@ -1329,11 +1329,11 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
                 std::string_view(request_json.json.data, request_json.json.size));
 
         // Parse response
-        session_pro_backend_set_payment_refund_requested_response response =
-                session_pro_backend_set_payment_refund_requested_response_parse(
+        bchat_pro_backend_set_payment_refund_requested_response response =
+                bchat_pro_backend_set_payment_refund_requested_response_parse(
                         response_json.data(), response_json.size());
         scope_exit response_free{[&]() {
-            session_pro_backend_set_payment_refund_requested_response_free(&response);
+            bchat_pro_backend_set_payment_refund_requested_response_free(&response);
         }};
 
         // Verify response
@@ -1345,7 +1345,7 @@ TEST_CASE("Pro Backend Dev Server", "[pro_backend][dev_server]") {
 
         // Verify the response
         REQUIRE(response.header.errors_count == 0);
-        REQUIRE(response.header.status == SESSION_PRO_BACKEND_STATUS_SUCCESS);
+        REQUIRE(response.header.status == BCHAT_PRO_BACKEND_STATUS_SUCCESS);
         REQUIRE(response.version == 0);
         REQUIRE(response.updated);
     }

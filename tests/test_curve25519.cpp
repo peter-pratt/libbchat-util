@@ -1,15 +1,15 @@
 #include <oxenc/hex.h>
 
 #include <catch2/catch_test_macros.hpp>
-#include <session/util.hpp>
+#include <bchat/util.hpp>
 
-#include "session/curve25519.h"
-#include "session/curve25519.hpp"
+#include "bchat/curve25519.h"
+#include "bchat/curve25519.hpp"
 #include "utils.hpp"
 
 TEST_CASE("X25519 key pair generation", "[curve25519][keypair]") {
-    auto kp1 = session::curve25519::curve25519_key_pair();
-    auto kp2 = session::curve25519::curve25519_key_pair();
+    auto kp1 = bchat::curve25519::curve25519_key_pair();
+    auto kp2 = bchat::curve25519::curve25519_key_pair();
 
     CHECK(kp1.first.size() == 32);
     CHECK(kp1.second.size() == 32);
@@ -18,7 +18,7 @@ TEST_CASE("X25519 key pair generation", "[curve25519][keypair]") {
 }
 
 TEST_CASE("X25519 conversion", "[curve25519][to curve25519 pubkey]") {
-    using namespace session;
+    using namespace bchat;
 
     auto ed_pk1 = "4cb76fdc6d32278e3f83dbf608360ecc6b65727934b85d2fb86862ff98c46ab7"_hexbytes;
     auto ed_pk2 = "5ea34e72bb044654a6a23675690ef5ffaaf1656b02f93fb76655f9cbdbe89876"_hexbytes;
@@ -33,7 +33,7 @@ TEST_CASE("X25519 conversion", "[curve25519][to curve25519 pubkey]") {
 }
 
 TEST_CASE("X25519 conversion", "[curve25519][to curve25519 seckey]") {
-    using namespace session;
+    using namespace bchat;
 
     auto ed_sk1 =
             "4cb76fdc6d32278e3f83dbf608360ecc6b65727934b85d2fb86862ff98c46ab78862834829a"

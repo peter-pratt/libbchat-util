@@ -1,12 +1,12 @@
-#include "session/fields.hpp"
+#include "bchat/fields.hpp"
 
 #include <oxenc/hex.h>
 
 #include <iterator>
 
-namespace session {
+namespace bchat {
 
-std::string SessionID::hex() const {
+std::string BChatID::hex() const {
     std::string id;
     id.reserve(33);
     id.push_back(static_cast<char>(netid));
@@ -14,4 +14,4 @@ std::string SessionID::hex() const {
     return id;
 }
 
-}  // namespace session
+}  // namespace bchat

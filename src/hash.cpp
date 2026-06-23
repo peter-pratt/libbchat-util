@@ -1,11 +1,11 @@
-#include "session/hash.hpp"
+#include "bchat/hash.hpp"
 
 #include <sodium/crypto_generichash_blake2b.h>
 
-#include "session/export.h"
-#include "session/util.hpp"
+#include "bchat/export.h"
+#include "bchat/util.hpp"
 
-namespace session::hash {
+namespace bchat::hash {
 
 void hash(
         std::span<unsigned char> hash,
@@ -38,11 +38,11 @@ std::vector<unsigned char> hash(
     return result;
 }
 
-}  // namespace session::hash
+}  // namespace bchat::hash
 
 extern "C" {
 
-LIBSESSION_C_API bool session_hash(
+LIBBCHAT_C_API bool bchat_hash(
         size_t size,
         const unsigned char* msg_in,
         size_t msg_len,
@@ -55,7 +55,7 @@ LIBSESSION_C_API bool session_hash(
         if (key_in && key_len)
             key = {key_in, key_len};
 
-        std::vector<unsigned char> result = session::hash::hash(size, {msg_in, msg_len}, key);
+        std::vector<unsigned char> result = bchat::hash::hash(size, {msg_in, msg_len}, key);
         std::memcpy(hash_out, result.data(), size);
         return true;
     } catch (...) {

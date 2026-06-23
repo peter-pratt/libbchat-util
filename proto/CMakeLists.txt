@@ -3,7 +3,7 @@ libbchat_static_bundle(protobuf::libprotobuf-lite)
 
 
 add_library(protos
-    SessionProtos.pb.cc
+    BChatProtos.pb.cc
     WebSocketResources.pb.cc)
 target_include_directories(protos PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(protos PUBLIC protobuf::libprotobuf-lite)
@@ -33,6 +33,6 @@ set(libbchat_export_targets "${libbchat_export_targets}" PARENT_SCOPE)
 
 
 add_custom_target(regen-protobuf
-    protoc --cpp_out=. SessionProtos.proto WebSocketResources.proto
+    protoc --cpp_out=. BChatProtos.proto WebSocketResources.proto
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
 )

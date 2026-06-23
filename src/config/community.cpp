@@ -1,10 +1,10 @@
-#include "session/config/community.hpp"
+#include "bchat/config/community.hpp"
 
 #include <oxenc/hex.h>
 
 #include <charconv>
 #include <optional>
-#include <session/types.hpp>
+#include <bchat/types.hpp>
 #include <stdexcept>
 #include <string_view>
 #include <type_traits>
@@ -12,11 +12,11 @@
 #include "internal.hpp"
 #include "oxenc/base32z.h"
 #include "oxenc/base64.h"
-#include "session/config/community.h"
-#include "session/export.h"
-#include "session/util.hpp"
+#include "bchat/config/community.h"
+#include "bchat/export.h"
+#include "bchat/util.hpp"
 
-namespace session::config {
+namespace bchat::config {
 
 community::community(std::string_view base_url_, std::string_view room_) {
     set_base_url(std::move(base_url_));
@@ -165,19 +165,19 @@ std::tuple<std::string, std::string, std::vector<unsigned char>> community::pars
     return {std::move(base), std::move(rm), std::move(*maybe_pk)};
 }
 
-}  // namespace session::config
+}  // namespace bchat::config
 
-LIBSESSION_C_API const size_t COMMUNITY_BASE_URL_MAX_LENGTH =
-        session::config::community::BASE_URL_MAX_LENGTH;
-LIBSESSION_C_API const size_t COMMUNITY_ROOM_MAX_LENGTH =
-        session::config::community::ROOM_MAX_LENGTH;
-LIBSESSION_C_API const size_t COMMUNITY_FULL_URL_MAX_LENGTH =
-        session::config::community::FULL_URL_MAX_LENGTH;
+LIBBCHAT_C_API const size_t COMMUNITY_BASE_URL_MAX_LENGTH =
+        bchat::config::community::BASE_URL_MAX_LENGTH;
+LIBBCHAT_C_API const size_t COMMUNITY_ROOM_MAX_LENGTH =
+        bchat::config::community::ROOM_MAX_LENGTH;
+LIBBCHAT_C_API const size_t COMMUNITY_FULL_URL_MAX_LENGTH =
+        bchat::config::community::FULL_URL_MAX_LENGTH;
 
-LIBSESSION_C_API bool community_parse_full_url(
+LIBBCHAT_C_API bool community_parse_full_url(
         const char* full_url, char* base_url, char* room_token, unsigned char* pubkey) {
     try {
-        auto [base, room, pk] = session::config::community::parse_full_url(full_url);
+        auto [base, room, pk] = bchat::config::community::parse_full_url(full_url);
         assert(base.size() <= COMMUNITY_BASE_URL_MAX_LENGTH);
         assert(room.size() <= COMMUNITY_ROOM_MAX_LENGTH);
         assert(pk.size() == 32);
@@ -190,14 +190,14 @@ LIBSESSION_C_API bool community_parse_full_url(
     return false;
 }
 
-LIBSESSION_C_API bool community_parse_partial_url(
+LIBBCHAT_C_API bool community_parse_partial_url(
         const char* full_url,
         char* base_url,
         char* room_token,
         unsigned char* pubkey,
         bool* has_pubkey) {
     try {
-        auto [base, room, maybe_pk] = session::config::community::parse_partial_url(full_url);
+        auto [base, room, maybe_pk] = bchat::config::community::parse_partial_url(full_url);
         assert(base.size() <= COMMUNITY_BASE_URL_MAX_LENGTH);
         assert(room.size() <= COMMUNITY_ROOM_MAX_LENGTH);
         assert(!maybe_pk || maybe_pk->size() == 32);
@@ -213,9 +213,9 @@ LIBSESSION_C_API bool community_parse_partial_url(
     return false;
 }
 
-LIBSESSION_C_API void community_make_full_url(
+LIBBCHAT_C_API void community_make_full_url(
         const char* base_url, const char* room, const unsigned char* pubkey, char* full_url) {
-    auto full = session::config::community::full_url(
+    auto full = bchat::config::community::full_url(
             base_url, room, std::span<const unsigned char>{pubkey, 32});
     assert(full.size() <= COMMUNITY_FULL_URL_MAX_LENGTH);
     std::memcpy(full_url, full.data(), full.size() + 1);

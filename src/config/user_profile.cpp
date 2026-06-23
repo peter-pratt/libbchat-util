@@ -1,18 +1,18 @@
-#include "session/config/user_profile.h"
+#include "bchat/config/user_profile.h"
 
 #include <sodium/crypto_generichash_blake2b.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include "internal.hpp"
-#include "session/config/contacts.hpp"
-#include "session/config/error.h"
-#include "session/config/pro.h"
-#include "session/config/pro.hpp"
-#include "session/config/user_profile.hpp"
-#include "session/export.h"
-#include "session/types.hpp"
+#include "bchat/config/contacts.hpp"
+#include "bchat/config/error.h"
+#include "bchat/config/pro.h"
+#include "bchat/config/pro.hpp"
+#include "bchat/config/user_profile.hpp"
+#include "bchat/export.h"
+#include "bchat/types.hpp"
 
-using namespace session::config;
+using namespace bchat::config;
 
 UserProfile::UserProfile(
         std::span<const unsigned char> ed25519_secretkey,
@@ -185,7 +185,7 @@ bool UserProfile::remove_pro_config() {
     return result;
 }
 
-session::ProProfileBitset UserProfile::get_profile_bitset() const {
+bchat::ProProfileBitset UserProfile::get_profile_bitset() const {
     ProProfileBitset result = {};
     if (const config::set* set = data["f"].set())
         result.data = bitset_from_set_of_int64_or_0(*set);
@@ -193,7 +193,7 @@ session::ProProfileBitset UserProfile::get_profile_bitset() const {
 }
 
 void UserProfile::set_pro_badge(bool enabled) {
-    auto feature = SESSION_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE;
+    auto feature = BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_PRO_BADGE;
     bool dirtied = enabled ? data["f"].set_insert(feature) : data["f"].set_erase(feature);
     if (dirtied) {
         const auto target_timestamp =
@@ -203,7 +203,7 @@ void UserProfile::set_pro_badge(bool enabled) {
 }
 
 void UserProfile::set_animated_avatar(bool enabled) {
-    auto feature = SESSION_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR;
+    auto feature = BCHAT_PROTOCOL_PRO_PROFILE_FEATURES_ANIMATED_AVATAR;
     bool dirtied = enabled ? data["f"].set_insert(feature) : data["f"].set_erase(feature);
     if (dirtied) {
         const auto target_timestamp =
@@ -229,12 +229,12 @@ void UserProfile::set_pro_access_expiry(
 
 extern "C" {
 
-using namespace session;
-using namespace session::config;
+using namespace bchat;
+using namespace bchat::config;
 
-LIBSESSION_C_API const size_t PROFILE_PIC_MAX_URL_LENGTH = profile_pic::MAX_URL_LENGTH;
+LIBBCHAT_C_API const size_t PROFILE_PIC_MAX_URL_LENGTH = profile_pic::MAX_URL_LENGTH;
 
-LIBSESSION_C_API int user_profile_init(
+LIBBCHAT_C_API int user_profile_init(
         config_object** conf,
         const unsigned char* ed25519_secretkey_bytes,
         const unsigned char* dumpstr,
@@ -243,23 +243,23 @@ LIBSESSION_C_API int user_profile_init(
     return c_wrapper_init<UserProfile>(conf, ed25519_secretkey_bytes, dumpstr, dumplen, error);
 }
 
-LIBSESSION_C_API const char* user_profile_get_name(const config_object* conf) {
+LIBBCHAT_C_API const char* user_profile_get_name(const config_object* conf) {
     if (auto s = unbox<UserProfile>(conf)->get_name())
         return s->data();
     return nullptr;
 }
 
-LIBSESSION_C_API int user_profile_set_name(config_object* conf, const char* name) {
+LIBBCHAT_C_API int user_profile_set_name(config_object* conf, const char* name) {
     return wrap_exceptions(
             conf,
             [&] {
                 unbox<UserProfile>(conf)->set_name(name);
                 return 0;
             },
-            static_cast<int>(SESSION_ERR_BAD_VALUE));
+            static_cast<int>(BCHAT_ERR_BAD_VALUE));
 }
 
-LIBSESSION_C_API user_profile_pic user_profile_get_pic(const config_object* conf) {
+LIBBCHAT_C_API user_profile_pic user_profile_get_pic(const config_object* conf) {
     user_profile_pic p;
     if (auto pic = unbox<UserProfile>(conf)->get_profile_pic(); pic) {
         copy_c_str(p.url, pic.url);
@@ -270,7 +270,7 @@ LIBSESSION_C_API user_profile_pic user_profile_get_pic(const config_object* conf
     return p;
 }
 
-LIBSESSION_C_API int user_profile_set_pic(config_object* conf, user_profile_pic pic) {
+LIBBCHAT_C_API int user_profile_set_pic(config_object* conf, user_profile_pic pic) {
     std::string_view url{pic.url};
     std::span<const unsigned char> key;
     if (!url.empty())
@@ -282,10 +282,10 @@ LIBSESSION_C_API int user_profile_set_pic(config_object* conf, user_profile_pic 
                 unbox<UserProfile>(conf)->set_profile_pic(url, key);
                 return 0;
             },
-            static_cast<int>(SESSION_ERR_BAD_VALUE));
+            static_cast<int>(BCHAT_ERR_BAD_VALUE));
 }
 
-LIBSESSION_C_API int user_profile_set_reupload_pic(config_object* conf, user_profile_pic pic) {
+LIBBCHAT_C_API int user_profile_set_reupload_pic(config_object* conf, user_profile_pic pic) {
     std::string_view url{pic.url};
     std::span<const unsigned char> key;
     if (!url.empty())
@@ -297,43 +297,43 @@ LIBSESSION_C_API int user_profile_set_reupload_pic(config_object* conf, user_pro
                 unbox<UserProfile>(conf)->set_reupload_profile_pic(url, key);
                 return 0;
             },
-            static_cast<int>(SESSION_ERR_BAD_VALUE));
+            static_cast<int>(BCHAT_ERR_BAD_VALUE));
 }
 
-LIBSESSION_C_API int user_profile_get_nts_priority(const config_object* conf) {
+LIBBCHAT_C_API int user_profile_get_nts_priority(const config_object* conf) {
     return unbox<UserProfile>(conf)->get_nts_priority();
 }
 
-LIBSESSION_C_API void user_profile_set_nts_priority(config_object* conf, int priority) {
+LIBBCHAT_C_API void user_profile_set_nts_priority(config_object* conf, int priority) {
     unbox<UserProfile>(conf)->set_nts_priority(priority);
 }
 
-LIBSESSION_C_API int user_profile_get_nts_expiry(const config_object* conf) {
+LIBBCHAT_C_API int user_profile_get_nts_expiry(const config_object* conf) {
     return unbox<UserProfile>(conf)->get_nts_expiry().value_or(0s).count();
 }
 
-LIBSESSION_C_API void user_profile_set_nts_expiry(config_object* conf, int expiry) {
+LIBBCHAT_C_API void user_profile_set_nts_expiry(config_object* conf, int expiry) {
     unbox<UserProfile>(conf)->set_nts_expiry(std::max(0, expiry) * 1s);
 }
 
-LIBSESSION_C_API int user_profile_get_blinded_msgreqs(const config_object* conf) {
+LIBBCHAT_C_API int user_profile_get_blinded_msgreqs(const config_object* conf) {
     if (auto opt = unbox<UserProfile>(conf)->get_blinded_msgreqs())
         return static_cast<int>(*opt);
     return -1;
 }
 
-LIBSESSION_C_API void user_profile_set_blinded_msgreqs(config_object* conf, int enabled) {
+LIBBCHAT_C_API void user_profile_set_blinded_msgreqs(config_object* conf, int enabled) {
     std::optional<bool> val;
     if (enabled >= 0)
         val = static_cast<bool>(enabled);
     unbox<UserProfile>(conf)->set_blinded_msgreqs(std::move(val));
 }
 
-LIBSESSION_C_API int64_t user_profile_get_profile_updated(config_object* conf) {
+LIBBCHAT_C_API int64_t user_profile_get_profile_updated(config_object* conf) {
     return epoch_seconds(unbox<UserProfile>(conf)->get_profile_updated());
 }
 
-LIBSESSION_C_API bool user_profile_get_pro_config(const config_object* conf, pro_pro_config* pro) {
+LIBBCHAT_C_API bool user_profile_get_pro_config(const config_object* conf, pro_pro_config* pro) {
     if (auto val = unbox<UserProfile>(conf)->get_pro_config(); val) {
         static_assert(sizeof pro->proof.gen_index_hash == sizeof(val->proof.gen_index_hash));
         static_assert(sizeof pro->proof.rotating_pubkey == sizeof(val->proof.rotating_pubkey));
@@ -358,7 +358,7 @@ LIBSESSION_C_API bool user_profile_get_pro_config(const config_object* conf, pro
     return false;
 }
 
-LIBSESSION_C_API void user_profile_set_pro_config(config_object* conf, const pro_pro_config* pro) {
+LIBBCHAT_C_API void user_profile_set_pro_config(config_object* conf, const pro_pro_config* pro) {
     ProConfig val = {};
     val.proof.version = pro->proof.version;
     std::memcpy(
@@ -377,32 +377,32 @@ LIBSESSION_C_API void user_profile_set_pro_config(config_object* conf, const pro
     unbox<UserProfile>(conf)->set_pro_config(val);
 }
 
-LIBSESSION_C_API bool user_profile_remove_pro_config(config_object* conf) {
+LIBBCHAT_C_API bool user_profile_remove_pro_config(config_object* conf) {
     return unbox<UserProfile>(conf)->remove_pro_config();
 }
 
-LIBSESSION_C_API session_protocol_pro_profile_bitset
+LIBBCHAT_C_API bchat_protocol_pro_profile_bitset
 user_profile_get_pro_features(const config_object* conf) {
-    session_protocol_pro_profile_bitset result = {};
+    bchat_protocol_pro_profile_bitset result = {};
     result.data = unbox<UserProfile>(conf)->get_profile_bitset().data;
     return result;
 }
 
-LIBSESSION_C_API void user_profile_set_pro_badge(config_object* conf, bool enabled) {
+LIBBCHAT_C_API void user_profile_set_pro_badge(config_object* conf, bool enabled) {
     unbox<UserProfile>(conf)->set_pro_badge(enabled);
 }
 
-LIBSESSION_C_API void user_profile_set_animated_avatar(config_object* conf, bool enabled) {
+LIBBCHAT_C_API void user_profile_set_animated_avatar(config_object* conf, bool enabled) {
     unbox<UserProfile>(conf)->set_animated_avatar(enabled);
 }
 
-LIBSESSION_C_API uint64_t user_profile_get_pro_access_expiry_ms(const config_object* conf) {
+LIBBCHAT_C_API uint64_t user_profile_get_pro_access_expiry_ms(const config_object* conf) {
     if (auto expiry = unbox<UserProfile>(conf)->get_pro_access_expiry())
         return epoch_ms(*expiry);
     return 0;
 }
 
-LIBSESSION_C_API void user_profile_set_pro_access_expiry_ms(
+LIBBCHAT_C_API void user_profile_set_pro_access_expiry_ms(
         config_object* conf, uint64_t access_expiry_ts_ms) {
     if (access_expiry_ts_ms <= 0)
         unbox<UserProfile>(conf)->set_pro_access_expiry(std::nullopt);

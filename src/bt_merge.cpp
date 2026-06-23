@@ -1,6 +1,6 @@
-#include "session/bt_merge.hpp"
+#include "bchat/bt_merge.hpp"
 
-namespace session::bt {
+namespace bchat::bt {
 bt_dict merge(const bt_dict& a, const bt_dict& b) {
     bt_dict result;
     auto it_a = a.begin();
@@ -18,4 +18,4 @@ bt_dict merge(const bt_dict& a, const bt_dict& b) {
     return result;
 }
 
-}  // namespace session::bt
+}  // namespace bchat::bt

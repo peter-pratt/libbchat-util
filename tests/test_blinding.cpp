@@ -6,11 +6,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include <iterator>
 
-#include "session/blinding.hpp"
-#include "session/util.hpp"
+#include "bchat/blinding.hpp"
+#include "bchat/util.hpp"
 #include "utils.hpp"
 
-using namespace session;
+using namespace bchat;
 
 constexpr std::array<unsigned char, 64> seed1{
         0xfe, 0xcd, 0x9a, 0x60, 0x34, 0xbc, 0x9a, 0xba, 0x27, 0x39, 0x25, 0xde, 0xe7,
@@ -36,33 +36,33 @@ constexpr std::array<unsigned char, 32> xpub2{
         0x78, 0x81, 0x96, 0x2c, 0x72, 0x36, 0x99, 0x15, 0x20, 0x73,
 };
 
-const std::string session_id1 = "05" + oxenc::to_hex(xpub1.begin(), xpub1.end());
-const std::string session_id2 = "05" + oxenc::to_hex(xpub2.begin(), xpub2.end());
+const std::string bchat_id1 = "05" + oxenc::to_hex(xpub1.begin(), xpub1.end());
+const std::string bchat_id2 = "05" + oxenc::to_hex(xpub2.begin(), xpub2.end());
 
 TEST_CASE("Communities 25xxx-blinded pubkey derivation", "[blinding25][pubkey]") {
     REQUIRE(sodium_init() >= 0);
 
     CHECK(blind25_id(
-                  session_id1,
+                  bchat_id1,
                   "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789") ==
           "253b991dcbba44cfdb45d5b38880d95cff723309e3ece6fd01415ad5fa1dccc7ac");
     CHECK(blind25_id(
-                  session_id1,
+                  bchat_id1,
                   "00cdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789") ==
           "2598589c7885b56cbeae6ab7b4224f202815520a54995872cb1833b44db6401c8d");
     CHECK(blind25_id(
-                  session_id2,
+                  bchat_id2,
                   "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789") ==
           "25a69cc6884530bf8498d22892e563716c4742f2845a7eb608de2aecbe7b6b5996");
 
-    std::vector<unsigned char> session_id1_raw;
-    oxenc::from_hex(session_id1.begin(), session_id1.end(), std::back_inserter(session_id1_raw));
+    std::vector<unsigned char> bchat_id1_raw;
+    oxenc::from_hex(bchat_id1.begin(), bchat_id1.end(), std::back_inserter(bchat_id1_raw));
     CHECK(to_hex(blind25_id(
-                  session_id1_raw,
+                  bchat_id1_raw,
                   "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"_hexbytes)) ==
           "253b991dcbba44cfdb45d5b38880d95cff723309e3ece6fd01415ad5fa1dccc7ac");
     CHECK(to_hex(blind25_id(
-                  {session_id1_raw.begin() + 1, session_id1_raw.end()},
+                  {bchat_id1_raw.begin() + 1, bchat_id1_raw.end()},
                   "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"_hexbytes)) ==
           "253b991dcbba44cfdb45d5b38880d95cff723309e3ece6fd01415ad5fa1dccc7ac");
 }
@@ -76,12 +76,12 @@ TEST_CASE("Communities 25xxx-blinded signing", "[blinding25][sign]") {
             "999def0123456789abcdef0123456789abcdef0123456789abcdef0123456789"sv,
             "888def0123456789abcdef0123456789abcdef0123456789abcdef0123456789"sv,
             "777def0123456789abcdef0123456789abcdef0123456789abcdef0123456789"sv};
-    auto b25_1 = blind25_id(session_id1, server_pks[0]);
-    auto b25_2 = blind25_id(session_id1, server_pks[1]);
-    auto b25_3 = blind25_id(session_id2, server_pks[2]);
-    auto b25_4 = blind25_id(session_id2, server_pks[3]);
-    auto b25_5 = blind25_id(session_id2, server_pks[4]);
-    auto b25_6 = blind25_id(session_id1, server_pks[5]);
+    auto b25_1 = blind25_id(bchat_id1, server_pks[0]);
+    auto b25_2 = blind25_id(bchat_id1, server_pks[1]);
+    auto b25_3 = blind25_id(bchat_id2, server_pks[2]);
+    auto b25_4 = blind25_id(bchat_id2, server_pks[3]);
+    auto b25_5 = blind25_id(bchat_id2, server_pks[4]);
+    auto b25_6 = blind25_id(bchat_id1, server_pks[5]);
 
     auto sig1 = blind25_sign(to_span(seed1), server_pks[0], to_span("hello"));
     CHECK(to_hex(sig1) ==
@@ -156,19 +156,19 @@ TEST_CASE("Communities 25xxx-blinded signing", "[blinding25][sign]") {
 TEST_CASE("Communities 15xxx-blinded pubkey derivation", "[blinding15][pubkey]") {
     REQUIRE(sodium_init() >= 0);
 
-    std::vector<unsigned char> session_id1_raw, session_id2_raw;
-    oxenc::from_hex(session_id1.begin(), session_id1.end(), std::back_inserter(session_id1_raw));
-    oxenc::from_hex(session_id2.begin(), session_id2.end(), std::back_inserter(session_id2_raw));
+    std::vector<unsigned char> bchat_id1_raw, bchat_id2_raw;
+    oxenc::from_hex(bchat_id1.begin(), bchat_id1.end(), std::back_inserter(bchat_id1_raw));
+    oxenc::from_hex(bchat_id2.begin(), bchat_id2.end(), std::back_inserter(bchat_id2_raw));
     CHECK(to_hex(blind15_id(
-                  session_id1_raw,
+                  bchat_id1_raw,
                   "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"_hexbytes)) ==
           "15b74ed205f1f931e1bb1291183778a9456b835937d923b0f2e248aa3a44c07844");
     CHECK(to_hex(blind15_id(
-                  session_id2_raw,
+                  bchat_id2_raw,
                   "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"_hexbytes)) ==
           "1561e070286ff7a71f167e92b18c709882b148d8238c8872caf414b301ba0564fd");
     CHECK(to_hex(blind15_id(
-                  {session_id1_raw.begin() + 1, session_id1_raw.end()},
+                  {bchat_id1_raw.begin() + 1, bchat_id1_raw.end()},
                   "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"_hexbytes)) ==
           "15b74ed205f1f931e1bb1291183778a9456b835937d923b0f2e248aa3a44c07844");
 }
@@ -183,13 +183,13 @@ TEST_CASE("Communities 15xxx-blinded signing", "[blinding15][sign]") {
             "999def0123456789abcdef0123456789abcdef0123456789abcdef0123456789"sv,
             "888def0123456789abcdef0123456789abcdef0123456789abcdef0123456789"sv,
             "777def0123456789abcdef0123456789abcdef0123456789abcdef0123456789"sv};
-    auto b15_1 = blind15_id(session_id1, server_pks[0])[0];
-    auto b15_2 = blind15_id(session_id1, server_pks[1])[0];
-    // session_id2 has a negative pubkey, so these next three need the negative [1] instead:
-    auto b15_3 = blind15_id(session_id2, server_pks[2])[1];
-    auto b15_4 = blind15_id(session_id2, server_pks[3])[1];
-    auto b15_5 = blind15_id(session_id2, server_pks[4])[1];
-    auto b15_6 = blind15_id(session_id1, server_pks[5])[0];
+    auto b15_1 = blind15_id(bchat_id1, server_pks[0])[0];
+    auto b15_2 = blind15_id(bchat_id1, server_pks[1])[0];
+    // bchat_id2 has a negative pubkey, so these next three need the negative [1] instead:
+    auto b15_3 = blind15_id(bchat_id2, server_pks[2])[1];
+    auto b15_4 = blind15_id(bchat_id2, server_pks[3])[1];
+    auto b15_5 = blind15_id(bchat_id2, server_pks[4])[1];
+    auto b15_6 = blind15_id(bchat_id1, server_pks[5])[0];
 
     auto sig1 = blind15_sign(to_span(seed1), server_pks[0], to_span("hello"));
     CHECK(to_hex(sig1) ==
@@ -315,7 +315,7 @@ TEST_CASE("Version 07xxx-blinded signing", "[blinding07][sign]") {
                   req_sig.data(), full_message.data(), full_message.size(), pk.data()) == 0);
 }
 
-TEST_CASE("Communities session id blinded id matching", "[blinding][matching]") {
+TEST_CASE("Communities bchat id blinded id matching", "[blinding][matching]") {
     std::array server_pks = {
             "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"sv,
             "00cdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"sv,
@@ -323,36 +323,36 @@ TEST_CASE("Communities session id blinded id matching", "[blinding][matching]") 
             "999def0123456789abcdef0123456789abcdef0123456789abcdef0123456789"sv,
             "888def0123456789abcdef0123456789abcdef0123456789abcdef0123456789"sv,
             "777def0123456789abcdef0123456789abcdef0123456789abcdef0123456789"sv};
-    auto b15_1 = blind15_id(session_id1, server_pks[0])[0];
-    auto b15_2 = blind15_id(session_id1, server_pks[1])[0];
-    auto b15_3 = blind15_id(session_id2, server_pks[2])[1];
-    auto b15_4 = blind15_id(session_id2, server_pks[3])[1];
-    auto b15_5 = blind15_id(session_id2, server_pks[4])[1];
-    auto b15_6 = blind15_id(session_id1, server_pks[5])[0];
-    auto b25_1 = blind25_id(session_id1, server_pks[0]);
-    auto b25_2 = blind25_id(session_id1, server_pks[1]);
-    auto b25_3 = blind25_id(session_id2, server_pks[2]);
-    auto b25_4 = blind25_id(session_id2, server_pks[3]);
-    auto b25_5 = blind25_id(session_id2, server_pks[4]);
-    auto b25_6 = blind25_id(session_id1, server_pks[5]);
+    auto b15_1 = blind15_id(bchat_id1, server_pks[0])[0];
+    auto b15_2 = blind15_id(bchat_id1, server_pks[1])[0];
+    auto b15_3 = blind15_id(bchat_id2, server_pks[2])[1];
+    auto b15_4 = blind15_id(bchat_id2, server_pks[3])[1];
+    auto b15_5 = blind15_id(bchat_id2, server_pks[4])[1];
+    auto b15_6 = blind15_id(bchat_id1, server_pks[5])[0];
+    auto b25_1 = blind25_id(bchat_id1, server_pks[0]);
+    auto b25_2 = blind25_id(bchat_id1, server_pks[1]);
+    auto b25_3 = blind25_id(bchat_id2, server_pks[2]);
+    auto b25_4 = blind25_id(bchat_id2, server_pks[3]);
+    auto b25_5 = blind25_id(bchat_id2, server_pks[4]);
+    auto b25_6 = blind25_id(bchat_id1, server_pks[5]);
 
-    CHECK(session_id_matches_blinded_id(session_id1, b15_1, server_pks[0]));
-    CHECK(session_id_matches_blinded_id(session_id1, b15_2, server_pks[1]));
-    CHECK(session_id_matches_blinded_id(session_id2, b15_3, server_pks[2]));
-    CHECK(session_id_matches_blinded_id(session_id2, b15_4, server_pks[3]));
-    CHECK(session_id_matches_blinded_id(session_id2, b15_5, server_pks[4]));
-    CHECK(session_id_matches_blinded_id(session_id1, b15_6, server_pks[5]));
-    CHECK(session_id_matches_blinded_id(session_id1, b25_1, server_pks[0]));
-    CHECK(session_id_matches_blinded_id(session_id1, b25_2, server_pks[1]));
-    CHECK(session_id_matches_blinded_id(session_id2, b25_3, server_pks[2]));
-    CHECK(session_id_matches_blinded_id(session_id2, b25_4, server_pks[3]));
-    CHECK(session_id_matches_blinded_id(session_id2, b25_5, server_pks[4]));
-    CHECK(session_id_matches_blinded_id(session_id1, b25_6, server_pks[5]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id1, b15_1, server_pks[0]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id1, b15_2, server_pks[1]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id2, b15_3, server_pks[2]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id2, b15_4, server_pks[3]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id2, b15_5, server_pks[4]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id1, b15_6, server_pks[5]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id1, b25_1, server_pks[0]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id1, b25_2, server_pks[1]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id2, b25_3, server_pks[2]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id2, b25_4, server_pks[3]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id2, b25_5, server_pks[4]));
+    CHECK(bchat_id_matches_blinded_id(bchat_id1, b25_6, server_pks[5]));
 
-    auto invalid_session_id = "9"s + session_id1.substr(1);
+    auto invalid_bchat_id = "9"s + bchat_id1.substr(1);
     auto invalid_blinded_id = "9"s + b15_1.substr(1);
     auto invalid_server_pk = server_pks[0].substr(0, 60);
-    CHECK_THROWS(session_id_matches_blinded_id(invalid_session_id, b15_1, server_pks[0]));
-    CHECK_THROWS(session_id_matches_blinded_id(session_id1, invalid_blinded_id, server_pks[0]));
-    CHECK_THROWS(session_id_matches_blinded_id(session_id1, invalid_blinded_id, invalid_server_pk));
+    CHECK_THROWS(bchat_id_matches_blinded_id(invalid_bchat_id, b15_1, server_pks[0]));
+    CHECK_THROWS(bchat_id_matches_blinded_id(bchat_id1, invalid_blinded_id, server_pks[0]));
+    CHECK_THROWS(bchat_id_matches_blinded_id(bchat_id1, invalid_blinded_id, invalid_server_pk));
 }

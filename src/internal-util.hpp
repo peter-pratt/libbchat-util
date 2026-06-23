@@ -2,7 +2,7 @@
 #include <cstring>
 #include <string_view>
 
-namespace session {
+namespace bchat {
 
 // Used by various C APIs with false returns to write a caught exception message into an error
 // buffer (if provided) on the way out.  The error buffer is expected to have at least 256 bytes
@@ -19,4 +19,4 @@ inline bool set_error(char* error, const std::exception& e) {
     return false;
 }
 
-}  // namespace session
+}  // namespace bchat

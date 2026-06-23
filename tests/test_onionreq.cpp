@@ -1,12 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
-#include <session/onionreq/hop_encryption.hpp>
-#include <session/onionreq/parser.hpp>
+#include <bchat/onionreq/hop_encryption.hpp>
+#include <bchat/onionreq/parser.hpp>
 
 #include "utils.hpp"
 
-using namespace session;
-using namespace session::onionreq;
-using namespace session::network;
+using namespace bchat;
+using namespace bchat::onionreq;
+using namespace bchat::network;
 
 TEST_CASE("Onion request encryption", "[encryption][onionreq]") {
 

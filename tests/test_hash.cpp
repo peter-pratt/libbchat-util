@@ -1,26 +1,26 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "session/hash.h"
-#include "session/hash.hpp"
-#include "session/util.hpp"
+#include "bchat/hash.h"
+#include "bchat/hash.hpp"
+#include "bchat/util.hpp"
 #include "utils.hpp"
 
 TEST_CASE("Hash generation", "[hash][hash]") {
-    auto hash1 = session::hash::hash(32, session::to_span("TestMessage"), std::nullopt);
-    auto hash2 = session::hash::hash(32, session::to_span("TestMessage"), std::nullopt);
+    auto hash1 = bchat::hash::hash(32, bchat::to_span("TestMessage"), std::nullopt);
+    auto hash2 = bchat::hash::hash(32, bchat::to_span("TestMessage"), std::nullopt);
     auto hash3 =
-            session::hash::hash(32, session::to_span("TestMessage"), session::to_span("TestKey"));
+            bchat::hash::hash(32, bchat::to_span("TestMessage"), bchat::to_span("TestKey"));
     auto hash4 =
-            session::hash::hash(32, session::to_span("TestMessage"), session::to_span("TestKey"));
-    auto hash5 = session::hash::hash(64, session::to_span("TestMessage"), std::nullopt);
+            bchat::hash::hash(32, bchat::to_span("TestMessage"), bchat::to_span("TestKey"));
+    auto hash5 = bchat::hash::hash(64, bchat::to_span("TestMessage"), std::nullopt);
     auto hash6 =
-            session::hash::hash(64, session::to_span("TestMessage"), session::to_span("TestKey"));
-    CHECK_THROWS(session::hash::hash(10, session::to_span("TestMessage"), std::nullopt));
-    CHECK_THROWS(session::hash::hash(100, session::to_span("TestMessage"), std::nullopt));
-    CHECK_THROWS(session::hash::hash(
+            bchat::hash::hash(64, bchat::to_span("TestMessage"), bchat::to_span("TestKey"));
+    CHECK_THROWS(bchat::hash::hash(10, bchat::to_span("TestMessage"), std::nullopt));
+    CHECK_THROWS(bchat::hash::hash(100, bchat::to_span("TestMessage"), std::nullopt));
+    CHECK_THROWS(bchat::hash::hash(
             32,
-            session::to_span("TestMessage"),
-            session::to_span("KeyThatIsTooLongKeyThatIsTooLongKeyThatIsTooLongKeyThatIsTooLongKeyTh"
+            bchat::to_span("TestMessage"),
+            bchat::to_span("KeyThatIsTooLongKeyThatIsTooLongKeyThatIsTooLongKeyThatIsTooLongKeyTh"
                              "atIsTooLon"
                              "g")));
 

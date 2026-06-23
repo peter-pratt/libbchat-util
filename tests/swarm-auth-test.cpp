@@ -2,9 +2,9 @@
 #include <oxenc/base64.h>
 #include <oxenc/endian.h>
 #include <oxenc/hex.h>
-#include <session/config/groups/info.h>
-#include <session/config/groups/keys.h>
-#include <session/config/groups/members.h>
+#include <bchat/config/groups/info.h>
+#include <bchat/config/groups/keys.h>
+#include <bchat/config/groups/members.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <algorithm>
@@ -13,18 +13,18 @@
 #include <iostream>
 #include <iterator>
 #include <nlohmann/json.hpp>
-#include <session/config/groups/info.hpp>
-#include <session/config/groups/keys.hpp>
-#include <session/config/groups/members.hpp>
-#include <session/config/user_groups.hpp>
-#include <session/util.hpp>
+#include <bchat/config/groups/info.hpp>
+#include <bchat/config/groups/keys.hpp>
+#include <bchat/config/groups/members.hpp>
+#include <bchat/config/user_groups.hpp>
+#include <bchat/util.hpp>
 #include <string_view>
 
 #include "utils.hpp"
 
 static constexpr int64_t created_ts = 1680064059;
 
-using namespace session::config;
+using namespace bchat::config;
 
 static std::array<unsigned char, 64> sk_from_seed(std::span<const unsigned char> seed) {
     std::array<unsigned char, 32> ignore;
@@ -33,7 +33,7 @@ static std::array<unsigned char, 64> sk_from_seed(std::span<const unsigned char>
     return sk;
 }
 
-static std::string session_id_from_ed(std::span<const unsigned char> ed_pk) {
+static std::string bchat_id_from_ed(std::span<const unsigned char> ed_pk) {
     std::string sid;
     std::array<unsigned char, 32> xpk;
     int rc = crypto_sign_ed25519_pk_to_curve25519(xpk.data(), ed_pk.data());
@@ -47,7 +47,7 @@ static std::string session_id_from_ed(std::span<const unsigned char> ed_pk) {
 struct pseudo_client {
     std::array<unsigned char, 64> secret_key;
     const std::span<const unsigned char> public_key{secret_key.data() + 32, 32};
-    std::string session_id{session_id_from_ed(public_key)};
+    std::string bchat_id{bchat_id_from_ed(public_key)};
 
     groups::Info info;
     groups::Members members;
@@ -92,16 +92,16 @@ int main() {
 
     pseudo_client admin{admin_seed, true, group_pk.data(), group_sk.data()};
     pseudo_client member{member_seed, false, group_pk.data(), std::nullopt};
-    session::config::UserGroups member_groups{member_seed, std::nullopt};
+    bchat::config::UserGroups member_groups{member_seed, std::nullopt};
 
-    auto auth_data = admin.keys.swarm_make_subaccount(member.session_id);
+    auto auth_data = admin.keys.swarm_make_subaccount(member.bchat_id);
     {
         auto g = member_groups.get_or_construct_group(member.info.id);
         g.auth_data = auth_data;
         member_groups.set(g);
     }
 
-    session::config::UserGroups member_gr2{member_seed, std::nullopt};
+    bchat::config::UserGroups member_gr2{member_seed, std::nullopt};
     auto [seqno, push, obs] = member_groups.push();
 
     std::vector<std::pair<std::string, std::span<const unsigned char>>> gr_conf;
@@ -116,7 +116,7 @@ int main() {
     auto msg = to_usv("hello world");
     std::array<unsigned char, 64> store_sig;
     std::vector<unsigned char> store_to_sign;
-    auto store_vec = session::str_to_vec("store999{}"_format(now));
+    auto store_vec = bchat::str_to_vec("store999{}"_format(now));
     store_to_sign.insert(store_to_sign.end(), store_vec.begin(), store_vec.end());
 
     crypto_sign_ed25519_detached(
@@ -135,7 +135,7 @@ int main() {
     std::cout << "STORE:\n\n" << store.dump() << "\n\n";
 
     std::vector<unsigned char> retrieve_to_sign;
-    auto retrieve_vec = session::str_to_vec("retrieve999{}"_format(now));
+    auto retrieve_vec = bchat::str_to_vec("retrieve999{}"_format(now));
     retrieve_to_sign.insert(retrieve_to_sign.end(), retrieve_vec.begin(), retrieve_vec.end());
     auto subauth = member.keys.swarm_subaccount_sign(retrieve_to_sign, auth_data);
 

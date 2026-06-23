@@ -1,17 +1,17 @@
-#include <session/config/pro.h>
-#include <session/pro_backend.h>
+#include <bchat/config/pro.h>
+#include <bchat/pro_backend.h>
 #include <sodium/crypto_generichash_blake2b.h>
 #include <sodium/crypto_sign_ed25519.h>
 
-#include <session/config/pro.hpp>
-#include <session/sodium_array.hpp>
+#include <bchat/config/pro.hpp>
+#include <bchat/sodium_array.hpp>
 
 #include "internal.hpp"
 
-namespace session::config {
+namespace bchat::config {
 
 bool ProConfig::load(const dict& root) {
-    // Get proof fields from session pro data sitting in the 'p' (proof) dictionary
+    // Get proof fields from bchat pro data sitting in the 'p' (proof) dictionary
     auto p_it = root.find("p");
     if (p_it == root.end())
         return false;
@@ -58,4 +58,4 @@ bool ProConfig::load(const dict& root) {
     return true;
 }
 
-};  // namespace session::config
+};  // namespace bchat::config

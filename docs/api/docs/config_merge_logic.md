@@ -636,7 +636,7 @@ deterministic encryption so that the *encrypted* version of the data is also unc
 
 Thus for encryption we compute the XChaCha20 nonce by not using a pure random nonce but rather using
 a 24-byte BLAKE2b keyed hash of the plaintext config message data, keys using 32-byte key
-`"libsession-config-nonce-hash-key"`.
+`"libbchat-config-nonce-hash-key"`.
 
 Note, however, that message hashes (as used in diff sections) depend on the plaintext serialized
 value, not the encrypted value.

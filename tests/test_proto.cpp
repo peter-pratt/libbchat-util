@@ -2,13 +2,13 @@
 
 #include <catch2/catch_all.hpp>
 #include <iostream>
-#include <session/config/namespaces.hpp>
-#include <session/config/protos.hpp>
-#include <session/config/user_profile.hpp>
+#include <bchat/config/namespaces.hpp>
+#include <bchat/config/protos.hpp>
+#include <bchat/config/user_profile.hpp>
 
 #include "utils.hpp"
 
-using namespace session::config;
+using namespace bchat::config;
 
 const std::vector<Namespace> groups{
         Namespace::UserProfile,

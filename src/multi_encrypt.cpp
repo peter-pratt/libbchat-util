@@ -1,17 +1,17 @@
 
 #include <oxenc/bt_producer.h>
 #include <oxenc/bt_serialize.h>
-#include <session/multi_encrypt.h>
+#include <bchat/multi_encrypt.h>
 #include <sodium/crypto_aead_xchacha20poly1305.h>
 #include <sodium/crypto_generichash_blake2b.h>
 #include <sodium/crypto_scalarmult_curve25519.h>
 #include <sodium/crypto_sign_ed25519.h>
 #include <sodium/randombytes.h>
 
-#include <session/multi_encrypt.hpp>
+#include <bchat/multi_encrypt.hpp>
 #include <stdexcept>
 
-namespace session {
+namespace bchat {
 
 const size_t encrypt_multiple_message_overhead = crypto_aead_xchacha20poly1305_ietf_ABYTES;
 
@@ -246,9 +246,9 @@ std::optional<std::vector<unsigned char>> decrypt_for_multiple_simple_ed25519(
     return decrypt_for_multiple_simple(encoded, ed25519_secret_key, to_span(sender_pub), domain);
 }
 
-}  // namespace session
+}  // namespace bchat
 
-using namespace session;
+using namespace bchat;
 
 static unsigned char* to_c_buffer(std::span<const unsigned char> x, size_t* out_len) {
     auto* ret = static_cast<unsigned char*>(malloc(x.size()));
@@ -257,7 +257,7 @@ static unsigned char* to_c_buffer(std::span<const unsigned char> x, size_t* out_
     return ret;
 }
 
-LIBSESSION_C_API unsigned char* session_encrypt_for_multiple_simple(
+LIBBCHAT_C_API unsigned char* bchat_encrypt_for_multiple_simple(
         size_t* out_len,
         const unsigned char* const* messages,
         const size_t* message_lengths,
@@ -282,7 +282,7 @@ LIBSESSION_C_API unsigned char* session_encrypt_for_multiple_simple(
         maybe_nonce.emplace(nonce, 24);
 
     try {
-        auto encoded = session::encrypt_for_multiple_simple(
+        auto encoded = bchat::encrypt_for_multiple_simple(
                 msgs,
                 recips,
                 std::span<const unsigned char>{x25519_privkey, 32},
@@ -296,7 +296,7 @@ LIBSESSION_C_API unsigned char* session_encrypt_for_multiple_simple(
     }
 }
 
-LIBSESSION_C_API unsigned char* session_encrypt_for_multiple_simple_ed25519(
+LIBBCHAT_C_API unsigned char* bchat_encrypt_for_multiple_simple_ed25519(
         size_t* out_len,
         const unsigned char* const* messages,
         const size_t* message_lengths,
@@ -310,8 +310,8 @@ LIBSESSION_C_API unsigned char* session_encrypt_for_multiple_simple_ed25519(
 
     try {
         auto [priv, pub] =
-                session::detail::x_keys(std::span<const unsigned char>{ed25519_secret_key, 64});
-        return session_encrypt_for_multiple_simple(
+                bchat::detail::x_keys(std::span<const unsigned char>{ed25519_secret_key, 64});
+        return bchat_encrypt_for_multiple_simple(
                 out_len,
                 messages,
                 message_lengths,
@@ -328,7 +328,7 @@ LIBSESSION_C_API unsigned char* session_encrypt_for_multiple_simple_ed25519(
     }
 }
 
-LIBSESSION_C_API unsigned char* session_decrypt_for_multiple_simple(
+LIBBCHAT_C_API unsigned char* bchat_decrypt_for_multiple_simple(
         size_t* out_len,
         const unsigned char* encoded,
         size_t encoded_len,
@@ -338,7 +338,7 @@ LIBSESSION_C_API unsigned char* session_decrypt_for_multiple_simple(
         const char* domain) {
 
     try {
-        if (auto decrypted = session::decrypt_for_multiple_simple(
+        if (auto decrypted = bchat::decrypt_for_multiple_simple(
                     std::span<const unsigned char>{encoded, encoded_len},
                     std::span<const unsigned char>{x25519_privkey, 32},
                     std::span<const unsigned char>{x25519_pubkey, 32},
@@ -352,7 +352,7 @@ LIBSESSION_C_API unsigned char* session_decrypt_for_multiple_simple(
     return nullptr;
 }
 
-LIBSESSION_C_API unsigned char* session_decrypt_for_multiple_simple_ed25519_from_x25519(
+LIBBCHAT_C_API unsigned char* bchat_decrypt_for_multiple_simple_ed25519_from_x25519(
         size_t* out_len,
         const unsigned char* encoded,
         size_t encoded_len,
@@ -361,7 +361,7 @@ LIBSESSION_C_API unsigned char* session_decrypt_for_multiple_simple_ed25519_from
         const char* domain) {
 
     try {
-        if (auto decrypted = session::decrypt_for_multiple_simple(
+        if (auto decrypted = bchat::decrypt_for_multiple_simple(
                     std::span<const unsigned char>{encoded, encoded_len},
                     std::span<const unsigned char>{ed25519_secret, 64},
                     std::span<const unsigned char>{sender_x25519_pubkey, 32},
@@ -374,7 +374,7 @@ LIBSESSION_C_API unsigned char* session_decrypt_for_multiple_simple_ed25519_from
     return nullptr;
 }
 
-LIBSESSION_C_API unsigned char* session_decrypt_for_multiple_simple_ed25519(
+LIBBCHAT_C_API unsigned char* bchat_decrypt_for_multiple_simple_ed25519(
         size_t* out_len,
         const unsigned char* encoded,
         size_t encoded_len,
@@ -383,7 +383,7 @@ LIBSESSION_C_API unsigned char* session_decrypt_for_multiple_simple_ed25519(
         const char* domain) {
 
     try {
-        if (auto decrypted = session::decrypt_for_multiple_simple_ed25519(
+        if (auto decrypted = bchat::decrypt_for_multiple_simple_ed25519(
                     std::span<const unsigned char>{encoded, encoded_len},
                     std::span<const unsigned char>{ed25519_secret, 64},
                     std::span<const unsigned char>{sender_ed25519_pubkey, 32},

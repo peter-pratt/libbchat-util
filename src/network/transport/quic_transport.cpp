@@ -1,19 +1,19 @@
-#include "session/network/transport/quic_transport.hpp"
+#include "bchat/network/transport/quic_transport.hpp"
 
 #include <oxen/log.hpp>
 #include <oxen/log/format.hpp>
 #include <oxen/quic/gnutls_crypto.hpp>
 
-#include "session/ed25519.hpp"
-#include "session/network/bchat_network_types.hpp"
+#include "bchat/ed25519.hpp"
+#include "bchat/network/bchat_network_types.hpp"
 
 using namespace oxen;
-using namespace session;
-using namespace session::network;
+using namespace bchat;
+using namespace bchat::network;
 using namespace std::literals;
 using namespace oxen::log::literals;
 
-namespace session::network {
+namespace bchat::network {
 
 namespace {
     inline auto cat = log::Cat("quic-transport");
@@ -84,7 +84,7 @@ void QuicTransport::set_node_failure_reporter(node_failure_reporter_t reporter) 
 }
 
 void QuicTransport::verify_connectivity(
-        service_node node,
+        master_node node,
         std::chrono::milliseconds timeout,
         const std::string& request_id,
         const RequestCategory category,
@@ -229,10 +229,10 @@ void QuicTransport::_send_request_internal(Request request, network_response_cal
                 if constexpr (std::is_same_v<T, oxen::quic::RemoteAddress>) {
                     log::trace(cat, "[Request {}]: Using pre-resolved RemoteAddress.", request_id);
                     remote = arg;
-                } else if constexpr (std::is_same_v<T, service_node>) {
+                } else if constexpr (std::is_same_v<T, master_node>) {
                     log::trace(
                             cat,
-                            "[Request {}]: Resolving service_node to RemoteAddress.",
+                            "[Request {}]: Resolving master_node to RemoteAddress.",
                             request_id);
                     remote.emplace(arg.remote_pubkey, arg.host(), arg.omq_port);
                 }
@@ -617,7 +617,7 @@ void QuicTransport::_fail_connection(
         auto to_fail = std::move(it->second);
         _pending_requests.erase(it);
 
-        std::string failure_reason = "Failed to establish connection to service node";
+        std::string failure_reason = "Failed to establish connection to master node";
         if (error_code == static_cast<uint64_t>(NGTCP2_ERR_HANDSHAKE_TIMEOUT))
             failure_reason += " (handshake timeout)";
 
@@ -641,4 +641,4 @@ void QuicTransport::_fail_connection(
         _update_status(ConnectionStatus::disconnected);
 }
 
-}  // namespace session::network
+}  // namespace bchat::network

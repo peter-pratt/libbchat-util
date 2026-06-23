@@ -1,4 +1,4 @@
-#include "session/onionreq/parser.hpp"
+#include "bchat/onionreq/parser.hpp"
 
 #include <oxenc/endian.h>
 #include <sodium/core.h>
@@ -6,7 +6,7 @@
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 
-namespace session::onionreq {
+namespace bchat::onionreq {
 
 OnionReqParser::OnionReqParser(
         std::span<const unsigned char> x25519_pk,
@@ -48,4 +48,4 @@ std::vector<unsigned char> OnionReqParser::encrypt_reply(
     return enc.encrypt(enc_type, to_vector(reply), remote_pk);
 }
 
-}  // namespace session::onionreq
+}  // namespace bchat::onionreq

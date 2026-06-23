@@ -1,14 +1,14 @@
-#include "session/config/local.h"
+#include "bchat/config/local.h"
 
 #include <sodium/crypto_generichash_blake2b.h>
 
 #include "internal.hpp"
-#include "session/config/error.h"
-#include "session/config/local.hpp"
-#include "session/export.h"
-#include "session/types.hpp"
+#include "bchat/config/error.h"
+#include "bchat/config/local.hpp"
+#include "bchat/export.h"
+#include "bchat/types.hpp"
 
-using namespace session::config;
+using namespace bchat::config;
 
 Local::Local(
         std::span<const unsigned char> ed25519_secretkey,
@@ -90,10 +90,10 @@ size_t Local::size_settings() const {
 
 extern "C" {
 
-using namespace session;
-using namespace session::config;
+using namespace bchat;
+using namespace bchat::config;
 
-LIBSESSION_C_API int local_init(
+LIBBCHAT_C_API int local_init(
         config_object** conf,
         const unsigned char* ed25519_secretkey_bytes,
         const unsigned char* dumpstr,
@@ -102,55 +102,55 @@ LIBSESSION_C_API int local_init(
     return c_wrapper_init<Local>(conf, ed25519_secretkey_bytes, dumpstr, dumplen, error);
 }
 
-LIBSESSION_C_API CLIENT_NOTIFY_CONTENT local_get_notification_content(const config_object* conf) {
+LIBBCHAT_C_API CLIENT_NOTIFY_CONTENT local_get_notification_content(const config_object* conf) {
     return static_cast<CLIENT_NOTIFY_CONTENT>(unbox<Local>(conf)->get_notification_content());
 }
 
-LIBSESSION_C_API void local_set_notification_content(
+LIBBCHAT_C_API void local_set_notification_content(
         config_object* conf, CLIENT_NOTIFY_CONTENT value) {
     unbox<Local>(conf)->set_notification_content(static_cast<notify_content>(value));
 }
 
-LIBSESSION_C_API int64_t local_get_ios_notification_sound(const config_object* conf) {
+LIBBCHAT_C_API int64_t local_get_ios_notification_sound(const config_object* conf) {
     return unbox<Local>(conf)->get_ios_notification_sound();
 }
 
-LIBSESSION_C_API void local_set_ios_notification_sound(config_object* conf, int64_t value) {
+LIBBCHAT_C_API void local_set_ios_notification_sound(config_object* conf, int64_t value) {
     unbox<Local>(conf)->set_ios_notification_sound(value);
 }
 
-LIBSESSION_C_API CLIENT_THEME local_get_theme(const config_object* conf) {
+LIBBCHAT_C_API CLIENT_THEME local_get_theme(const config_object* conf) {
     return static_cast<CLIENT_THEME>(unbox<Local>(conf)->get_theme());
 }
 
-LIBSESSION_C_API void local_set_theme(config_object* conf, CLIENT_THEME value) {
+LIBBCHAT_C_API void local_set_theme(config_object* conf, CLIENT_THEME value) {
     unbox<Local>(conf)->set_theme(static_cast<theme>(value));
 }
 
-LIBSESSION_C_API CLIENT_THEME_PRIMARY_COLOR
+LIBBCHAT_C_API CLIENT_THEME_PRIMARY_COLOR
 local_get_theme_primary_color(const config_object* conf) {
     return static_cast<CLIENT_THEME_PRIMARY_COLOR>(unbox<Local>(conf)->get_theme_primary_color());
 }
 
-LIBSESSION_C_API void local_set_theme_primary_color(
+LIBBCHAT_C_API void local_set_theme_primary_color(
         config_object* conf, CLIENT_THEME_PRIMARY_COLOR value) {
     unbox<Local>(conf)->set_theme_primary_color(static_cast<theme_primary_color>(value));
 }
 
-LIBSESSION_C_API int local_get_setting(const config_object* conf, const char* key) {
+LIBBCHAT_C_API int local_get_setting(const config_object* conf, const char* key) {
     if (auto opt = unbox<Local>(conf)->get_setting(key))
         return static_cast<int>(*opt);
     return -1;
 }
 
-LIBSESSION_C_API void local_set_setting(config_object* conf, const char* key, int value) {
+LIBBCHAT_C_API void local_set_setting(config_object* conf, const char* key, int value) {
     std::optional<bool> val;
     if (value >= 0)
         val = static_cast<bool>(value);
     unbox<Local>(conf)->set_setting(key, std::move(val));
 }
 
-LIBSESSION_C_API size_t local_size_settings(const config_object* conf) {
+LIBBCHAT_C_API size_t local_size_settings(const config_object* conf) {
     return unbox<Local>(conf)->size_settings();
 }
 

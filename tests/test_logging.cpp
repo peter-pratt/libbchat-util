@@ -1,10 +1,10 @@
-#include <session/logging.h>
+#include <bchat/logging.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <oxen/log.hpp>
 #include <oxen/log/format.hpp>
 #include <regex>
-#include <session/logging.hpp>
+#include <bchat/logging.hpp>
 
 #include "utils.hpp"
 
@@ -12,7 +12,7 @@
 #include <oxen/quic/network.hpp>
 #endif
 
-using namespace session;
+using namespace bchat;
 using namespace oxen;
 using namespace oxen::log::literals;
 
@@ -41,15 +41,15 @@ TEST_CASE("Logging callbacks", "[logging]") {
     log_level_lowerer log_relief_b{log::Level::info, "test.b"};
 
     SECTION("C++ lambdas") {
-        session::add_logger([&](std::string_view msg) { simple_logs.emplace_back(msg); });
-        session::add_logger([&](auto msg, auto cat, auto level) {
+        bchat::add_logger([&](std::string_view msg) { simple_logs.emplace_back(msg); });
+        bchat::add_logger([&](auto msg, auto cat, auto level) {
             full_logs.push_back("{}|{}|{}"_format(cat, level.to_string(), msg));
         });
     }
     SECTION("C function pointers") {
-        session_add_logger_simple(
+        bchat_add_logger_simple(
                 [](const char* msg, size_t msglen) { simple_logs.emplace_back(msg, msglen); });
-        session_add_logger_full([](const char* msg,
+        bchat_add_logger_full([](const char* msg,
                                    size_t msglen,
                                    const char* cat,
                                    size_t cat_len,
@@ -95,7 +95,7 @@ TEST_CASE("Logging callbacks with quic::Network", "[logging][network]") {
     simple_logs.clear();
     log_level_lowerer log_relief{log::Level::debug, "quic"};
 
-    session::add_logger([&](std::string_view msg) { simple_logs.emplace_back(msg); });
+    bchat::add_logger([&](std::string_view msg) { simple_logs.emplace_back(msg); });
 
     {
         quic::Network net;

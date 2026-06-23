@@ -1,4 +1,4 @@
-#include "session/onionreq/hop_encryption.hpp"
+#include "bchat/onionreq/hop_encryption.hpp"
 
 #include <nettle/gcm.h>
 #include <oxenc/endian.h>
@@ -16,13 +16,13 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 
-#include "session/export.h"
-#include "session/network/key_types.hpp"
-#include "session/onionreq/builder.hpp"
-#include "session/util.hpp"
-#include "session/xed25519.hpp"
+#include "bchat/export.h"
+#include "bchat/network/key_types.hpp"
+#include "bchat/onionreq/builder.hpp"
+#include "bchat/util.hpp"
+#include "bchat/xed25519.hpp"
 
-namespace session::onionreq {
+namespace bchat::onionreq {
 
 namespace {
 
@@ -54,7 +54,7 @@ namespace {
 
     // More robust shared secret calculation, used when using xchacha20-poly1305 encryption.  (This
     // could be used for AES-GCM as well, but would break backwards compatibility with existing
-    // Session clients).
+    // BChat clients).
     std::array<unsigned char, crypto_aead_xchacha20poly1305_ietf_KEYBYTES> xchacha20_shared_key(
             const network::x25519_pubkey& local_pub,
             const network::x25519_seckey& local_sec,
@@ -148,7 +148,7 @@ std::vector<unsigned char> HopEncryption::decrypt_aesgcm(
 
     if (!response_long_enough(EncryptType::aes_gcm, ciphertext_.size()))
         throw std::invalid_argument{
-                "Ciphertext data is too short: " + session::to_string(ciphertext_)};
+                "Ciphertext data is too short: " + bchat::to_string(ciphertext_)};
 
     auto key = derive_symmetric_key(private_key_, pubKey);
 
@@ -244,4 +244,4 @@ std::vector<unsigned char> HopEncryption::decrypt_xchacha20(
     return plaintext;
 }
 
-}  // namespace session::onionreq
+}  // namespace bchat::onionreq

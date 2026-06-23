@@ -1,11 +1,11 @@
-#include "session/config/groups/members.hpp"
+#include "bchat/config/groups/members.hpp"
 
 #include <oxenc/hex.h>
 
 #include "../internal.hpp"
-#include "session/config/groups/members.h"
+#include "bchat/config/groups/members.h"
 
-namespace session::config::groups {
+namespace bchat::config::groups {
 
 Members::Members(
         std::span<const unsigned char> ed25519_pubkey,
@@ -30,7 +30,7 @@ void Members::load_extra_data(oxenc::bt_dict_consumer&& extra) {
 }
 
 std::optional<member> Members::get(std::string_view pubkey_hex) const {
-    std::string pubkey = session_id_to_bytes(pubkey_hex);
+    std::string pubkey = bchat_id_to_bytes(pubkey_hex);
 
     auto* info_dict = data["m"][pubkey].dict();
     if (!info_dict)
@@ -52,7 +52,7 @@ member Members::get_or_construct(std::string_view pubkey_hex) const {
 
 void Members::set(const member& mem) {
 
-    std::string pk = session_id_to_bytes(mem.session_id);
+    std::string pk = bchat_id_to_bytes(mem.bchat_id);
     auto info = data["m"][pk];
 
     // Always set the name, even if empty, to keep the dict from getting pruned if there are no
@@ -77,11 +77,11 @@ void Members::set(const member& mem) {
     // add them to the `pending_send_ids` until they are given a new status
     if ((!mem.admin && mem.invite_status == STATUS_NOT_SENT) ||
         (mem.admin && mem.promotion_status == STATUS_NOT_SENT))
-        set_pending_send(mem.session_id, true);
+        set_pending_send(mem.bchat_id, true);
     else if (
             (!mem.admin && mem.invite_status != STATUS_NOT_SENT) ||
             (mem.admin && mem.promotion_status != STATUS_NOT_SENT))
-        set_pending_send(mem.session_id, false);
+        set_pending_send(mem.bchat_id, false);
 }
 
 void member::load(const dict& info_dict) {
@@ -145,13 +145,13 @@ Members::iterator& Members::iterator::operator++() {
     return *this;
 }
 
-bool Members::erase(std::string_view session_id) {
-    std::string pk = session_id_to_bytes(session_id);
+bool Members::erase(std::string_view bchat_id) {
+    std::string pk = bchat_id_to_bytes(bchat_id);
     auto info = data["m"][pk];
     bool ret = info.exists();
     info.erase();
 
-    set_pending_send(std::string(session_id), false);
+    set_pending_send(std::string(bchat_id), false);
 
     return ret;
 }
@@ -176,11 +176,11 @@ void Members::set_pending_send(std::string pubkey_hex, bool pending) {
         _needs_dump = true;
 }
 
-member::member(std::string sid) : session_id{std::move(sid)} {
-    check_session_id(session_id);
+member::member(std::string sid) : bchat_id{std::move(sid)} {
+    check_bchat_id(bchat_id);
 }
 
-member::member(const config_group_member& m) : session_id{m.session_id, 66} {
+member::member(const config_group_member& m) : bchat_id{m.bchat_id, 66} {
     assert(std::strlen(m.name) <= MAX_NAME_LENGTH);
     name = m.name;
     assert(std::strlen(m.profile_pic.url) <= profile_pic::MAX_URL_LENGTH);
@@ -205,7 +205,7 @@ member::member(const config_group_member& m) : session_id{m.session_id, 66} {
 }
 
 void member::into(config_group_member& m) const {
-    std::memcpy(m.session_id, session_id.data(), 67);
+    std::memcpy(m.bchat_id, bchat_id.data(), 67);
     copy_c_str(m.name, name);
     if (profile_picture) {
         copy_c_str(m.profile_pic.url, profile_picture.url);
@@ -278,12 +278,12 @@ void member::set_name_truncated(std::string n) {
     set_name(utf8_truncate(std::move(n), MAX_NAME_LENGTH));
 }
 
-}  // namespace session::config::groups
+}  // namespace bchat::config::groups
 
-using namespace session;
-using namespace session::config;
+using namespace bchat;
+using namespace bchat::config;
 
-LIBSESSION_C_API int groups_members_init(
+LIBBCHAT_C_API int groups_members_init(
         config_object** conf,
         const unsigned char* ed25519_pubkey,
         const unsigned char* ed25519_secretkey,
@@ -294,12 +294,12 @@ LIBSESSION_C_API int groups_members_init(
             conf, ed25519_pubkey, ed25519_secretkey, dump, dumplen, error);
 }
 
-LIBSESSION_C_API bool groups_members_get(
-        config_object* conf, config_group_member* member, const char* session_id) {
+LIBBCHAT_C_API bool groups_members_get(
+        config_object* conf, config_group_member* member, const char* bchat_id) {
     return wrap_exceptions(
             conf,
             [&] {
-                if (auto c = unbox<groups::Members>(conf)->get(session_id)) {
+                if (auto c = unbox<groups::Members>(conf)->get(bchat_id)) {
                     c->into(*member);
                     return true;
                 }
@@ -308,18 +308,18 @@ LIBSESSION_C_API bool groups_members_get(
             false);
 }
 
-LIBSESSION_C_API bool groups_members_get_or_construct(
-        config_object* conf, config_group_member* member, const char* session_id) {
+LIBBCHAT_C_API bool groups_members_get_or_construct(
+        config_object* conf, config_group_member* member, const char* bchat_id) {
     return wrap_exceptions(
             conf,
             [&] {
-                unbox<groups::Members>(conf)->get_or_construct(session_id).into(*member);
+                unbox<groups::Members>(conf)->get_or_construct(bchat_id).into(*member);
                 return true;
             },
             false);
 }
 
-LIBSESSION_C_API bool groups_members_set(config_object* conf, const config_group_member* member) {
+LIBBCHAT_C_API bool groups_members_set(config_object* conf, const config_group_member* member) {
     return wrap_exceptions(
             conf,
             [&] {
@@ -329,7 +329,7 @@ LIBSESSION_C_API bool groups_members_set(config_object* conf, const config_group
             false);
 }
 
-LIBSESSION_C_API GROUP_MEMBER_STATUS
+LIBBCHAT_C_API GROUP_MEMBER_STATUS
 groups_members_get_status(const config_object* conf, const config_group_member* member) {
     try {
         auto m = groups::member{*member};
@@ -339,9 +339,9 @@ groups_members_get_status(const config_object* conf, const config_group_member* 
     }
 }
 
-LIBSESSION_C_API bool groups_members_set_invite_sent(config_object* conf, const char* session_id) {
+LIBBCHAT_C_API bool groups_members_set_invite_sent(config_object* conf, const char* bchat_id) {
     try {
-        if (auto m = unbox<groups::Members>(conf)->get(session_id)) {
+        if (auto m = unbox<groups::Members>(conf)->get(bchat_id)) {
             m->set_invite_sent();
             unbox<groups::Members>(conf)->set(*m);
             return true;
@@ -352,10 +352,10 @@ LIBSESSION_C_API bool groups_members_set_invite_sent(config_object* conf, const 
     }
 }
 
-LIBSESSION_C_API bool groups_members_set_invite_not_sent(
-        config_object* conf, const char* session_id) {
+LIBBCHAT_C_API bool groups_members_set_invite_not_sent(
+        config_object* conf, const char* bchat_id) {
     try {
-        if (auto m = unbox<groups::Members>(conf)->get(session_id)) {
+        if (auto m = unbox<groups::Members>(conf)->get(bchat_id)) {
             m->set_invite_not_sent();
             unbox<groups::Members>(conf)->set(*m);
             return true;
@@ -366,10 +366,10 @@ LIBSESSION_C_API bool groups_members_set_invite_not_sent(
     }
 }
 
-LIBSESSION_C_API bool groups_members_set_invite_failed(
-        config_object* conf, const char* session_id) {
+LIBBCHAT_C_API bool groups_members_set_invite_failed(
+        config_object* conf, const char* bchat_id) {
     try {
-        if (auto m = unbox<groups::Members>(conf)->get(session_id)) {
+        if (auto m = unbox<groups::Members>(conf)->get(bchat_id)) {
             m->set_invite_failed();
             unbox<groups::Members>(conf)->set(*m);
             return true;
@@ -380,10 +380,10 @@ LIBSESSION_C_API bool groups_members_set_invite_failed(
     }
 }
 
-LIBSESSION_C_API bool groups_members_set_invite_accepted(
-        config_object* conf, const char* session_id) {
+LIBBCHAT_C_API bool groups_members_set_invite_accepted(
+        config_object* conf, const char* bchat_id) {
     try {
-        if (auto m = unbox<groups::Members>(conf)->get(session_id)) {
+        if (auto m = unbox<groups::Members>(conf)->get(bchat_id)) {
             m->set_invite_accepted();
             unbox<groups::Members>(conf)->set(*m);
             return true;
@@ -394,9 +394,9 @@ LIBSESSION_C_API bool groups_members_set_invite_accepted(
     }
 }
 
-LIBSESSION_C_API bool groups_members_set_promoted(config_object* conf, const char* session_id) {
+LIBBCHAT_C_API bool groups_members_set_promoted(config_object* conf, const char* bchat_id) {
     try {
-        if (auto m = unbox<groups::Members>(conf)->get(session_id)) {
+        if (auto m = unbox<groups::Members>(conf)->get(bchat_id)) {
             m->set_promoted();
             unbox<groups::Members>(conf)->set(*m);
             return true;
@@ -407,10 +407,10 @@ LIBSESSION_C_API bool groups_members_set_promoted(config_object* conf, const cha
     }
 }
 
-LIBSESSION_C_API bool groups_members_set_promotion_sent(
-        config_object* conf, const char* session_id) {
+LIBBCHAT_C_API bool groups_members_set_promotion_sent(
+        config_object* conf, const char* bchat_id) {
     try {
-        if (auto m = unbox<groups::Members>(conf)->get(session_id)) {
+        if (auto m = unbox<groups::Members>(conf)->get(bchat_id)) {
             m->set_promotion_sent();
             unbox<groups::Members>(conf)->set(*m);
             return true;
@@ -421,10 +421,10 @@ LIBSESSION_C_API bool groups_members_set_promotion_sent(
     }
 }
 
-LIBSESSION_C_API bool groups_members_set_promotion_failed(
-        config_object* conf, const char* session_id) {
+LIBBCHAT_C_API bool groups_members_set_promotion_failed(
+        config_object* conf, const char* bchat_id) {
     try {
-        if (auto m = unbox<groups::Members>(conf)->get(session_id)) {
+        if (auto m = unbox<groups::Members>(conf)->get(bchat_id)) {
             m->set_promotion_failed();
             unbox<groups::Members>(conf)->set(*m);
             return true;
@@ -435,10 +435,10 @@ LIBSESSION_C_API bool groups_members_set_promotion_failed(
     }
 }
 
-LIBSESSION_C_API bool groups_members_set_promotion_accepted(
-        config_object* conf, const char* session_id) {
+LIBBCHAT_C_API bool groups_members_set_promotion_accepted(
+        config_object* conf, const char* bchat_id) {
     try {
-        if (auto m = unbox<groups::Members>(conf)->get(session_id)) {
+        if (auto m = unbox<groups::Members>(conf)->get(bchat_id)) {
             m->set_promotion_accepted();
             unbox<groups::Members>(conf)->set(*m);
             return true;
@@ -449,10 +449,10 @@ LIBSESSION_C_API bool groups_members_set_promotion_accepted(
     }
 }
 
-LIBSESSION_C_API bool groups_members_set_removed(
-        config_object* conf, const char* session_id, bool messages) {
+LIBBCHAT_C_API bool groups_members_set_removed(
+        config_object* conf, const char* bchat_id, bool messages) {
     try {
-        if (auto m = unbox<groups::Members>(conf)->get(session_id)) {
+        if (auto m = unbox<groups::Members>(conf)->get(bchat_id)) {
             m->set_removed(messages);
             unbox<groups::Members>(conf)->set(*m);
             return true;
@@ -463,30 +463,30 @@ LIBSESSION_C_API bool groups_members_set_removed(
     }
 }
 
-LIBSESSION_C_API bool groups_members_erase(config_object* conf, const char* session_id) {
+LIBBCHAT_C_API bool groups_members_erase(config_object* conf, const char* bchat_id) {
     try {
-        return unbox<groups::Members>(conf)->erase(session_id);
+        return unbox<groups::Members>(conf)->erase(bchat_id);
     } catch (...) {
         return false;
     }
 }
 
-LIBSESSION_C_API size_t groups_members_size(const config_object* conf) {
+LIBBCHAT_C_API size_t groups_members_size(const config_object* conf) {
     return unbox<groups::Members>(conf)->size();
 }
 
-LIBSESSION_C_API groups_members_iterator* groups_members_iterator_new(const config_object* conf) {
+LIBBCHAT_C_API groups_members_iterator* groups_members_iterator_new(const config_object* conf) {
     auto* it = new groups_members_iterator{};
     it->_internals = new groups::Members::iterator{unbox<groups::Members>(conf)->begin()};
     return it;
 }
 
-LIBSESSION_C_API void groups_members_iterator_free(groups_members_iterator* it) {
+LIBBCHAT_C_API void groups_members_iterator_free(groups_members_iterator* it) {
     delete static_cast<groups::Members::iterator*>(it->_internals);
     delete it;
 }
 
-LIBSESSION_C_API bool groups_members_iterator_done(
+LIBBCHAT_C_API bool groups_members_iterator_done(
         groups_members_iterator* it, config_group_member* c) {
     auto& real = *static_cast<groups::Members::iterator*>(it->_internals);
     if (real.done())
@@ -495,6 +495,6 @@ LIBSESSION_C_API bool groups_members_iterator_done(
     return false;
 }
 
-LIBSESSION_C_API void groups_members_iterator_advance(groups_members_iterator* it) {
+LIBBCHAT_C_API void groups_members_iterator_advance(groups_members_iterator* it) {
     ++*static_cast<groups::Members::iterator*>(it->_internals);
 }

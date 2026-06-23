@@ -5,13 +5,13 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_exception.hpp>
 #include <iterator>
-#include <session/config.hpp>
-#include <session/config/encrypt.hpp>
-#include <session/types.hpp>
+#include <bchat/config.hpp>
+#include <bchat/config/encrypt.hpp>
+#include <bchat/types.hpp>
 
 #include "utils.hpp"
 
-using namespace session;
+using namespace bchat;
 
 TEST_CASE("config message encryption", "[config][encrypt]") {
     auto message1 = "some message 1"_bytes;

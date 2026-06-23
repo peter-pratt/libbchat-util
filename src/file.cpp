@@ -1,7 +1,7 @@
 #include <fstream>
-#include <session/file.hpp>
+#include <bchat/file.hpp>
 
-namespace session {
+namespace bchat {
 
 std::ofstream open_for_writing(const fs::path& filename) {
     std::ofstream out;
@@ -40,4 +40,4 @@ void write_whole_file(const fs::path& filename, std::string_view contents) {
     out.write(contents.data(), static_cast<std::streamsize>(contents.size()));
 }
 
-}  // namespace session
+}  // namespace bchat

@@ -1,4 +1,4 @@
-#include "session/network/routing/belnet_router.hpp"
+#include "bchat/network/routing/belnet_router.hpp"
 
 #include <fmt/ranges.h>
 #include <fmt/std.h>
@@ -9,21 +9,21 @@
 #include <oxen/log/format.hpp>
 #include <session/router.hpp>
 
-#include "session/network/network_opt.hpp"
-#include "session/onionreq/builder.hpp"
-#include "session/onionreq/response_parser.hpp"
-#include "session/random.hpp"
+#include "bchat/network/network_opt.hpp"
+#include "bchat/onionreq/builder.hpp"
+#include "bchat/onionreq/response_parser.hpp"
+#include "bchat/random.hpp"
 
 using namespace oxen;
-using namespace session;
-using namespace session::network;
+using namespace bchat;
+using namespace bchat::network;
 using namespace std::literals;
 using namespace oxen::log::literals;
 
-namespace session::network {
+namespace bchat::network {
 
 namespace {
-    auto cat = oxen::log::Cat("session-router");
+    auto cat = oxen::log::Cat("belnet-router");
 
     static constexpr std::string_view PROXIED_REQUESTS_KEY{"proxied_requests"};
 
@@ -34,7 +34,7 @@ namespace {
                 [&key]<typename T>(const T& arg) {
                     if constexpr (
                             std::is_same_v<T, oxen::quic::RemoteAddress> ||
-                            std::is_same_v<T, service_node>) {
+                            std::is_same_v<T, master_node>) {
                         key = oxenc::to_hex(arg.view_remote_key());
                     } else {
                         static_assert(std::is_same_v<T, ServerDestination>);
@@ -59,10 +59,10 @@ namespace {
                         log::trace(
                                 cat, "[Request {}]: Using pre-resolved RemoteAddress.", request_id);
                         result.emplace(arg.view_remote_key(), arg.port());
-                    } else if constexpr (std::is_same_v<T, service_node>) {
+                    } else if constexpr (std::is_same_v<T, master_node>) {
                         log::trace(
                                 cat,
-                                "[Request {}]: Resolving service_node to RemoteAddress.",
+                                "[Request {}]: Resolving master_node to RemoteAddress.",
                                 request_id);
                         result.emplace(arg.remote_pubkey, arg.omq_port);
                     }
@@ -80,27 +80,27 @@ namespace {
 
 }  // namespace
 
-std::shared_ptr<SessionRouter> SessionRouter::make(
-        config::SessionRouter config,
+std::shared_ptr<BelnetRouter> BelnetRouter::make(
+        config::BelnetRouter config,
         std::shared_ptr<oxen::quic::Loop> loop,
-        std::weak_ptr<SnodePool> snode_pool,
+        std::weak_ptr<MnodePool> mnode_pool,
         std::weak_ptr<ITransport> transport) {
     // Need a factory constructor because we want to call `weak_from_this` during the initial set
     // (which isn't supported during construction), this approach allows us to do so
-    auto result = std::shared_ptr<SessionRouter>(
-            new SessionRouter(std::move(config), loop, snode_pool, transport));
+    auto result = std::shared_ptr<BelnetRouter>(
+            new BelnetRouter(std::move(config), loop, mnode_pool, transport));
     result->_init();
     return result;
 }
 
-SessionRouter::SessionRouter(
-        config::SessionRouter config,
+BelnetRouter::BelnetRouter(
+        config::BelnetRouter config,
         std::shared_ptr<oxen::quic::Loop> loop,
-        std::weak_ptr<SnodePool> snode_pool,
+        std::weak_ptr<MnodePool> mnode_pool,
         std::weak_ptr<ITransport> transport) :
-        _config{std::move(config)}, _loop{loop}, _snode_pool{snode_pool}, _transport{transport} {}
+        _config{std::move(config)}, _loop{loop}, _mnode_pool{mnode_pool}, _transport{transport} {}
 
-void SessionRouter::_init() {
+void BelnetRouter::_init() {
     log::trace(cat, "Initializing.");
 
     // "listen=:0" listens on a random port - this prevents multiple test devices on the same
@@ -126,12 +126,12 @@ void SessionRouter::_init() {
                     if (!self)
                         return;
 
-                    auto snode_pool = _snode_pool.lock();
-                    if (!snode_pool)
+                    auto mnode_pool = _mnode_pool.lock();
+                    if (!mnode_pool)
                         return;
 
-                    if (snode_pool->size() == 0)
-                        snode_pool->refresh_if_needed({}, [weak_self, this] {
+                    if (mnode_pool->size() == 0)
+                        mnode_pool->refresh_if_needed({}, [weak_self, this] {
                             auto self = weak_self.lock();
                             if (!self)
                                 return;
@@ -153,7 +153,7 @@ void SessionRouter::_init() {
     }
 }
 
-SessionRouter::~SessionRouter() {
+BelnetRouter::~BelnetRouter() {
     std::vector<std::thread> threads_to_join;
 
     // Use 'call_get' to force this to be synchronous
@@ -177,7 +177,7 @@ SessionRouter::~SessionRouter() {
 
 // MARK: IRouter
 
-void SessionRouter::suspend() {
+void BelnetRouter::suspend() {
     // Use 'call_get' to force this to be synchronous
     _loop->call_get([this] {
         _suspended = true;
@@ -186,7 +186,7 @@ void SessionRouter::suspend() {
     });
 }
 
-void SessionRouter::resume(bool automatically_reconnect) {
+void BelnetRouter::resume(bool automatically_reconnect) {
     // Use 'call_get' to force this to be synchronous
     _loop->call_get([this] {
         if (!_suspended)
@@ -197,35 +197,35 @@ void SessionRouter::resume(bool automatically_reconnect) {
     });
 }
 
-void SessionRouter::close_connections() {
+void BelnetRouter::close_connections() {
     // Use 'call_get' to force this to be synchronous
     _loop->call_get([this] { _close_connections(); });
 }
 
-void SessionRouter::clear_cache() {
+void BelnetRouter::clear_cache() {
     // TODO: Implement this.
 }
 
-std::vector<PathInfo> SessionRouter::get_active_paths() {
+std::vector<PathInfo> BelnetRouter::get_active_paths() {
     // TODO: Implement this.
     return {};
 }
 
-void SessionRouter::send_request(Request request, network_response_callback_t callback) {
+void BelnetRouter::send_request(Request request, network_response_callback_t callback) {
     _loop->call([weak_self = weak_from_this(), req = std::move(request), cb = std::move(callback)] {
         if (auto self = weak_self.lock())
             self->_send_request_internal(std::move(req), std::move(cb));
     });
 }
 
-void SessionRouter::upload(UploadRequest request) {
+void BelnetRouter::upload(UploadRequest request) {
     _loop->call([weak_self = weak_from_this(), req = std::move(request)] {
         if (auto self = weak_self.lock())
             self->_upload_internal(std::move(req));
     });
 }
 
-void SessionRouter::download(DownloadRequest request) {
+void BelnetRouter::download(DownloadRequest request) {
     _loop->call([weak_self = weak_from_this(), req = std::move(request)] {
         if (auto self = weak_self.lock())
             self->_download_internal(std::move(req));
@@ -234,7 +234,7 @@ void SessionRouter::download(DownloadRequest request) {
 
 // MARK: Internal Logic
 
-void SessionRouter::_finish_setup() {
+void BelnetRouter::_finish_setup() {
     // Start processing requests
     _ready = true;
     log::debug(cat, "Finishing setup, router is now ready.");
@@ -260,8 +260,8 @@ void SessionRouter::_finish_setup() {
     }
 }
 
-void SessionRouter::_close_connections() {
-    // TODO: Need to close any active connections on the session router instance.
+void BelnetRouter::_close_connections() {
+    // TODO: Need to close any active connections on the bchat router instance.
 
     // Cancel any uploads and downloads
     for (auto& [id, request_and_thread] : _active_uploads) {
@@ -299,7 +299,7 @@ void SessionRouter::_close_connections() {
     log::info(cat, "Closed all connections.");
 }
 
-void SessionRouter::_update_status(ConnectionStatus new_status) {
+void BelnetRouter::_update_status(ConnectionStatus new_status) {
     ConnectionStatus old_status = _status.load();
     if (old_status == new_status)
         return;
@@ -310,7 +310,7 @@ void SessionRouter::_update_status(ConnectionStatus new_status) {
         on_status_changed();
 }
 
-void SessionRouter::_send_request_internal(Request request, network_response_callback_t callback) {
+void BelnetRouter::_send_request_internal(Request request, network_response_callback_t callback) {
     // If we are suspended then fail immediately
     if (_suspended)
         return callback(
@@ -318,7 +318,7 @@ void SessionRouter::_send_request_internal(Request request, network_response_cal
                 false,
                 ERROR_NETWORK_SUSPENDED,
                 {content_type_plain_text},
-                "SessionRouter is suspended.");
+                "BelnetRouter is suspended.");
 
     // Queue the request if we aren't ready
     auto key = pending_request_key(request.destination);
@@ -385,7 +385,7 @@ void SessionRouter::_send_request_internal(Request request, network_response_cal
     _send_direct_request(std::move(request), std::move(json_parsing_callback));
 }
 
-void SessionRouter::_send_direct_request(Request request, network_response_callback_t callback) {
+void BelnetRouter::_send_direct_request(Request request, network_response_callback_t callback) {
     try {
         if (std::holds_alternative<ServerDestination>(request.destination))
             throw std::runtime_error{"Attempted to send server request directly"};
@@ -434,26 +434,26 @@ void SessionRouter::_send_direct_request(Request request, network_response_callb
     }
 }
 
-void SessionRouter::_send_proxy_request(Request request, network_response_callback_t callback) {
-    auto snode_pool = _snode_pool.lock();
-    if (!snode_pool) {
+void BelnetRouter::_send_proxy_request(Request request, network_response_callback_t callback) {
+    auto mnode_pool = _mnode_pool.lock();
+    if (!mnode_pool) {
         return callback(
                 false,
                 false,
-                ERROR_NO_SNODE_POOL,
+                ERROR_NO_MNODE_POOL,
                 {content_type_plain_text},
-                "SnodePool was destroyed, cannot find proxy.");
+                "MnodePool was destroyed, cannot find proxy.");
     }
 
-    auto proxy_nodes = snode_pool->get_unused_nodes(1);
+    auto proxy_nodes = mnode_pool->get_unused_nodes(1);
 
     if (proxy_nodes.empty()) {
         log::warning(
                 cat,
-                "[Request {}]: No available proxy nodes, waiting for SnodePool refresh.",
+                "[Request {}]: No available proxy nodes, waiting for MnodePool refresh.",
                 request.request_id);
 
-        snode_pool->refresh_if_needed(
+        mnode_pool->refresh_if_needed(
                 {},
                 [weak_self = weak_from_this(),
                  this,
@@ -463,40 +463,40 @@ void SessionRouter::_send_proxy_request(Request request, network_response_callba
                     if (!self)
                         return;
 
-                    auto snode_pool = _snode_pool.lock();
-                    if (!snode_pool)
+                    auto mnode_pool = _mnode_pool.lock();
+                    if (!mnode_pool)
                         return cb(
                                 false,
                                 false,
-                                ERROR_NO_SNODE_POOL,
+                                ERROR_NO_MNODE_POOL,
                                 {content_type_plain_text},
-                                "SnodePool was destroyed, cannot find proxy.");
+                                "MnodePool was destroyed, cannot find proxy.");
 
-                    if (snode_pool->get_unused_nodes(1).empty())
+                    if (mnode_pool->get_unused_nodes(1).empty())
                         return cb(
                                 false,
                                 false,
                                 -1,
                                 {content_type_plain_text},
-                                "SnodePool refresh failed.");
+                                "MnodePool refresh failed.");
 
                     log::info(
                             cat,
-                            "[Request {}]: SnodePool refresh complete, retrying proxy selection.",
+                            "[Request {}]: MnodePool refresh complete, retrying proxy selection.",
                             req.request_id);
                     _send_proxy_request(std::move(req), std::move(cb));
                 });
         return;
     }
 
-    service_node proxy_node = proxy_nodes[0];
+    master_node proxy_node = proxy_nodes[0];
     std::vector<unsigned char> encrypted_blob;
     std::shared_ptr<onionreq::ResponseParser> parser;
     log::debug(
             cat, "[Request {}]: Selected {} as proxy.", request.request_id, proxy_node.to_string());
 
     try {
-        std::vector<service_node> proxy_path = {proxy_node};
+        std::vector<master_node> proxy_path = {proxy_node};
         auto builder = onionreq::Builder(request.destination, request.endpoint, proxy_path);
         encrypted_blob = builder.generate_onion_blob(request.body);
         parser = std::make_shared<onionreq::ResponseParser>(builder);
@@ -550,11 +550,11 @@ void SessionRouter::_send_proxy_request(Request request, network_response_callba
                 }
             };
 
-    // Now that we have a service_node destination we can send a direct request
+    // Now that we have a master_node destination we can send a direct request
     _send_direct_request(std::move(proxy_request), std::move(proxy_callback));
 }
 
-void SessionRouter::_upload_internal(UploadRequest request) {
+void BelnetRouter::_upload_internal(UploadRequest request) {
     // TODO: Update this to use streaming approach
     const std::string upload_id = random::unique_id("UP");
     log::info(cat, "[Upload {}]: Starting upload.", upload_id);
@@ -692,7 +692,7 @@ void SessionRouter::_upload_internal(UploadRequest request) {
     });
 }
 
-void SessionRouter::_download_internal(DownloadRequest request) {
+void BelnetRouter::_download_internal(DownloadRequest request) {
     const std::string download_id = random::unique_id("DL");
     log::info(cat, "[Download {}]: Starting download.", download_id);
 
@@ -778,7 +778,7 @@ void SessionRouter::_download_internal(DownloadRequest request) {
     }
 }
 
-void SessionRouter::_establish_tunnel(
+void BelnetRouter::_establish_tunnel(
         std::span<const unsigned char>& remote_pubkey,
         const uint16_t remote_port,
         const std::string& initiating_req_id) {
@@ -819,15 +819,15 @@ void SessionRouter::_establish_tunnel(
     // }
 
     std::string srouter_address;
-    srouter_address.reserve(oxenc::to_base32z_size(32UL) + ".snode"sv.size());
+    srouter_address.reserve(oxenc::to_base32z_size(32UL) + ".mnode"sv.size());
     oxenc::to_base32z(
             remote_pubkey.begin(), remote_pubkey.begin() + 32, std::back_inserter(srouter_address));
-    srouter_address += ".snode"sv;
+    srouter_address += ".mnode"sv;
 
     // srouter::RouterID router_id{remote_pubkey.first<32>()};
-    // auto snode_address = "34d9udo9ethfcrcaxcgdyxsi1w8gr79jzornsytcfgdw5rpmif8y.loki";//
+    // auto mnode_address = "34d9udo9ethfcrcaxcgdyxsi1w8gr79jzornsytcfgdw5rpmif8y.loki";//
     // address.to_network_address(true);
-    //  auto snode_address = "55fxd8stjrt9g6rsbftx7eesy47pj4751xjghinr3k9ffxh4ieyo.snode";
+    //  auto mnode_address = "55fxd8stjrt9g6rsbftx7eesy47pj4751xjghinr3k9ffxh4ieyo.mnode";
     // auto srouter_address = router_id.to_network_address(true);
     auto test_port = remote_port;  // 35519;
 
@@ -840,7 +840,7 @@ void SessionRouter::_establish_tunnel(
             srouter_address,
             test_port,
             [weak_self = weak_from_this(), this, address_pubkey_hex, initiating_req_id](
-                    router::tunnel_info info) mutable {
+                    session::router::tunnel_info info) mutable {
                 auto self = weak_self.lock();
                 if (!self)
                     return;
@@ -876,7 +876,7 @@ void SessionRouter::_establish_tunnel(
 
                 log::info(
                         cat,
-                        "[Request {}] Unable to establish session router UDP connection to {}.",
+                        "[Request {}] Unable to establish bchat router UDP connection to {}.",
                         initiating_req_id,
                         address_pubkey_hex);
 
@@ -907,8 +907,8 @@ void SessionRouter::_establish_tunnel(
             });
 }
 
-void SessionRouter::_send_via_tunnel(
-        router::tunnel_info tunnel, Request request, network_response_callback_t callback) {
+void BelnetRouter::_send_via_tunnel(
+        session::router::tunnel_info tunnel, Request request, network_response_callback_t callback) {
     // TODO: Is there a way to check that the 'tunnel_info' still active?.
 
     // If the request has already timedout at this point then just fail it immediately
@@ -954,4 +954,4 @@ void SessionRouter::_send_via_tunnel(
     transport->send_request(std::move(router_request), std::move(callback));
 }
 
-}  // namespace session::network
+}  // namespace bchat::network

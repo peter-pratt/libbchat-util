@@ -1,10 +1,10 @@
 #include <fmt/core.h>
-#include <session/types.h>
+#include <bchat/types.h>
 
 #include <cstdarg>
-#include <session/types.hpp>
+#include <bchat/types.hpp>
 
-namespace session {
+namespace bchat {
 span_u8 span_u8_alloc_or_throw(size_t size) {
     span_u8 result = {};
     result.size = size;
@@ -38,7 +38,7 @@ string8 string8_copy_or_throw(const void* data, size_t size) {
     result.data[result.size] = 0;
     return result;
 }
-};  // namespace session
+};  // namespace bchat
 
 int snprintf_clamped(char* buffer, size_t size, char const* fmt, ...) {
     va_list args;

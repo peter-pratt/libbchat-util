@@ -1,20 +1,20 @@
 #include <fmt/core.h>
 #include <oxenc/hex.h>
-#include <session/export.h>
-#include <session/pro_backend.h>
+#include <bchat/export.h>
+#include <bchat/pro_backend.h>
 #include <sodium/crypto_generichash_blake2b.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <chrono>
 #include <nlohmann/json.hpp>
-#include <session/pro_backend.hpp>
-#include <session/bchat_encrypt.hpp>
-#include <session/sodium_array.hpp>
-#include <session/types.hpp>
+#include <bchat/pro_backend.hpp>
+#include <bchat/bchat_encrypt.hpp>
+#include <bchat/sodium_array.hpp>
+#include <bchat/types.hpp>
 
 // clang-format off
-const session_pro_backend_payment_provider_metadata SESSION_PRO_BACKEND_PAYMENT_PROVIDER_METADATA[SESSION_PRO_BACKEND_PAYMENT_PROVIDER_COUNT] = {
-    /*SESSION_PRO_PAYMENT_PROVIDER_NIL*/ {
+const bchat_pro_backend_payment_provider_metadata BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_METADATA[BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_COUNT] = {
+    /*BCHAT_PRO_PAYMENT_PROVIDER_NIL*/ {
         .device                             = string8_literal(""),
         .store                              = string8_literal(""),
         .platform                           = string8_literal(""),
@@ -25,18 +25,18 @@ const session_pro_backend_payment_provider_metadata SESSION_PRO_BACKEND_PAYMENT_
         .update_subscription_url            = string8_literal(""),
         .cancel_subscription_url            = string8_literal(""),
     },
-    /*SESSION_PRO_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE*/ {
+    /*BCHAT_PRO_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE*/ {
         .device                             = string8_literal("Android"),
         .store                              = string8_literal("Google Play Store"),
         .platform                           = string8_literal("Google"),
         .platform_account                   = string8_literal("Google account"),
         .refund_platform_url                = string8_literal("https://support.google.com/googleplay/workflow/9813244?"),
-        .refund_support_url                 = string8_literal("https://getsession.org/android-refund"),
-        .refund_status_url                  = string8_literal("https://getsession.org/android-refund"),
+        .refund_support_url                 = string8_literal("https://getbchat.org/android-refund"),
+        .refund_status_url                  = string8_literal("https://getbchat.org/android-refund"),
         .update_subscription_url            = string8_literal("https://play.google.com/store/account/subscriptions?package=network.loki.messenger"),
         .cancel_subscription_url            = string8_literal("https://play.google.com/store/account/subscriptions?package=network.loki.messenger"),
     },
-    /*SESSION_PRO_PAYMENT_PROVIDER_IOS_APP_STORE*/ {
+    /*BCHAT_PRO_PAYMENT_PROVIDER_IOS_APP_STORE*/ {
         .device                             = string8_literal("iOS"),
         .store                              = string8_literal("Apple App Store"),
         .platform                           = string8_literal("Apple"),
@@ -47,7 +47,7 @@ const session_pro_backend_payment_provider_metadata SESSION_PRO_BACKEND_PAYMENT_
         .update_subscription_url            = string8_literal("https://apps.apple.com/account/subscriptions"),
         .cancel_subscription_url            = string8_literal("https://account.apple.com/account/manage/section/subscriptions"),
     },
-    /*SESSION_PRO_PAYMENT_PROVIDER_RANGEPROOF*/ {
+    /*BCHAT_PRO_PAYMENT_PROVIDER_RANGEPROOF*/ {
         .device                             = string8_literal(""),
         .store                              = string8_literal(""),
         .platform                           = string8_literal(""),
@@ -81,23 +81,23 @@ const T json_require(
     } else {
         bool success = false;
         std::string_view type = {};
-        if constexpr (session::is_one_of<T, double, float>) {
+        if constexpr (bchat::is_one_of<T, double, float>) {
             type = "a float";
             success = it->is_number_float();
-        } else if constexpr (session::is_one_of<T, uint64_t, uint32_t, uint16_t, uint8_t>) {
+        } else if constexpr (bchat::is_one_of<T, uint64_t, uint32_t, uint16_t, uint8_t>) {
             type = "a number";
             success = it->is_number();
-        } else if constexpr (session::is_one_of<T, std::string, std::string_view>) {
+        } else if constexpr (bchat::is_one_of<T, std::string, std::string_view>) {
             type = "a string";
             success = it->is_string();
-        } else if constexpr (session::is_one_of<T, nlohmann::json::array_t>) {
+        } else if constexpr (bchat::is_one_of<T, nlohmann::json::array_t>) {
             type = "an array";
             success = it->is_array();
-        } else if constexpr (session::is_one_of<T, bool>) {
+        } else if constexpr (bchat::is_one_of<T, bool>) {
             type = "a boolean";
             success = it->is_boolean();
         } else {
-            static_assert(session::is_one_of<T, nlohmann::json::object_t>);
+            static_assert(bchat::is_one_of<T, nlohmann::json::object_t>);
             type = "an object";
             success = it->is_object();
         }
@@ -157,7 +157,7 @@ bool json_require_fixed_bytes_from_hex(
 }
 };  // namespace
 
-namespace session::pro_backend {
+namespace bchat::pro_backend {
 std::string AddProPaymentRequest::to_json() const {
     nlohmann::json j;
     j["version"] = version;
@@ -165,14 +165,14 @@ std::string AddProPaymentRequest::to_json() const {
     j["rotating_pkey"] = oxenc::to_hex(rotating_pkey);
     j["payment_tx"]["provider"] = payment_tx.provider;
     switch (payment_tx.provider) {
-        case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_NIL: [[fallthrough]];
-        case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_COUNT: break;
-        case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_RANGEPROOF: {assert(false && "Unimplemented");} break;
-        case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE: {
+        case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_NIL: [[fallthrough]];
+        case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_COUNT: break;
+        case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_RANGEPROOF: {assert(false && "Unimplemented");} break;
+        case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE: {
             j["payment_tx"]["google_payment_token"] = payment_tx.payment_id;
             j["payment_tx"]["google_order_id"] = payment_tx.order_id;
         } break;
-        case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_IOS_APP_STORE: {
+        case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_IOS_APP_STORE: {
             j["payment_tx"]["apple_tx_id"] = payment_tx.payment_id;
         } break;
     }
@@ -186,7 +186,7 @@ MasterRotatingSignatures AddProPaymentRequest::build_sigs(
         std::uint8_t version,
         std::span<const uint8_t> master_privkey,
         std::span<const uint8_t> rotating_privkey,
-        SESSION_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
+        BCHAT_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
         std::span<const uint8_t> payment_tx_payment_id,
         std::span<const uint8_t> payment_tx_order_id) {
     cleared_uc64 master_from_seed;
@@ -209,7 +209,7 @@ MasterRotatingSignatures AddProPaymentRequest::build_sigs(
         throw std::invalid_argument{"Invalid rotating_privkey: expected 32 or 64 bytes"};
     }
 
-    if (payment_tx_provider == SESSION_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE) {
+    if (payment_tx_provider == BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE) {
         if (payment_tx_order_id.empty())
             throw std::invalid_argument{
                     "Invalid payment_tx_order_id: order ID must be set for a Google Play store "
@@ -222,13 +222,13 @@ MasterRotatingSignatures AddProPaymentRequest::build_sigs(
     }
 
     // Hash components to 32 bytes, must match:
-    //   https://github.com/Doy-lee/session-pro-backend/blob/5b66b1a4a64dc8da0225507019cbe21d7642fa78/backend.py#L171
+    //   https://github.com/Doy-lee/bchat-pro-backend/blob/5b66b1a4a64dc8da0225507019cbe21d7642fa78/backend.py#L171
     array_uc32 hash_to_sign = {};
     crypto_generichash_blake2b_state state = {};
     make_blake2b32_hasher(
             &state,
-            {SESSION_PROTOCOL_ADD_PRO_PAYMENT_HASH_PERSONALISATION,
-             sizeof(SESSION_PROTOCOL_ADD_PRO_PAYMENT_HASH_PERSONALISATION) - 1});
+            {BCHAT_PROTOCOL_ADD_PRO_PAYMENT_HASH_PERSONALISATION,
+             sizeof(BCHAT_PROTOCOL_ADD_PRO_PAYMENT_HASH_PERSONALISATION) - 1});
     crypto_generichash_blake2b_update(&state, &version, sizeof(version));
     crypto_generichash_blake2b_update(
             &state,
@@ -274,7 +274,7 @@ std::string AddProPaymentRequest::build_to_json(
         std::uint8_t version,
         std::span<const uint8_t> master_privkey,
         std::span<const uint8_t> rotating_privkey,
-        SESSION_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
+        BCHAT_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
         std::span<const uint8_t> payment_tx_payment_id,
         std::span<const uint8_t> payment_tx_order_id) {
     cleared_uc64 master_from_seed;
@@ -335,12 +335,12 @@ AddProPaymentOrGenerateProProofResponse AddProPaymentOrGenerateProProofResponse:
     nlohmann::json j = json_parse(json, result.errors);
     result.status = json_require<uint8_t>(j, "status", result.errors);
     if (result.errors.size()) {
-        result.status = SESSION_PRO_BACKEND_STATUS_GENERIC_ERROR;
+        result.status = BCHAT_PRO_BACKEND_STATUS_GENERIC_ERROR;
         return result;
     }
 
     // Parse errors
-    if (result.status != SESSION_PRO_BACKEND_STATUS_SUCCESS) {
+    if (result.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS) {
         parse_json_response_errors(j, result.errors);
         return result;
     }
@@ -401,15 +401,15 @@ MasterRotatingSignatures GenerateProProofRequest::build_sigs(
     }
 
     // Hash components to 32 bytes, must match:
-    //   https://github.com/Doy-lee/session-pro-backend/blob/5b66b1a4a64dc8da0225507019cbe21d7642fa78/backend.py#L631
+    //   https://github.com/Doy-lee/bchat-pro-backend/blob/5b66b1a4a64dc8da0225507019cbe21d7642fa78/backend.py#L631
     uint8_t version = 0;
     uint64_t unix_ts_ms = epoch_ms(unix_ts);
     array_uc32 hash_to_sign = {};
     crypto_generichash_blake2b_state state = {};
     make_blake2b32_hasher(
             &state,
-            {SESSION_PROTOCOL_GENERATE_PROOF_HASH_PERSONALISATION,
-             sizeof(SESSION_PROTOCOL_GENERATE_PROOF_HASH_PERSONALISATION) - 1});
+            {BCHAT_PROTOCOL_GENERATE_PROOF_HASH_PERSONALISATION,
+             sizeof(BCHAT_PROTOCOL_GENERATE_PROOF_HASH_PERSONALISATION) - 1});
     crypto_generichash_blake2b_update(&state, &version, sizeof(version));
     crypto_generichash_blake2b_update(
             &state, master_privkey.data() + 32, crypto_sign_ed25519_PUBLICKEYBYTES);
@@ -497,12 +497,12 @@ GetProRevocationsResponse GetProRevocationsResponse::parse(std::string_view json
     nlohmann::json j = json_parse(json, result.errors);
     result.status = json_require<uint8_t>(j, "status", result.errors);
     if (result.errors.size()) {
-        result.status = SESSION_PRO_BACKEND_STATUS_GENERIC_ERROR;
+        result.status = BCHAT_PRO_BACKEND_STATUS_GENERIC_ERROR;
         return result;
     }
 
     // Parse errors
-    if (result.status != SESSION_PRO_BACKEND_STATUS_SUCCESS) {
+    if (result.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS) {
         parse_json_response_errors(j, result.errors);
         return result;
     }
@@ -570,14 +570,14 @@ array_uc64 GetProDetailsRequest::build_sig(
     }
 
     // Hash components to 32 bytes, must match:
-    //   https://github.com/Doy-lee/session-pro-backend/blob/635b14fc93302658de6c07c017f705673fc7c57f/server.py#L395
+    //   https://github.com/Doy-lee/bchat-pro-backend/blob/635b14fc93302658de6c07c017f705673fc7c57f/server.py#L395
     array_uc32 hash_to_sign = {};
     crypto_generichash_blake2b_state state = {};
     uint64_t unix_ts_ms = epoch_ms(unix_ts);
     make_blake2b32_hasher(
             &state,
-            {SESSION_PROTOCOL_GET_PRO_DETAILS_HASH_PERSONALISATION,
-             sizeof(SESSION_PROTOCOL_GET_PRO_DETAILS_HASH_PERSONALISATION) - 1});
+            {BCHAT_PROTOCOL_GET_PRO_DETAILS_HASH_PERSONALISATION,
+             sizeof(BCHAT_PROTOCOL_GET_PRO_DETAILS_HASH_PERSONALISATION) - 1});
     crypto_generichash_blake2b_update(&state, &version, sizeof(version));
     crypto_generichash_blake2b_update(
             &state,
@@ -634,12 +634,12 @@ GetProDetailsResponse GetProDetailsResponse::parse(std::string_view json) {
     nlohmann::json j = json_parse(json, result.errors);
     result.status = json_require<uint8_t>(j, "status", result.errors);
     if (result.errors.size()) {
-        result.status = SESSION_PRO_BACKEND_STATUS_GENERIC_ERROR;
+        result.status = BCHAT_PRO_BACKEND_STATUS_GENERIC_ERROR;
         return result;
     }
 
     // Parse errors
-    if (result.status != SESSION_PRO_BACKEND_STATUS_SUCCESS) {
+    if (result.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS) {
         parse_json_response_errors(j, result.errors);
         return result;
     }
@@ -650,21 +650,21 @@ GetProDetailsResponse GetProDetailsResponse::parse(std::string_view json) {
 
     // Parse payload
     uint32_t user_status = json_require<uint32_t>(result_obj, "status", result.errors);
-    if (user_status >= SESSION_PRO_BACKEND_USER_PRO_STATUS_COUNT) {
+    if (user_status >= BCHAT_PRO_BACKEND_USER_PRO_STATUS_COUNT) {
         result.errors.push_back(
                 fmt::format("User pro status value was out-of-bounds: {}", user_status));
         return result;
     }
-    result.user_status = static_cast<SESSION_PRO_BACKEND_USER_PRO_STATUS>(user_status);
+    result.user_status = static_cast<BCHAT_PRO_BACKEND_USER_PRO_STATUS>(user_status);
 
     uint32_t error_report = json_require<uint32_t>(result_obj, "error_report", result.errors);
-    if (error_report >= SESSION_PRO_BACKEND_GET_PRO_DETAILS_ERROR_REPORT_COUNT) {
+    if (error_report >= BCHAT_PRO_BACKEND_GET_PRO_DETAILS_ERROR_REPORT_COUNT) {
         result.errors.push_back(
                 fmt::format("Error report value was out-of-bounds: {}", user_status));
         return result;
     }
     result.error_report =
-            static_cast<SESSION_PRO_BACKEND_GET_PRO_DETAILS_ERROR_REPORT>(error_report);
+            static_cast<BCHAT_PRO_BACKEND_GET_PRO_DETAILS_ERROR_REPORT>(error_report);
 
     result.auto_renewing = json_require<bool>(result_obj, "auto_renewing", result.errors);
 
@@ -710,25 +710,25 @@ GetProDetailsResponse GetProDetailsResponse::parse(std::string_view json) {
                 json_require<uint64_t>(obj, "refund_requested_unix_ts_ms", result.errors);
 
         ProPaymentItem item = {};
-        if (status > SESSION_PRO_BACKEND_PAYMENT_STATUS_NIL &&
-            status < SESSION_PRO_BACKEND_PAYMENT_STATUS_COUNT) {
-            item.status = static_cast<SESSION_PRO_BACKEND_PAYMENT_STATUS>(status);
+        if (status > BCHAT_PRO_BACKEND_PAYMENT_STATUS_NIL &&
+            status < BCHAT_PRO_BACKEND_PAYMENT_STATUS_COUNT) {
+            item.status = static_cast<BCHAT_PRO_BACKEND_PAYMENT_STATUS>(status);
         } else {
             result.errors.push_back(fmt::format("Status value was out-of-bounds: {}", status));
         }
 
-        if (plan > SESSION_PRO_BACKEND_PLAN_NIL && plan < SESSION_PRO_BACKEND_PLAN_COUNT) {
-            item.plan = static_cast<SESSION_PRO_BACKEND_PLAN>(plan);
+        if (plan > BCHAT_PRO_BACKEND_PLAN_NIL && plan < BCHAT_PRO_BACKEND_PLAN_COUNT) {
+            item.plan = static_cast<BCHAT_PRO_BACKEND_PLAN>(plan);
         } else {
             result.errors.push_back(fmt::format("Plan value was out-of-bounds: {}", plan));
         }
 
-        if (payment_provider > SESSION_PRO_BACKEND_PAYMENT_PROVIDER_NIL &&
-            payment_provider < SESSION_PRO_BACKEND_PAYMENT_PROVIDER_COUNT) {
+        if (payment_provider > BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_NIL &&
+            payment_provider < BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_COUNT) {
             item.payment_provider =
-                    static_cast<SESSION_PRO_BACKEND_PAYMENT_PROVIDER>(payment_provider);
+                    static_cast<BCHAT_PRO_BACKEND_PAYMENT_PROVIDER>(payment_provider);
             item.payment_provider_metadata =
-                    SESSION_PRO_BACKEND_PAYMENT_PROVIDER_METADATA + payment_provider;
+                    BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_METADATA + payment_provider;
         } else {
             result.errors.push_back(
                     fmt::format("Payment provider value was out-of-bounds: {}", payment_provider));
@@ -749,38 +749,38 @@ GetProDetailsResponse GetProDetailsResponse::parse(std::string_view json) {
         item.refund_requested_unix_ts = std::chrono::sys_time<std::chrono::milliseconds>(
                 std::chrono::milliseconds(refund_requested_ts));
         switch (item.payment_provider) {
-            case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_COUNT: [[fallthrough]];
-            case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_NIL: {
+            case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_COUNT: [[fallthrough]];
+            case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_NIL: {
             } break;
-            case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE: {
+            case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE: {
                 item.google_payment_token =
                         json_require<std::string>(obj, "google_payment_token", result.errors);
                 assert(item.google_payment_token.size() <
-                       sizeof(((session_pro_backend_pro_payment_item*)0)->google_payment_token));
+                       sizeof(((bchat_pro_backend_pro_payment_item*)0)->google_payment_token));
                 item.google_order_id =
                         json_require<std::string>(obj, "google_order_id", result.errors);
                 assert(item.google_order_id.size() <
-                       sizeof(((session_pro_backend_pro_payment_item*)0)->google_order_id));
+                       sizeof(((bchat_pro_backend_pro_payment_item*)0)->google_order_id));
             } break;
 
-            case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_IOS_APP_STORE: {
+            case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_IOS_APP_STORE: {
                 item.apple_original_tx_id =
                         json_require<std::string>(obj, "apple_original_tx_id", result.errors);
                 item.apple_tx_id = json_require<std::string>(obj, "apple_tx_id", result.errors);
                 item.apple_web_line_order_id =
                         json_require<std::string>(obj, "apple_web_line_order_id", result.errors);
                 assert(item.apple_original_tx_id.size() <
-                       sizeof(((session_pro_backend_pro_payment_item*)0)->apple_original_tx_id));
+                       sizeof(((bchat_pro_backend_pro_payment_item*)0)->apple_original_tx_id));
                 assert(item.apple_tx_id.size() <
-                       sizeof(((session_pro_backend_pro_payment_item*)0)->apple_tx_id));
+                       sizeof(((bchat_pro_backend_pro_payment_item*)0)->apple_tx_id));
                 assert(item.apple_web_line_order_id.size() <
-                       sizeof(((session_pro_backend_pro_payment_item*)0)->apple_web_line_order_id));
+                       sizeof(((bchat_pro_backend_pro_payment_item*)0)->apple_web_line_order_id));
             } break;
-            case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_RANGEPROOF: {
+            case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_RANGEPROOF: {
                 item.rangeproof_order_id =
                           json_require<std::string>(obj, "rangeproof_order_id", result.errors);
                 assert(item.rangeproof_order_id.size() <
-                        sizeof(((session_pro_backend_pro_payment_item*)0)->rangeproof_order_id));
+                        sizeof(((bchat_pro_backend_pro_payment_item*)0)->rangeproof_order_id));
             } break;
         }
 
@@ -798,7 +798,7 @@ array_uc64 SetPaymentRefundRequestedRequest::build_sig(
         std::span<const uint8_t> master_privkey,
         std::chrono::sys_time<std::chrono::milliseconds> unix_ts,
         std::chrono::sys_time<std::chrono::milliseconds> refund_requested_unix_ts,
-        SESSION_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
+        BCHAT_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
         std::span<const uint8_t> payment_tx_payment_id,
         std::span<const uint8_t> payment_tx_order_id) {
     cleared_uc64 master_from_seed;
@@ -812,13 +812,13 @@ array_uc64 SetPaymentRefundRequestedRequest::build_sig(
     }
 
     // Hash components to 32 bytes, must match:
-    //   https://github.com/Doy-lee/session-pro-backend/blob/5962925d7f18f83a3ff5774885495e5dd55ecb0a/server.py#L634
+    //   https://github.com/Doy-lee/bchat-pro-backend/blob/5962925d7f18f83a3ff5774885495e5dd55ecb0a/server.py#L634
     array_uc32 hash_to_sign = {};
     crypto_generichash_blake2b_state state = {};
     make_blake2b32_hasher(
             &state,
-            {SESSION_PROTOCOL_SET_PAYMENT_REFUND_REQUESTED_HASH_PERSONALISATION,
-             sizeof(SESSION_PROTOCOL_SET_PAYMENT_REFUND_REQUESTED_HASH_PERSONALISATION) - 1});
+            {BCHAT_PROTOCOL_SET_PAYMENT_REFUND_REQUESTED_HASH_PERSONALISATION,
+             sizeof(BCHAT_PROTOCOL_SET_PAYMENT_REFUND_REQUESTED_HASH_PERSONALISATION) - 1});
     crypto_generichash_blake2b_update(&state, &version, sizeof(version));
     crypto_generichash_blake2b_update(
             &state,
@@ -866,7 +866,7 @@ std::string SetPaymentRefundRequestedRequest::build_to_json(
         std::span<const uint8_t> master_privkey,
         std::chrono::sys_time<std::chrono::milliseconds> unix_ts,
         std::chrono::sys_time<std::chrono::milliseconds> refund_requested_unix_ts,
-        SESSION_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
+        BCHAT_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
         std::span<const uint8_t> payment_tx_payment_id,
         std::span<const uint8_t> payment_tx_order_id) {
     array_uc64 sig = SetPaymentRefundRequestedRequest::build_sig(
@@ -906,14 +906,14 @@ std::string SetPaymentRefundRequestedRequest::to_json() const {
     j["refund_requested_unix_ts_ms"] = epoch_ms(refund_requested_unix_ts);
     j["payment_tx"]["provider"] = payment_tx.provider;
     switch (payment_tx.provider) {
-        case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_NIL: [[fallthrough]];
-        case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_COUNT: break;
-        case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_RANGEPROOF: {assert(false && "Unimplemented");} break;
-        case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE: {
+        case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_NIL: [[fallthrough]];
+        case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_COUNT: break;
+        case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_RANGEPROOF: {assert(false && "Unimplemented");} break;
+        case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE: {
             j["payment_tx"]["google_payment_token"] = payment_tx.payment_id;
             j["payment_tx"]["google_order_id"] = payment_tx.order_id;
         } break;
-        case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_IOS_APP_STORE: {
+        case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_IOS_APP_STORE: {
             j["payment_tx"]["apple_tx_id"] = payment_tx.payment_id;
         } break;
     }
@@ -928,12 +928,12 @@ SetPaymentRefundRequestedResponse SetPaymentRefundRequestedResponse::parse(std::
     nlohmann::json j = json_parse(json, result.errors);
     result.status = json_require<uint8_t>(j, "status", result.errors);
     if (result.errors.size()) {
-        result.status = SESSION_PRO_BACKEND_STATUS_GENERIC_ERROR;
+        result.status = BCHAT_PRO_BACKEND_STATUS_GENERIC_ERROR;
         return result;
     }
 
     // Parse errors
-    if (result.status != SESSION_PRO_BACKEND_STATUS_SUCCESS) {
+    if (result.status != BCHAT_PRO_BACKEND_STATUS_SUCCESS) {
         parse_json_response_errors(j, result.errors);
         return result;
     }
@@ -947,9 +947,9 @@ SetPaymentRefundRequestedResponse SetPaymentRefundRequestedResponse::parse(std::
     result.updated = json_require<bool>(result_obj, "updated", result.errors);
     return result;
 }
-}  // namespace session::pro_backend
+}  // namespace bchat::pro_backend
 
-using namespace session::pro_backend;
+using namespace bchat::pro_backend;
 
 /// Define a string8 from a c-string literal. The string should not be modified as it'll live in the
 /// data-section of the binary (or be interned, e.t.c)
@@ -958,14 +958,14 @@ using namespace session::pro_backend;
 static string8 C_PARSE_ERROR_OUT_OF_MEMORY = STRING8_LIT("Ran out-of-memory creating C response");
 static string8 C_PARSE_ERROR_INVALID_ARGS = STRING8_LIT("One or more C arguments were NULL");
 
-LIBSESSION_C_API session_pro_backend_master_rotating_signatures
-session_pro_backend_add_pro_payment_request_build_sigs(
+LIBBCHAT_C_API bchat_pro_backend_master_rotating_signatures
+bchat_pro_backend_add_pro_payment_request_build_sigs(
         uint8_t request_version,
         const uint8_t* master_privkey,
         size_t master_privkey_len,
         const uint8_t* rotating_privkey,
         size_t rotating_privkey_len,
-        SESSION_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
+        BCHAT_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
         const uint8_t* payment_tx_payment_id,
         size_t payment_tx_payment_id_len,
         const uint8_t* payment_tx_order_id,
@@ -978,7 +978,7 @@ session_pro_backend_add_pro_payment_request_build_sigs(
             payment_tx_payment_id, payment_tx_payment_id_len);
     std::span<const uint8_t> payment_tx_order_id_span(payment_tx_order_id, payment_tx_order_id_len);
 
-    session_pro_backend_master_rotating_signatures result = {};
+    bchat_pro_backend_master_rotating_signatures result = {};
     try {
         auto sigs = AddProPaymentRequest::build_sigs(
                 request_version,
@@ -1002,19 +1002,19 @@ session_pro_backend_add_pro_payment_request_build_sigs(
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_to_json
-session_pro_backend_add_pro_payment_request_build_to_json(
+LIBBCHAT_C_API bchat_pro_backend_to_json
+bchat_pro_backend_add_pro_payment_request_build_to_json(
         uint8_t request_version,
         const uint8_t* master_privkey,
         size_t master_privkey_len,
         const uint8_t* rotating_privkey,
         size_t rotating_privkey_len,
-        SESSION_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
+        BCHAT_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
         const uint8_t* payment_tx_payment_id,
         size_t payment_tx_payment_id_len,
         const uint8_t* payment_tx_order_id,
         size_t payment_tx_order_id_len) {
-    session_pro_backend_to_json result = {};
+    bchat_pro_backend_to_json result = {};
 
     // Convert C inputs to C++ types
     std::span<const uint8_t> master_span(master_privkey, master_privkey_len);
@@ -1031,7 +1031,7 @@ session_pro_backend_add_pro_payment_request_build_to_json(
                 payment_tx_provider,
                 payment_tx_payment_id_span,
                 payment_tx_order_id_span);
-        result.json = session::string8_copy_or_throw(json.data(), json.size());
+        result.json = bchat::string8_copy_or_throw(json.data(), json.size());
         result.success = true;
     } catch (const std::exception& e) {
         const std::string& error = e.what();
@@ -1046,8 +1046,8 @@ session_pro_backend_add_pro_payment_request_build_to_json(
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_master_rotating_signatures
-session_pro_backend_generate_pro_proof_request_build_sigs(
+LIBBCHAT_C_API bchat_pro_backend_master_rotating_signatures
+bchat_pro_backend_generate_pro_proof_request_build_sigs(
         uint8_t request_version,
         const uint8_t* master_privkey,
         size_t master_privkey_len,
@@ -1060,7 +1060,7 @@ session_pro_backend_generate_pro_proof_request_build_sigs(
     std::span<const uint8_t> rotating_span(rotating_privkey, rotating_privkey_len);
     std::chrono::milliseconds ts{unix_ts_ms};
 
-    session_pro_backend_master_rotating_signatures result = {};
+    bchat_pro_backend_master_rotating_signatures result = {};
     try {
         auto sigs = GenerateProProofRequest::build_sigs(
                 request_version,
@@ -1082,8 +1082,8 @@ session_pro_backend_generate_pro_proof_request_build_sigs(
     return result;
 }
 
-LIBSESSION_EXPORT
-session_pro_backend_to_json session_pro_backend_generate_pro_proof_request_build_to_json(
+LIBBCHAT_EXPORT
+bchat_pro_backend_to_json bchat_pro_backend_generate_pro_proof_request_build_to_json(
         uint8_t request_version,
         const uint8_t* master_privkey,
         size_t master_privkey_len,
@@ -1095,14 +1095,14 @@ session_pro_backend_to_json session_pro_backend_generate_pro_proof_request_build
     std::span<const uint8_t> rotating_span(rotating_privkey, rotating_privkey_len);
     std::chrono::milliseconds ts{unix_ts_ms};
 
-    session_pro_backend_to_json result = {};
+    bchat_pro_backend_to_json result = {};
     try {
         auto json = GenerateProProofRequest::build_to_json(
                 request_version,
                 master_span,
                 rotating_span,
                 std::chrono::sys_time<std::chrono::milliseconds>(ts));
-        result.json = session::string8_copy_or_throw(json.data(), json.size());
+        result.json = bchat::string8_copy_or_throw(json.data(), json.size());
         result.success = true;
     } catch (const std::exception& e) {
         const std::string& error = e.what();
@@ -1116,8 +1116,8 @@ session_pro_backend_to_json session_pro_backend_generate_pro_proof_request_build
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_signature
-session_pro_backend_get_pro_details_request_build_sig(
+LIBBCHAT_C_API bchat_pro_backend_signature
+bchat_pro_backend_get_pro_details_request_build_sig(
         uint8_t request_version,
         const uint8_t* master_privkey,
         size_t master_privkey_len,
@@ -1127,7 +1127,7 @@ session_pro_backend_get_pro_details_request_build_sig(
     std::span<const uint8_t> master_span{master_privkey, master_privkey_len};
     std::chrono::sys_time<std::chrono::milliseconds> ts{std::chrono::milliseconds(unix_ts_ms)};
 
-    session_pro_backend_signature result = {};
+    bchat_pro_backend_signature result = {};
     try {
         auto sig = GetProDetailsRequest::build_sig(request_version, master_span, ts, count);
         std::memcpy(result.sig.data, sig.data(), sig.size());
@@ -1144,8 +1144,8 @@ session_pro_backend_get_pro_details_request_build_sig(
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_to_json
-session_pro_backend_get_pro_details_request_build_to_json(
+LIBBCHAT_C_API bchat_pro_backend_to_json
+bchat_pro_backend_get_pro_details_request_build_to_json(
         uint8_t request_version,
         const uint8_t* master_privkey,
         size_t master_privkey_len,
@@ -1155,10 +1155,10 @@ session_pro_backend_get_pro_details_request_build_to_json(
     std::span<const uint8_t> master_span{master_privkey, master_privkey_len};
     std::chrono::sys_time<std::chrono::milliseconds> ts{std::chrono::milliseconds(unix_ts_ms)};
 
-    session_pro_backend_to_json result = {};
+    bchat_pro_backend_to_json result = {};
     try {
         auto json = GetProDetailsRequest::build_to_json(request_version, master_span, ts, count);
-        result.json = session::string8_copy_or_throw(json.data(), json.size());
+        result.json = bchat::string8_copy_or_throw(json.data(), json.size());
         result.success = true;
     } catch (const std::exception& e) {
         const std::string& error = e.what();
@@ -1172,9 +1172,9 @@ session_pro_backend_get_pro_details_request_build_to_json(
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_to_json session_pro_backend_add_pro_payment_request_to_json(
-        const session_pro_backend_add_pro_payment_request* request) {
-    session_pro_backend_to_json result = {};
+LIBBCHAT_C_API bchat_pro_backend_to_json bchat_pro_backend_add_pro_payment_request_to_json(
+        const bchat_pro_backend_add_pro_payment_request* request) {
+    bchat_pro_backend_to_json result = {};
     if (!request)
         return result;
 
@@ -1193,7 +1193,7 @@ LIBSESSION_C_API session_pro_backend_to_json session_pro_backend_add_pro_payment
 
     try {
         std::string json = cpp.to_json();
-        result.json = session::string8_copy_or_throw(json.data(), json.size());
+        result.json = bchat::string8_copy_or_throw(json.data(), json.size());
         result.success = true;
     } catch (const std::exception& e) {
         const std::string& error = e.what();
@@ -1208,9 +1208,9 @@ LIBSESSION_C_API session_pro_backend_to_json session_pro_backend_add_pro_payment
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_to_json session_pro_backend_generate_pro_proof_request_to_json(
-        const session_pro_backend_generate_pro_proof_request* request) {
-    session_pro_backend_to_json result = {};
+LIBBCHAT_C_API bchat_pro_backend_to_json bchat_pro_backend_generate_pro_proof_request_to_json(
+        const bchat_pro_backend_generate_pro_proof_request* request) {
+    bchat_pro_backend_to_json result = {};
     if (!request)
         return result;
 
@@ -1226,7 +1226,7 @@ LIBSESSION_C_API session_pro_backend_to_json session_pro_backend_generate_pro_pr
 
     try {
         std::string json = cpp.to_json();
-        result.json = session::string8_copy_or_throw(json.data(), json.size());
+        result.json = bchat::string8_copy_or_throw(json.data(), json.size());
         result.success = true;
     } catch (const std::exception& e) {
         const std::string& error = e.what();
@@ -1241,10 +1241,10 @@ LIBSESSION_C_API session_pro_backend_to_json session_pro_backend_generate_pro_pr
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_to_json
-session_pro_backend_get_pro_revocations_request_to_json(
-        const session_pro_backend_get_pro_revocations_request* request) {
-    session_pro_backend_to_json result = {};
+LIBBCHAT_C_API bchat_pro_backend_to_json
+bchat_pro_backend_get_pro_revocations_request_to_json(
+        const bchat_pro_backend_get_pro_revocations_request* request) {
+    bchat_pro_backend_to_json result = {};
     if (!request)
         return result;
 
@@ -1255,7 +1255,7 @@ session_pro_backend_get_pro_revocations_request_to_json(
 
     try {
         std::string json = cpp.to_json();
-        result.json = session::string8_copy_or_throw(json.data(), json.size());
+        result.json = bchat::string8_copy_or_throw(json.data(), json.size());
         result.success = true;
     } catch (const std::exception& e) {
         const std::string& error = e.what();
@@ -1270,9 +1270,9 @@ session_pro_backend_get_pro_revocations_request_to_json(
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_to_json session_pro_backend_get_pro_details_request_to_json(
-        const session_pro_backend_get_pro_details_request* request) {
-    session_pro_backend_to_json result = {};
+LIBBCHAT_C_API bchat_pro_backend_to_json bchat_pro_backend_get_pro_details_request_to_json(
+        const bchat_pro_backend_get_pro_details_request* request) {
+    bchat_pro_backend_to_json result = {};
     if (!request)
         return result;
 
@@ -1288,7 +1288,7 @@ LIBSESSION_C_API session_pro_backend_to_json session_pro_backend_get_pro_details
 
     try {
         std::string json = cpp.to_json();
-        result.json = session::string8_copy_or_throw(json.data(), json.size());
+        result.json = bchat::string8_copy_or_throw(json.data(), json.size());
         result.success = true;
     } catch (const std::exception& e) {
         const std::string& error = e.what();
@@ -1303,11 +1303,11 @@ LIBSESSION_C_API session_pro_backend_to_json session_pro_backend_get_pro_details
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_add_pro_payment_or_generate_pro_proof_response
-session_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
+LIBBCHAT_C_API bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response
+bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
         const char* json, size_t json_len) {
 
-    session_pro_backend_add_pro_payment_or_generate_pro_proof_response result = {};
+    bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response result = {};
     if (!json) {
         result.header.status = 1;
         result.header.errors = &C_PARSE_ERROR_INVALID_ARGS;
@@ -1343,7 +1343,7 @@ session_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
     // error response returns the same struct just with different fields populated.
     result.header.status = cpp.status;
     result.proof.version = cpp.proof.version;
-    result.proof.expiry_unix_ts_ms = session::epoch_ms(cpp.proof.expiry_unix_ts);
+    result.proof.expiry_unix_ts_ms = bchat::epoch_ms(cpp.proof.expiry_unix_ts);
     std::memcpy(
             result.proof.gen_index_hash.data,
             cpp.proof.gen_index_hash.data(),
@@ -1365,9 +1365,9 @@ session_pro_backend_add_pro_payment_or_generate_pro_proof_response_parse(
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_get_pro_revocations_response
-session_pro_backend_get_pro_revocations_response_parse(const char* json, size_t json_len) {
-    session_pro_backend_get_pro_revocations_response result = {};
+LIBBCHAT_C_API bchat_pro_backend_get_pro_revocations_response
+bchat_pro_backend_get_pro_revocations_response_parse(const char* json, size_t json_len) {
+    bchat_pro_backend_get_pro_revocations_response result = {};
     if (!json) {
         result.header.status = 1;
         result.header.errors = &C_PARSE_ERROR_INVALID_ARGS;
@@ -1418,21 +1418,21 @@ session_pro_backend_get_pro_revocations_response_parse(const char* json, size_t 
 
     // Copy items
     result.items_count = cpp.items.size();
-    result.items = static_cast<session_pro_backend_pro_revocation_item*>(
+    result.items = static_cast<bchat_pro_backend_pro_revocation_item*>(
             arena_alloc(&arena, result.items_count * sizeof(*result.items)));
 
     for (size_t index = 0; index < result.items_count; ++index) {
         const ProRevocationItem& src = cpp.items[index];
-        session_pro_backend_pro_revocation_item& dest = result.items[index];
+        bchat_pro_backend_pro_revocation_item& dest = result.items[index];
         std::memcpy(dest.gen_index_hash.data, src.gen_index_hash.data(), src.gen_index_hash.size());
-        dest.expiry_unix_ts_ms = session::epoch_ms(src.expiry_unix_ts);
+        dest.expiry_unix_ts_ms = bchat::epoch_ms(src.expiry_unix_ts);
     }
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_get_pro_details_response
-session_pro_backend_get_pro_details_response_parse(const char* json, size_t json_len) {
-    session_pro_backend_get_pro_details_response result = {};
+LIBBCHAT_C_API bchat_pro_backend_get_pro_details_response
+bchat_pro_backend_get_pro_details_response_parse(const char* json, size_t json_len) {
+    bchat_pro_backend_get_pro_details_response result = {};
     if (!json) {
         result.header.status = 1;
         result.header.errors = &C_PARSE_ERROR_INVALID_ARGS;
@@ -1464,14 +1464,14 @@ session_pro_backend_get_pro_details_response_parse(const char* json, size_t json
         result.header.internal_arena_buf_ = arena.data;
     }
 
-    using session::epoch_ms;
+    using bchat::epoch_ms;
 
     // Copy to C struct, this is guaranteed not to fail because we pre-allocated memory upfront.
     result.header.status = cpp.status;
     result.status = cpp.user_status;
     result.error_report = cpp.error_report;
     result.items_count = cpp.items.size();
-    result.items = (session_pro_backend_pro_payment_item*)arena_alloc(
+    result.items = (bchat_pro_backend_pro_payment_item*)arena_alloc(
             &arena, result.items_count * sizeof(*result.items));
     result.auto_renewing = cpp.auto_renewing;
     result.expiry_unix_ts_ms = epoch_ms(cpp.expiry_unix_ts);
@@ -1481,7 +1481,7 @@ session_pro_backend_get_pro_details_response_parse(const char* json, size_t json
 
     for (size_t index = 0; index < result.items_count; ++index) {
         const ProPaymentItem& src = cpp.items[index];
-        session_pro_backend_pro_payment_item& dest = result.items[index];
+        bchat_pro_backend_pro_payment_item& dest = result.items[index];
         dest.status = src.status;
         dest.plan = src.plan;
         dest.payment_provider = src.payment_provider;
@@ -1489,15 +1489,15 @@ session_pro_backend_get_pro_details_response_parse(const char* json, size_t json
         dest.unredeemed_unix_ts_ms = epoch_ms(src.unredeemed_unix_ts);
         dest.redeemed_unix_ts_ms = epoch_ms(src.redeemed_unix_ts);
         dest.expiry_unix_ts_ms = epoch_ms(src.expiry_unix_ts);
-        dest.grace_period_duration_ms = session::duration_ms(src.grace_period_duration_ms);
+        dest.grace_period_duration_ms = bchat::duration_ms(src.grace_period_duration_ms);
         dest.platform_refund_expiry_unix_ts_ms = epoch_ms(src.platform_refund_expiry_unix_ts);
         dest.revoked_unix_ts_ms = epoch_ms(src.revoked_unix_ts);
         dest.refund_requested_unix_ts_ms = epoch_ms(src.refund_requested_unix_ts);
 
         switch (dest.payment_provider) {
-            case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_NIL: [[fallthrough]];
-            case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_COUNT: break;
-            case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE: {
+            case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_NIL: [[fallthrough]];
+            case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_COUNT: break;
+            case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_GOOGLE_PLAY_STORE: {
                 dest.google_payment_token_count = snprintf_clamped(
                         dest.google_payment_token,
                         sizeof(dest.google_payment_token),
@@ -1508,7 +1508,7 @@ session_pro_backend_get_pro_details_response_parse(const char* json, size_t json
                         src.google_order_id.data());
             } break;
 
-            case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_IOS_APP_STORE: {
+            case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_IOS_APP_STORE: {
                 dest.apple_original_tx_id_count = snprintf_clamped(
                         dest.apple_original_tx_id,
                         sizeof(dest.apple_original_tx_id),
@@ -1520,7 +1520,7 @@ session_pro_backend_get_pro_details_response_parse(const char* json, size_t json
                         sizeof(dest.apple_web_line_order_id),
                         src.apple_web_line_order_id.data());
             } break;
-            case SESSION_PRO_BACKEND_PAYMENT_PROVIDER_RANGEPROOF: {
+            case BCHAT_PRO_BACKEND_PAYMENT_PROVIDER_RANGEPROOF: {
                 dest.rangeproof_order_id_count = snprintf_clamped(
                         dest.rangeproof_order_id,
                         sizeof(dest.rangeproof_order_id),
@@ -1543,14 +1543,14 @@ session_pro_backend_get_pro_details_response_parse(const char* json, size_t json
     return result;
 }
 
-LIBSESSION_C_API
-session_pro_backend_signature session_pro_backend_set_payment_refund_requested_request_build_sigs(
+LIBBCHAT_C_API
+bchat_pro_backend_signature bchat_pro_backend_set_payment_refund_requested_request_build_sigs(
         uint8_t request_version,
         const uint8_t* master_privkey,
         size_t master_privkey_len,
         uint64_t unix_ts_ms,
         uint64_t refund_requested_unix_ts_ms,
-        SESSION_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
+        BCHAT_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
         const uint8_t* payment_tx_payment_id,
         size_t payment_tx_payment_id_len,
         const uint8_t* payment_tx_order_id,
@@ -1564,7 +1564,7 @@ session_pro_backend_signature session_pro_backend_set_payment_refund_requested_r
             payment_tx_payment_id, payment_tx_payment_id_len);
     std::span<const uint8_t> payment_tx_order_id_span(payment_tx_order_id, payment_tx_order_id_len);
 
-    session_pro_backend_signature result = {};
+    bchat_pro_backend_signature result = {};
     try {
         auto sig = SetPaymentRefundRequestedRequest::build_sig(
                 request_version,
@@ -1588,14 +1588,14 @@ session_pro_backend_signature session_pro_backend_set_payment_refund_requested_r
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_to_json
-session_pro_backend_set_payment_refund_requested_request_build_to_json(
+LIBBCHAT_C_API bchat_pro_backend_to_json
+bchat_pro_backend_set_payment_refund_requested_request_build_to_json(
         uint8_t request_version,
         const uint8_t* master_privkey,
         size_t master_privkey_len,
         uint64_t unix_ts_ms,
         uint64_t refund_requested_unix_ts_ms,
-        SESSION_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
+        BCHAT_PRO_BACKEND_PAYMENT_PROVIDER payment_tx_provider,
         const uint8_t* payment_tx_payment_id,
         size_t payment_tx_payment_id_len,
         const uint8_t* payment_tx_order_id,
@@ -1610,7 +1610,7 @@ session_pro_backend_set_payment_refund_requested_request_build_to_json(
             payment_tx_payment_id, payment_tx_payment_id_len);
     std::span<const uint8_t> payment_tx_order_id_span(payment_tx_order_id, payment_tx_order_id_len);
 
-    session_pro_backend_to_json result = {};
+    bchat_pro_backend_to_json result = {};
     try {
         auto json = SetPaymentRefundRequestedRequest::build_to_json(
                 request_version,
@@ -1620,7 +1620,7 @@ session_pro_backend_set_payment_refund_requested_request_build_to_json(
                 payment_tx_provider,
                 payment_tx_payment_id_span,
                 payment_tx_order_id_span);
-        result.json = session::string8_copy_or_throw(json.data(), json.size());
+        result.json = bchat::string8_copy_or_throw(json.data(), json.size());
         result.success = true;
     } catch (const std::exception& e) {
         const std::string& error = e.what();
@@ -1634,10 +1634,10 @@ session_pro_backend_set_payment_refund_requested_request_build_to_json(
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_to_json
-session_pro_backend_set_payment_refund_requested_request_to_json(
-        const session_pro_backend_set_payment_refund_requested_request* request) {
-    session_pro_backend_to_json result = {};
+LIBBCHAT_C_API bchat_pro_backend_to_json
+bchat_pro_backend_set_payment_refund_requested_request_to_json(
+        const bchat_pro_backend_set_payment_refund_requested_request* request) {
+    bchat_pro_backend_to_json result = {};
     if (!request)
         return result;
 
@@ -1659,7 +1659,7 @@ session_pro_backend_set_payment_refund_requested_request_to_json(
 
     try {
         std::string json = cpp.to_json();
-        result.json = session::string8_copy_or_throw(json.data(), json.size());
+        result.json = bchat::string8_copy_or_throw(json.data(), json.size());
         result.success = true;
     } catch (const std::exception& e) {
         const std::string& error = e.what();
@@ -1674,9 +1674,9 @@ session_pro_backend_set_payment_refund_requested_request_to_json(
     return result;
 }
 
-LIBSESSION_C_API session_pro_backend_set_payment_refund_requested_response
-session_pro_backend_set_payment_refund_requested_response_parse(const char* json, size_t json_len) {
-    session_pro_backend_set_payment_refund_requested_response result = {};
+LIBBCHAT_C_API bchat_pro_backend_set_payment_refund_requested_response
+bchat_pro_backend_set_payment_refund_requested_response_parse(const char* json, size_t json_len) {
+    bchat_pro_backend_set_payment_refund_requested_response result = {};
     if (!json) {
         result.header.status = 1;
         result.header.errors = &C_PARSE_ERROR_INVALID_ARGS;
@@ -1724,39 +1724,39 @@ session_pro_backend_set_payment_refund_requested_response_parse(const char* json
     return result;
 }
 
-LIBSESSION_C_API void session_pro_backend_to_json_free(session_pro_backend_to_json* to_json) {
+LIBBCHAT_C_API void bchat_pro_backend_to_json_free(bchat_pro_backend_to_json* to_json) {
     if (to_json) {
         free(to_json->json.data);
         *to_json = {};
     }
 }
 
-LIBSESSION_C_API void session_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(
-        session_pro_backend_add_pro_payment_or_generate_pro_proof_response* response) {
+LIBBCHAT_C_API void bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response_free(
+        bchat_pro_backend_add_pro_payment_or_generate_pro_proof_response* response) {
     if (response) {
         free(response->header.internal_arena_buf_);
         *response = {};
     }
 }
 
-LIBSESSION_C_API void session_pro_backend_get_pro_revocations_response_free(
-        session_pro_backend_get_pro_revocations_response* response) {
+LIBBCHAT_C_API void bchat_pro_backend_get_pro_revocations_response_free(
+        bchat_pro_backend_get_pro_revocations_response* response) {
     if (response) {
         free(response->header.internal_arena_buf_);
         *response = {};
     }
 }
 
-LIBSESSION_C_API void session_pro_backend_get_pro_details_response_free(
-        session_pro_backend_get_pro_details_response* response) {
+LIBBCHAT_C_API void bchat_pro_backend_get_pro_details_response_free(
+        bchat_pro_backend_get_pro_details_response* response) {
     if (response) {
         free(response->header.internal_arena_buf_);
         *response = {};
     }
 }
 
-LIBSESSION_C_API void session_pro_backend_set_payment_refund_requested_response_free(
-        session_pro_backend_set_payment_refund_requested_response* response) {
+LIBBCHAT_C_API void bchat_pro_backend_set_payment_refund_requested_response_free(
+        bchat_pro_backend_set_payment_refund_requested_response* response) {
     if (response) {
         free(response->header.internal_arena_buf_);
         *response = {};

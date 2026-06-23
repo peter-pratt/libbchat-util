@@ -2,8 +2,8 @@
 
 set -e
 
-if ! [ -f LICENSE ] || ! [ -d include/session ]; then
-    echo "You need to run this as ./utils/android.sh from the top-level libsession-util project directory"
+if ! [ -f LICENSE ] || ! [ -d include/bchat ]; then
+    echo "You need to run this as ./utils/android.sh from the top-level libbchat-util project directory"
     exit 1
 fi
 
@@ -12,7 +12,7 @@ if [ -z "$NDK" ]; then
     exit 1
 fi
 
-archive="${1:-libsession-util-android-TAG.tar.xz}"
+archive="${1:-libbchat-util-android-TAG.tar.xz}"
 
 if [[ "$archive" =~ TAG ]]; then
     if [ -n "$DRONE_TAG" ]; then
@@ -48,11 +48,11 @@ cd build-android
 pkg="${archive%%.tar.xz}"
 
 mkdir -p "$pkg"/include
-cp -rv ../include/session "$pkg"/include/
+cp -rv ../include/bchat "$pkg"/include/
 
 for abi in "${abis[@]}"; do
     mkdir -p "$pkg"/lib/$abi
-    cp -v $abi/libsession-util.a "$pkg"/lib/$abi
+    cp -v $abi/libbchat-util.a "$pkg"/lib/$abi
 done
 
 tar cvJf "$archive" "$pkg"

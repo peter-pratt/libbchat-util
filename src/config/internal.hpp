@@ -8,29 +8,29 @@
 #include <string_view>
 #include <type_traits>
 
-#include "session/config/base.h"
-#include "session/config/base.hpp"
-#include "session/config/error.h"
-#include "session/types.hpp"
+#include "bchat/config/base.h"
+#include "bchat/config/base.hpp"
+#include "bchat/config/error.h"
+#include "bchat/types.hpp"
 
-namespace session {
+namespace bchat {
 
-inline constexpr std::string_view to_string(session::SessionIDPrefix prefix) {
+inline constexpr std::string_view to_string(bchat::BChatIDPrefix prefix) {
     switch (prefix) {
-        case session::SessionIDPrefix::unblinded: return "00"sv;
-        case session::SessionIDPrefix::group: return "03"sv;
-        case session::SessionIDPrefix::standard: return "05"sv;
-        case session::SessionIDPrefix::community_blinded_legacy: return "15"sv;
-        case session::SessionIDPrefix::community_blinded: return "25"sv;
-        case session::SessionIDPrefix::version_blinded: return "07"sv;
+        case bchat::BChatIDPrefix::unblinded: return "00"sv;
+        case bchat::BChatIDPrefix::group: return "03"sv;
+        case bchat::BChatIDPrefix::standard: return "05"sv;
+        case bchat::BChatIDPrefix::community_blinded_legacy: return "15"sv;
+        case bchat::BChatIDPrefix::community_blinded: return "25"sv;
+        case bchat::BChatIDPrefix::version_blinded: return "07"sv;
     }
 
     return "05"sv;  // Fallback to standard, shouldn't occur
 };
 
-};  // namespace session
+};  // namespace bchat
 
-namespace session::config {
+namespace bchat::config {
 
 template <typename ConfigT, typename... Args>
 [[nodiscard]] int c_wrapper_init_generic(config_object** conf, char* error, Args&&... args) {
@@ -46,13 +46,13 @@ template <typename ConfigT, typename... Args>
                 msg.resize(255);
             std::memcpy(error, msg.c_str(), msg.size() + 1);
         }
-        return SESSION_ERR_INVALID_DUMP;
+        return BCHAT_ERR_INVALID_DUMP;
     }
 
     c_conf->internals = c.release();
     c_conf->last_error = nullptr;
     *conf = c_conf.release();
-    return SESSION_ERR_NONE;
+    return BCHAT_ERR_NONE;
 }
 
 template <typename ConfigT>
@@ -136,20 +136,20 @@ config_string_list* make_string_list(Container vals) {
     return ret;
 }
 
-// Throws std::invalid_argument if session_id doesn't look valid.  Can optionally be passed a prefix
+// Throws std::invalid_argument if bchat_id doesn't look valid.  Can optionally be passed a prefix
 // byte for id's that aren't starting with 0x05 (e.g. 0x03 for non-legacy group ids).
-void check_session_id(std::string_view session_id, std::string_view prefix = "05");
+void check_bchat_id(std::string_view bchat_id, std::string_view prefix = "05");
 
 // Throws std::invalid_argument if id doesn't look valid.
-SessionIDPrefix get_session_id_prefix(std::string_view id);
+BChatIDPrefix get_bchat_id_prefix(std::string_view id);
 
-// Checks the session_id (throwing if invalid) then returns it as bytes
-std::string session_id_to_bytes(std::string_view session_id, std::string_view prefix = "05");
+// Checks the bchat_id (throwing if invalid) then returns it as bytes
+std::string bchat_id_to_bytes(std::string_view bchat_id, std::string_view prefix = "05");
 
-// Checks the session_id (throwing if invalid) then returns it as bytes, omitting the 05 (or
-// whatever) prefix, which is a pubkey (x25519 for 05 session_ids, ed25519 for other prefixes).
-std::array<unsigned char, 32> session_id_pk(
-        std::string_view session_id, std::string_view prefix = "05");
+// Checks the bchat_id (throwing if invalid) then returns it as bytes, omitting the 05 (or
+// whatever) prefix, which is a pubkey (x25519 for 05 bchat_ids, ed25519 for other prefixes).
+std::array<unsigned char, 32> bchat_id_pk(
+        std::string_view bchat_id, std::string_view prefix = "05");
 
 // Validates a community pubkey; we accept it in hex, base32z, or base64 (padded or unpadded).
 // Throws std::invalid_argument if invalid.
@@ -163,14 +163,14 @@ std::vector<unsigned char> decode_pubkey(std::string_view pk);
 void make_lc(std::string& s);
 
 // Digs into a config `dict` to get out a config::set; nullptr if not there (or not set)
-const config::set* maybe_set(const session::config::dict& d, const char* key);
+const config::set* maybe_set(const bchat::config::dict& d, const char* key);
 
 // Digs into a config `dict` to get out an int64_t; nullopt if not there (or not int)
-std::optional<int64_t> maybe_int(const session::config::dict& d, const char* key);
+std::optional<int64_t> maybe_int(const bchat::config::dict& d, const char* key);
 
 // Digs into a config `dict` to get out an int64_t; returns 0 if the value is not there or not an
 // int.  Equivalent to `maybe_int(d, key).value_or(0)`.
-int64_t int_or_0(const session::config::dict& d, const char* key);
+int64_t int_or_0(const bchat::config::dict& d, const char* key);
 
 // Returns std::chrono::system_clock::now(), with the given precision (seconds, if unspecified).
 template <typename Duration = std::chrono::seconds>
@@ -180,43 +180,43 @@ std::chrono::sys_time<Duration> ts_now() {
 
 // Digs into a config `dict` to get out an int64_t containing unix timestamp seconds, returns it
 // wrapped in a std::chrono::sys_seconds.  Returns nullopt if not there (or not int).
-std::optional<std::chrono::sys_seconds> maybe_ts(const session::config::dict& d, const char* key);
+std::optional<std::chrono::sys_seconds> maybe_ts(const bchat::config::dict& d, const char* key);
 
 // Digs into a config `dict` to get out an int64_t containing unix timestamp milliseconds, returns
 // it wrapped in a std::chrono::sys_time<std::chrono::milliseconds>.  Returns nullopt if not there
 // (or not int).
 std::optional<std::chrono::sys_time<std::chrono::milliseconds>> maybe_ts_ms(
-        const session::config::dict& d, const char* key);
+        const bchat::config::dict& d, const char* key);
 
 // Works like maybe_ts, except that if the value isn't present it returns a default-constructed
 // sys_seconds (i.e. unix timestamp 0).  Equivalent to `maybe_ts(d,
 // key).value_or(std::chrono::sys_seconds{})`.
-std::chrono::sys_seconds ts_or_epoch(const session::config::dict& d, const char* key);
+std::chrono::sys_seconds ts_or_epoch(const bchat::config::dict& d, const char* key);
 
 // Digs into a config `dict` to get out a string; nullopt if not there (or not string)
-std::optional<std::string> maybe_string(const session::config::dict& d, const char* key);
+std::optional<std::string> maybe_string(const bchat::config::dict& d, const char* key);
 
 // Extract a U64 bitset from a set of i64's
-uint64_t bitset_from_set_of_int64_or_0(const session::config::set& s);
+uint64_t bitset_from_set_of_int64_or_0(const bchat::config::set& s);
 
 // Individually write each bit from bitset into a set consisting of int64's
 void set_int64_set_from_bitset(ConfigBase::DictFieldProxy&& field, uint64_t bitset);
 
 // Digs into a config `dict` to get out a string; ""s if not there (or not string)
-std::string string_or_empty(const session::config::dict& d, const char* key);
+std::string string_or_empty(const bchat::config::dict& d, const char* key);
 
 // Digs into a config `dict` to get out a string view; nullopt if not there (or not string).  The
 // string view is only valid as long as the dict stays unchanged.
-std::optional<std::string_view> maybe_sv(const session::config::dict& d, const char* key);
+std::optional<std::string_view> maybe_sv(const bchat::config::dict& d, const char* key);
 
 // Digs into a config `dict` to get out a string view; ""sv if not there (or not string).  The
 // string view is only valid as long as the dict stays unchanged.
-std::string_view sv_or_empty(const session::config::dict& d, const char* key);
+std::string_view sv_or_empty(const bchat::config::dict& d, const char* key);
 
 // Digs into a config `dict` to get out a std::vector<unsigned char>; nullopt if not there (or not
 // string)
 std::optional<std::vector<unsigned char>> maybe_vector(
-        const session::config::dict& d, const char* key);
+        const bchat::config::dict& d, const char* key);
 
 /// Sets a value to 1 if true, removes it if false.
 void set_flag(ConfigBase::DictFieldProxy&& field, bool val);
@@ -266,13 +266,13 @@ void load_unknowns(
         oxenc::bt_dict_consumer& in,
         std::string_view previous,
         std::string_view until);
-}  // namespace session::config
+}  // namespace bchat::config
 
 namespace fmt {
 
 template <>
-struct formatter<session::SessionIDPrefix, char> : formatter<std::string_view> {
-    auto format(const session::SessionIDPrefix& val, fmt::format_context& ctx) const {
+struct formatter<bchat::BChatIDPrefix, char> : formatter<std::string_view> {
+    auto format(const bchat::BChatIDPrefix& val, fmt::format_context& ctx) const {
         return formatter<std::string_view>::format(to_string(val), ctx);
     }
 };

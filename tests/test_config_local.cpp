@@ -1,14 +1,14 @@
 #include <oxenc/hex.h>
-#include <session/config/encrypt.h>
-#include <session/config/local.h>
+#include <bchat/config/encrypt.h>
+#include <bchat/config/local.h>
 #include <sodium/crypto_sign_ed25519.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
-#include <session/config/local.hpp>
-#include <session/config/notify.hpp>
-#include <session/config/theme.hpp>
-#include <session/util.hpp>
+#include <bchat/config/local.hpp>
+#include <bchat/config/notify.hpp>
+#include <bchat/config/theme.hpp>
+#include <bchat/util.hpp>
 #include <string_view>
 
 #include "utils.hpp"
@@ -32,21 +32,21 @@ TEST_CASE("Local", "[config][local]") {
     CHECK(oxenc::to_hex(seed.begin(), seed.end()) ==
           oxenc::to_hex(ed_sk.begin(), ed_sk.begin() + 32));
 
-    session::config::Local local{std::span<const unsigned char>{seed}, std::nullopt};
+    bchat::config::Local local{std::span<const unsigned char>{seed}, std::nullopt};
 
-    CHECK(local.get_notification_content() == session::config::notify_content::defaulted);
+    CHECK(local.get_notification_content() == bchat::config::notify_content::defaulted);
     CHECK(local.get_ios_notification_sound() == 0);
-    CHECK(local.get_theme() == session::config::theme::defaulted);
-    CHECK(local.get_theme_primary_color() == session::config::theme_primary_color::defaulted);
+    CHECK(local.get_theme() == bchat::config::theme::defaulted);
+    CHECK(local.get_theme_primary_color() == bchat::config::theme_primary_color::defaulted);
 
-    local.set_notification_content(session::config::notify_content::name_no_preview);
-    CHECK(local.get_notification_content() == session::config::notify_content::name_no_preview);
+    local.set_notification_content(bchat::config::notify_content::name_no_preview);
+    CHECK(local.get_notification_content() == bchat::config::notify_content::name_no_preview);
     local.set_ios_notification_sound(5);
     CHECK(local.get_ios_notification_sound() == 5);
-    local.set_theme(session::config::theme::ocean_dark);
-    CHECK(local.get_theme() == session::config::theme::ocean_dark);
-    local.set_theme_primary_color(session::config::theme_primary_color::orange);
-    CHECK(local.get_theme_primary_color() == session::config::theme_primary_color::orange);
+    local.set_theme(bchat::config::theme::ocean_dark);
+    CHECK(local.get_theme() == bchat::config::theme::ocean_dark);
+    local.set_theme_primary_color(bchat::config::theme_primary_color::orange);
+    CHECK(local.get_theme_primary_color() == bchat::config::theme_primary_color::orange);
     CHECK(local.needs_dump());
     local.dump();
     CHECK_FALSE(local.needs_dump());
@@ -60,13 +60,13 @@ TEST_CASE("Local", "[config][local]") {
     CHECK(local.size_settings() == 1);
 
     // Ensure all of these settings were stored in the dump and loaded correctly
-    session::config::Local local2{std::span<const unsigned char>{seed}, local.dump()};
+    bchat::config::Local local2{std::span<const unsigned char>{seed}, local.dump()};
     CHECK_FALSE(local.needs_dump());
 
-    CHECK(local2.get_notification_content() == session::config::notify_content::name_no_preview);
+    CHECK(local2.get_notification_content() == bchat::config::notify_content::name_no_preview);
     CHECK(local2.get_ios_notification_sound() == 5);
-    CHECK(local2.get_theme() == session::config::theme::ocean_dark);
-    CHECK(local2.get_theme_primary_color() == session::config::theme_primary_color::orange);
+    CHECK(local2.get_theme() == bchat::config::theme::ocean_dark);
+    CHECK(local2.get_theme_primary_color() == bchat::config::theme_primary_color::orange);
     CHECK(local2.get_setting("test_setting"));
     CHECK(local2.size_settings() == 1);
 

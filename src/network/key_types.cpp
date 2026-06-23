@@ -1,4 +1,4 @@
-#include "session/network/key_types.hpp"
+#include "bchat/network/key_types.hpp"
 
 #include <oxenc/base32z.h>
 #include <oxenc/base64.h>
@@ -8,7 +8,7 @@
 #include <cstring>
 #include <type_traits>
 
-namespace session::network {
+namespace bchat::network {
 
 namespace detail {
 
@@ -32,9 +32,9 @@ namespace detail {
 
 }  // namespace detail
 
-std::string ed25519_pubkey::snode_address() const {
+std::string ed25519_pubkey::mnode_address() const {
     auto addr = oxenc::to_base32z(begin(), end());
-    addr += ".snode";
+    addr += ".mnode";
     return addr;
 }
 
@@ -90,4 +90,4 @@ x25519_pubkey compute_x25519_pubkey(std::span<const unsigned char> ed25519_pk) {
     return x25519_pubkey::from_bytes({xpk.data(), 32});
 }
 
-}  // namespace session::network
+}  // namespace bchat::network

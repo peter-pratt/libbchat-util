@@ -1,4 +1,4 @@
-#include "session/config/base.hpp"
+#include "bchat/config/base.hpp"
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -20,16 +20,16 @@
 
 #include "internal.hpp"
 #include "oxenc/bt_serialize.h"
-#include "session/config/base.h"
-#include "session/config/encrypt.hpp"
-#include "session/config/protos.hpp"
-#include "session/export.h"
-#include "session/util.hpp"
+#include "bchat/config/base.h"
+#include "bchat/config/encrypt.hpp"
+#include "bchat/config/protos.hpp"
+#include "bchat/export.h"
+#include "bchat/util.hpp"
 
 using namespace std::literals;
 using namespace oxen::log::literals;
 
-namespace session::config {
+namespace bchat::config {
 
 namespace log = oxen::log;
 
@@ -1137,23 +1137,23 @@ void set_error(config_object* conf, std::string e) {
     conf->last_error = error.c_str();
 }
 
-}  // namespace session::config
+}  // namespace bchat::config
 
 extern "C" {
 
-using namespace session;
-using namespace session::config;
+using namespace bchat;
+using namespace bchat::config;
 
-LIBSESSION_EXPORT void config_free(config_object* conf) {
+LIBBCHAT_EXPORT void config_free(config_object* conf) {
     delete static_cast<internals<>*>(conf->internals);
     delete conf;
 }
 
-LIBSESSION_EXPORT int16_t config_storage_namespace(const config_object* conf) {
+LIBBCHAT_EXPORT int16_t config_storage_namespace(const config_object* conf) {
     return static_cast<int16_t>(unbox(conf)->storage_namespace());
 }
 
-LIBSESSION_EXPORT config_string_list* config_merge(
+LIBBCHAT_EXPORT config_string_list* config_merge(
         config_object* conf,
         const char* const* msg_hashes,
         const unsigned char* const* configs,
@@ -1171,11 +1171,11 @@ LIBSESSION_EXPORT config_string_list* config_merge(
     });
 }
 
-LIBSESSION_EXPORT bool config_needs_push(const config_object* conf) {
+LIBBCHAT_EXPORT bool config_needs_push(const config_object* conf) {
     return unbox(conf)->needs_push();
 }
 
-LIBSESSION_EXPORT config_push_data* config_push(config_object* conf) {
+LIBBCHAT_EXPORT config_push_data* config_push(config_object* conf) {
     return wrap_exceptions(conf, [&] {
         auto& config = *unbox(conf);
         auto [seqno, data, obs] = config.push();
@@ -1251,7 +1251,7 @@ LIBSESSION_EXPORT config_push_data* config_push(config_object* conf) {
     });
 }
 
-LIBSESSION_EXPORT void config_confirm_pushed(
+LIBBCHAT_EXPORT void config_confirm_pushed(
         config_object* conf, seqno_t seqno, const char* const* msg_hashes, size_t hashes_len) {
     std::unordered_set<std::string> hashes;
     for (size_t i = 0; i < hashes_len; i++)
@@ -1260,7 +1260,7 @@ LIBSESSION_EXPORT void config_confirm_pushed(
     unbox(conf)->confirm_pushed(seqno, std::move(hashes));
 }
 
-LIBSESSION_EXPORT bool config_dump(config_object* conf, unsigned char** out, size_t* outlen) {
+LIBBCHAT_EXPORT bool config_dump(config_object* conf, unsigned char** out, size_t* outlen) {
     return wrap_exceptions(
             conf,
             [&] {
@@ -1274,23 +1274,23 @@ LIBSESSION_EXPORT bool config_dump(config_object* conf, unsigned char** out, siz
             false);
 }
 
-LIBSESSION_EXPORT bool config_needs_dump(const config_object* conf) {
+LIBBCHAT_EXPORT bool config_needs_dump(const config_object* conf) {
     return unbox(conf)->needs_dump();
 }
 
-LIBSESSION_EXPORT config_string_list* config_curr_hashes(const config_object* conf) {
+LIBBCHAT_EXPORT config_string_list* config_curr_hashes(const config_object* conf) {
     return make_string_list(unbox(conf)->curr_hashes());
 }
 
-LIBSESSION_EXPORT config_string_list* config_active_hashes(const config_object* conf) {
+LIBBCHAT_EXPORT config_string_list* config_active_hashes(const config_object* conf) {
     return make_string_list(unbox(conf)->active_hashes());
 }
 
-LIBSESSION_EXPORT config_string_list* config_old_hashes(config_object* conf) {
+LIBBCHAT_EXPORT config_string_list* config_old_hashes(config_object* conf) {
     return make_string_list(unbox(conf)->old_hashes());
 }
 
-LIBSESSION_EXPORT unsigned char* config_get_keys(const config_object* conf, size_t* len) {
+LIBBCHAT_EXPORT unsigned char* config_get_keys(const config_object* conf, size_t* len) {
     const auto keys = unbox(conf)->get_keys();
     assert(static_cast<size_t>(std::count_if(keys.begin(), keys.end(), [](const auto& k) {
                return k.size() == 32;
@@ -1309,7 +1309,7 @@ LIBSESSION_EXPORT unsigned char* config_get_keys(const config_object* conf, size
     return buf;
 }
 
-LIBSESSION_EXPORT bool config_add_key(config_object* conf, const unsigned char* key) {
+LIBBCHAT_EXPORT bool config_add_key(config_object* conf, const unsigned char* key) {
     return wrap_exceptions(
             conf,
             [&] {
@@ -1319,7 +1319,7 @@ LIBSESSION_EXPORT bool config_add_key(config_object* conf, const unsigned char* 
             false);
 }
 
-LIBSESSION_EXPORT bool config_add_key_low_prio(config_object* conf, const unsigned char* key) {
+LIBBCHAT_EXPORT bool config_add_key_low_prio(config_object* conf, const unsigned char* key) {
     return wrap_exceptions(
             conf,
             [&] {
@@ -1328,31 +1328,31 @@ LIBSESSION_EXPORT bool config_add_key_low_prio(config_object* conf, const unsign
             },
             false);
 }
-LIBSESSION_EXPORT int config_clear_keys(config_object* conf) {
+LIBBCHAT_EXPORT int config_clear_keys(config_object* conf) {
     return unbox(conf)->clear_keys();
 }
-LIBSESSION_EXPORT bool config_remove_key(config_object* conf, const unsigned char* key) {
+LIBBCHAT_EXPORT bool config_remove_key(config_object* conf, const unsigned char* key) {
     return unbox(conf)->remove_key({key, 32});
 }
-LIBSESSION_EXPORT int config_key_count(const config_object* conf) {
+LIBBCHAT_EXPORT int config_key_count(const config_object* conf) {
     return unbox(conf)->key_count();
 }
-LIBSESSION_EXPORT bool config_has_key(const config_object* conf, const unsigned char* key) {
+LIBBCHAT_EXPORT bool config_has_key(const config_object* conf, const unsigned char* key) {
     try {
         return unbox(conf)->has_key({key, 32});
     } catch (...) {
         return false;
     }
 }
-LIBSESSION_EXPORT const unsigned char* config_key(const config_object* conf, size_t i) {
+LIBBCHAT_EXPORT const unsigned char* config_key(const config_object* conf, size_t i) {
     return unbox(conf)->key(i).data();
 }
 
-LIBSESSION_EXPORT const char* config_encryption_domain(const config_object* conf) {
+LIBBCHAT_EXPORT const char* config_encryption_domain(const config_object* conf) {
     return unbox(conf)->encryption_domain();
 }
 
-LIBSESSION_EXPORT bool config_set_sig_keys(config_object* conf, const unsigned char* secret) {
+LIBBCHAT_EXPORT bool config_set_sig_keys(config_object* conf, const unsigned char* secret) {
     return wrap_exceptions(
             conf,
             [&] {
@@ -1362,7 +1362,7 @@ LIBSESSION_EXPORT bool config_set_sig_keys(config_object* conf, const unsigned c
             false);
 }
 
-LIBSESSION_EXPORT bool config_set_sig_pubkey(config_object* conf, const unsigned char* pubkey) {
+LIBBCHAT_EXPORT bool config_set_sig_pubkey(config_object* conf, const unsigned char* pubkey) {
     return wrap_exceptions(
             conf,
             [&] {
@@ -1372,14 +1372,14 @@ LIBSESSION_EXPORT bool config_set_sig_pubkey(config_object* conf, const unsigned
             false);
 }
 
-LIBSESSION_EXPORT const unsigned char* config_get_sig_pubkey(const config_object* conf) {
+LIBBCHAT_EXPORT const unsigned char* config_get_sig_pubkey(const config_object* conf) {
     const auto& pk = unbox(conf)->get_sig_pubkey();
     if (pk)
         return pk->data();
     return nullptr;
 }
 
-LIBSESSION_EXPORT void config_clear_sig_keys(config_object* conf) {
+LIBBCHAT_EXPORT void config_clear_sig_keys(config_object* conf) {
     unbox(conf)->clear_sig_keys();
 }
 

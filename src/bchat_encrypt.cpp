@@ -1,10 +1,10 @@
-#include "session/bchat_encrypt.hpp"
+#include "bchat/bchat_encrypt.hpp"
 
 #include <oxenc/base64.h>
 #include <oxenc/bt_producer.h>
 #include <oxenc/bt_serialize.h>
 #include <oxenc/hex.h>
-#include <session/bchat_encrypt.h>
+#include <bchat/bchat_encrypt.h>
 #include <sodium/crypto_aead_xchacha20poly1305.h>
 #include <sodium/crypto_box.h>
 #include <sodium/crypto_core_ed25519.h>
@@ -25,13 +25,13 @@
 #include <stdexcept>
 #include <vector>
 
-#include "session/blinding.hpp"
-#include "session/sodium_array.hpp"
-#include "session/types.hpp"
+#include "bchat/blinding.hpp"
+#include "bchat/sodium_array.hpp"
+#include "bchat/types.hpp"
 
 using namespace std::literals;
 
-namespace session {
+namespace bchat {
 
 namespace detail {
     // detail::to_hashable takes either an integral type, system_clock::time_point, or a string
@@ -108,7 +108,7 @@ std::vector<unsigned char> sign_for_recipient(
     return buf;
 }
 
-static const std::span<const unsigned char> BOX_HASHKEY = to_span("SessionBoxEphemeralHashKey");
+static const std::span<const unsigned char> BOX_HASHKEY = to_span("BChatBoxEphemeralHashKey");
 
 std::vector<unsigned char> encrypt_for_recipient(
         std::span<const unsigned char> ed25519_privkey,
@@ -413,7 +413,7 @@ std::vector<unsigned char> encrypt_for_group(
 
     // Sender ed pubkey, by which the message can be validated.  Note that there are *two*
     // components to this validation: first the regular signature validation of the "s" signature we
-    // add below, but then also validation that this Ed25519 converts to the Session ID of the
+    // add below, but then also validation that this Ed25519 converts to the BChat ID of the
     // claimed sender of the message inside the encoded message data.
     dict.append(
             "a",
@@ -473,46 +473,46 @@ std::vector<unsigned char> encrypt_for_group(
     return ciphertext;
 }
 
-std::pair<std::vector<unsigned char>, std::string> decrypt_incoming_session_id(
+std::pair<std::vector<unsigned char>, std::string> decrypt_incoming_bchat_id(
         std::span<const unsigned char> ed25519_privkey, std::span<const unsigned char> ciphertext) {
     auto [buf, sender_ed_pk] = decrypt_incoming(ed25519_privkey, ciphertext);
 
-    // Convert the sender_ed_pk to the sender's session ID
+    // Convert the sender_ed_pk to the sender's bchat ID
     std::array<unsigned char, 32> sender_x_pk;
 
     if (0 != crypto_sign_ed25519_pk_to_curve25519(sender_x_pk.data(), sender_ed_pk.data()))
         throw std::runtime_error{"Sender ed25519 pubkey to x25519 pubkey conversion failed"};
 
     // Everything is good, so just drop A and Y off the message and prepend the '05' prefix to
-    // the sender session ID
-    std::string sender_session_id;
-    sender_session_id.reserve(66);
-    sender_session_id += "05";
-    oxenc::to_hex(sender_x_pk.begin(), sender_x_pk.end(), std::back_inserter(sender_session_id));
+    // the sender bchat ID
+    std::string sender_bchat_id;
+    sender_bchat_id.reserve(66);
+    sender_bchat_id += "05";
+    oxenc::to_hex(sender_x_pk.begin(), sender_x_pk.end(), std::back_inserter(sender_bchat_id));
 
-    return {buf, sender_session_id};
+    return {buf, sender_bchat_id};
 }
 
-std::pair<std::vector<unsigned char>, std::string> decrypt_incoming_session_id(
+std::pair<std::vector<unsigned char>, std::string> decrypt_incoming_bchat_id(
         std::span<const unsigned char> x25519_pubkey,
         std::span<const unsigned char> x25519_seckey,
         std::span<const unsigned char> ciphertext) {
     auto [buf, sender_ed_pk] = decrypt_incoming(x25519_pubkey, x25519_seckey, ciphertext);
 
-    // Convert the sender_ed_pk to the sender's session ID
+    // Convert the sender_ed_pk to the sender's bchat ID
     std::array<unsigned char, 32> sender_x_pk;
 
     if (0 != crypto_sign_ed25519_pk_to_curve25519(sender_x_pk.data(), sender_ed_pk.data()))
         throw std::runtime_error{"Sender ed25519 pubkey to x25519 pubkey conversion failed"};
 
     // Everything is good, so just drop A and Y off the message and prepend the '05' prefix to
-    // the sender session ID
-    std::string sender_session_id;
-    sender_session_id.reserve(66);
-    sender_session_id += "05";
-    oxenc::to_hex(sender_x_pk.begin(), sender_x_pk.end(), std::back_inserter(sender_session_id));
+    // the sender bchat ID
+    std::string sender_bchat_id;
+    sender_bchat_id.reserve(66);
+    sender_bchat_id += "05";
+    oxenc::to_hex(sender_x_pk.begin(), sender_x_pk.end(), std::back_inserter(sender_bchat_id));
 
-    return {buf, sender_session_id};
+    return {buf, sender_bchat_id};
 }
 
 std::pair<std::vector<unsigned char>, std::vector<unsigned char>> decrypt_incoming(
@@ -606,7 +606,7 @@ std::pair<std::vector<unsigned char>, std::string> decrypt_from_blinded_recipien
         dec_key = blinded_shared_secret(ed25519_privkey, recipient_id, sender_id, server_pk, false);
 
     std::pair<std::vector<unsigned char>, std::string> result;
-    auto& [buf, sender_session_id] = result;
+    auto& [buf, sender_bchat_id] = result;
 
     // v, ct, nc = data[0], data[1:-24], data[-24:]
     if (ciphertext[0] != BLINDED_ENCRYPT_VERSION)
@@ -648,18 +648,18 @@ std::pair<std::vector<unsigned char>, std::string> decrypt_from_blinded_recipien
     uc32 sender_ed_pk;
     std::memcpy(sender_ed_pk.data(), buf.data() + (buf.size() - 32), 32);
 
-    // Convert the sender_ed_pk to the sender's session ID
+    // Convert the sender_ed_pk to the sender's bchat ID
     uc32 sender_x_pk;
     if (0 != crypto_sign_ed25519_pk_to_curve25519(sender_x_pk.data(), sender_ed_pk.data()))
         throw std::runtime_error{"Sender ed25519 pubkey to x25519 pubkey conversion failed"};
 
-    std::vector<unsigned char> session_id;  // Gets populated by the following ..._from_ed calls
+    std::vector<unsigned char> bchat_id;  // Gets populated by the following ..._from_ed calls
 
     // Verify that the inner sender_ed_pk (A) yields the same outer kA we got with the message
     auto extracted_sender =
             recipient_id[0] == 0x25
-                    ? blinded25_id_from_ed(to_span(sender_ed_pk), server_pk, &session_id)
-                    : blinded15_id_from_ed(to_span(sender_ed_pk), server_pk, &session_id);
+                    ? blinded25_id_from_ed(to_span(sender_ed_pk), server_pk, &bchat_id)
+                    : blinded15_id_from_ed(to_span(sender_ed_pk), server_pk, &bchat_id);
 
     bool matched = to_string_view(sender_id) == to_string_view(extracted_sender);
     if (!matched && extracted_sender[0] == 0x15) {
@@ -671,11 +671,11 @@ std::pair<std::vector<unsigned char>, std::string> decrypt_from_blinded_recipien
         throw std::runtime_error{"Blinded sender id does not match the actual sender"};
 
     // Everything is good, so just drop the sender_ed_pk off the message and prepend the '05' prefix
-    // to the sender session ID
+    // to the sender bchat ID
     buf.resize(buf.size() - 32);
-    sender_session_id.reserve(66);
-    sender_session_id += "05";
-    oxenc::to_hex(sender_x_pk.begin(), sender_x_pk.end(), std::back_inserter(sender_session_id));
+    sender_bchat_id.reserve(66);
+    sender_bchat_id += "05";
+    oxenc::to_hex(sender_x_pk.begin(), sender_x_pk.end(), std::back_inserter(sender_bchat_id));
 
     return result;
 }
@@ -757,12 +757,12 @@ DecryptGroupMessage decrypt_group_message(
     std::array<unsigned char, 32> x_pk;
     if (0 != crypto_sign_ed25519_pk_to_curve25519(x_pk.data(), ed_pk.data()))
         throw std::runtime_error{
-                "author ed25519 pubkey is invalid (unable to convert it to a session id)"};
+                "author ed25519 pubkey is invalid (unable to convert it to a bchat id)"};
 
-    auto& [_, session_id, data] = result;
-    session_id.reserve(66);
-    session_id += "05";
-    oxenc::to_hex(x_pk.begin(), x_pk.end(), std::back_inserter(session_id));
+    auto& [_, bchat_id, data] = result;
+    bchat_id.reserve(66);
+    bchat_id += "05";
+    oxenc::to_hex(x_pk.begin(), x_pk.end(), std::back_inserter(bchat_id));
 
     std::span<const unsigned char> raw_data;
     if (dict.skip_until("d")) {
@@ -847,8 +847,8 @@ std::string decrypt_ons_response(
                     msg.data(), ciphertext.data(), ciphertext.size(), nonce.data(), key.data()))
             throw std::runtime_error{"Failed to decrypt"};
 
-        std::string session_id = oxenc::to_hex(msg.begin(), msg.end());
-        return session_id;
+        std::string bchat_id = oxenc::to_hex(msg.begin(), msg.end());
+        return bchat_id;
     }
 
     if (ciphertext.size() < crypto_aead_xchacha20poly1305_ietf_ABYTES)
@@ -892,8 +892,8 @@ std::string decrypt_ons_response(
     if (buf_len != 33)
         throw std::runtime_error{"Invalid decrypted value: expected to be 33 bytes"};
 
-    std::string session_id = oxenc::to_hex(buf.begin(), buf.end());
-    return session_id;
+    std::string bchat_id = oxenc::to_hex(buf.begin(), buf.end());
+    return bchat_id;
 }
 
 std::vector<unsigned char> decrypt_push_notification(
@@ -1031,13 +1031,13 @@ std::vector<unsigned char> decrypt_xchacha20(
     return plaintext;
 }
 
-}  // namespace session
+}  // namespace bchat
 
 extern "C" {
 
-using namespace session;
+using namespace bchat;
 
-LIBSESSION_C_API bool session_encrypt_for_recipient_deterministic(
+LIBBCHAT_C_API bool bchat_encrypt_for_recipient_deterministic(
         const unsigned char* plaintext_in,
         size_t plaintext_len,
         const unsigned char* ed25519_privkey,
@@ -1045,7 +1045,7 @@ LIBSESSION_C_API bool session_encrypt_for_recipient_deterministic(
         unsigned char** ciphertext_out,
         size_t* ciphertext_len) {
     try {
-        auto ciphertext = session::encrypt_for_recipient_deterministic(
+        auto ciphertext = bchat::encrypt_for_recipient_deterministic(
                 std::span<const unsigned char>{ed25519_privkey, 64},
                 std::span<const unsigned char>{recipient_pubkey, 32},
                 std::span<const unsigned char>{plaintext_in, plaintext_len});
@@ -1059,7 +1059,7 @@ LIBSESSION_C_API bool session_encrypt_for_recipient_deterministic(
     }
 }
 
-LIBSESSION_C_API bool session_encrypt_for_blinded_recipient(
+LIBBCHAT_C_API bool bchat_encrypt_for_blinded_recipient(
         const unsigned char* plaintext_in,
         size_t plaintext_len,
         const unsigned char* ed25519_privkey,
@@ -1068,7 +1068,7 @@ LIBSESSION_C_API bool session_encrypt_for_blinded_recipient(
         unsigned char** ciphertext_out,
         size_t* ciphertext_len) {
     try {
-        auto ciphertext = session::encrypt_for_blinded_recipient(
+        auto ciphertext = bchat::encrypt_for_blinded_recipient(
                 std::span<const unsigned char>{ed25519_privkey, 64},
                 std::span<const unsigned char>{community_pubkey, 32},
                 std::span<const unsigned char>{recipient_blinded_id, 33},
@@ -1083,7 +1083,7 @@ LIBSESSION_C_API bool session_encrypt_for_blinded_recipient(
     }
 }
 
-LIBSESSION_C_API session_encrypt_group_message session_encrypt_for_group(
+LIBBCHAT_C_API bchat_encrypt_group_message bchat_encrypt_for_group(
         const unsigned char* user_ed25519_privkey,
         size_t user_ed25519_privkey_len,
         const unsigned char* group_ed25519_pubkey,
@@ -1096,7 +1096,7 @@ LIBSESSION_C_API session_encrypt_group_message session_encrypt_for_group(
         size_t padding,
         char* error,
         size_t error_len) {
-    session_encrypt_group_message result = {};
+    bchat_encrypt_group_message result = {};
     try {
         std::vector<unsigned char> result_cpp = encrypt_for_group(
                 {user_ed25519_privkey, user_ed25519_privkey_len},
@@ -1107,7 +1107,7 @@ LIBSESSION_C_API session_encrypt_group_message session_encrypt_for_group(
                 padding);
         result = {
                 .success = true,
-                .ciphertext = session::span_u8_copy_or_throw(result_cpp.data(), result_cpp.size()),
+                .ciphertext = bchat::span_u8_copy_or_throw(result_cpp.data(), result_cpp.size()),
         };
     } catch (const std::exception& e) {
         std::string error_cpp = e.what();
@@ -1119,20 +1119,20 @@ LIBSESSION_C_API session_encrypt_group_message session_encrypt_for_group(
     return result;
 }
 
-LIBSESSION_C_API bool session_decrypt_incoming(
+LIBBCHAT_C_API bool bchat_decrypt_incoming(
         const unsigned char* ciphertext_in,
         size_t ciphertext_len,
         const unsigned char* ed25519_privkey,
-        char* session_id_out,
+        char* bchat_id_out,
         unsigned char** plaintext_out,
         size_t* plaintext_len) {
     try {
-        auto result = session::decrypt_incoming_session_id(
+        auto result = bchat::decrypt_incoming_bchat_id(
                 std::span<const unsigned char>{ed25519_privkey, 64},
                 std::span<const unsigned char>{ciphertext_in, ciphertext_len});
-        auto [plaintext, session_id] = result;
+        auto [plaintext, bchat_id] = result;
 
-        std::memcpy(session_id_out, session_id.c_str(), session_id.size() + 1);
+        std::memcpy(bchat_id_out, bchat_id.c_str(), bchat_id.size() + 1);
         *plaintext_out = static_cast<unsigned char*>(malloc(plaintext.size()));
         *plaintext_len = plaintext.size();
         std::memcpy(*plaintext_out, plaintext.data(), plaintext.size());
@@ -1142,22 +1142,22 @@ LIBSESSION_C_API bool session_decrypt_incoming(
     }
 }
 
-LIBSESSION_C_API bool session_decrypt_incoming_legacy_group(
+LIBBCHAT_C_API bool bchat_decrypt_incoming_legacy_group(
         const unsigned char* ciphertext_in,
         size_t ciphertext_len,
         const unsigned char* x25519_pubkey,
         const unsigned char* x25519_seckey,
-        char* session_id_out,
+        char* bchat_id_out,
         unsigned char** plaintext_out,
         size_t* plaintext_len) {
     try {
-        auto result = session::decrypt_incoming_session_id(
+        auto result = bchat::decrypt_incoming_bchat_id(
                 std::span<const unsigned char>{x25519_pubkey, 32},
                 std::span<const unsigned char>{x25519_seckey, 32},
                 std::span<const unsigned char>{ciphertext_in, ciphertext_len});
-        auto [plaintext, session_id] = result;
+        auto [plaintext, bchat_id] = result;
 
-        std::memcpy(session_id_out, session_id.c_str(), session_id.size() + 1);
+        std::memcpy(bchat_id_out, bchat_id.c_str(), bchat_id.size() + 1);
         *plaintext_out = static_cast<unsigned char*>(malloc(plaintext.size()));
         *plaintext_len = plaintext.size();
         std::memcpy(*plaintext_out, plaintext.data(), plaintext.size());
@@ -1167,26 +1167,26 @@ LIBSESSION_C_API bool session_decrypt_incoming_legacy_group(
     }
 }
 
-LIBSESSION_C_API bool session_decrypt_for_blinded_recipient(
+LIBBCHAT_C_API bool bchat_decrypt_for_blinded_recipient(
         const unsigned char* ciphertext_in,
         size_t ciphertext_len,
         const unsigned char* ed25519_privkey,
         const unsigned char* community_pubkey,
         const unsigned char* sender_id,
         const unsigned char* recipient_id,
-        char* session_id_out,
+        char* bchat_id_out,
         unsigned char** plaintext_out,
         size_t* plaintext_len) {
     try {
-        auto result = session::decrypt_from_blinded_recipient(
+        auto result = bchat::decrypt_from_blinded_recipient(
                 std::span<const unsigned char>{ed25519_privkey, 64},
                 std::span<const unsigned char>{community_pubkey, 32},
                 std::span<const unsigned char>{sender_id, 33},
                 std::span<const unsigned char>{recipient_id, 33},
                 std::span<const unsigned char>{ciphertext_in, ciphertext_len});
-        auto [plaintext, session_id] = result;
+        auto [plaintext, bchat_id] = result;
 
-        std::memcpy(session_id_out, session_id.c_str(), session_id.size() + 1);
+        std::memcpy(bchat_id_out, bchat_id.c_str(), bchat_id.size() + 1);
         *plaintext_out = static_cast<unsigned char*>(malloc(plaintext.size()));
         *plaintext_len = plaintext.size();
         std::memcpy(*plaintext_out, plaintext.data(), plaintext.size());
@@ -1196,7 +1196,7 @@ LIBSESSION_C_API bool session_decrypt_for_blinded_recipient(
     }
 }
 
-LIBSESSION_C_API session_decrypt_group_message_result session_decrypt_group_message(
+LIBBCHAT_C_API bchat_decrypt_group_message_result bchat_decrypt_group_message(
         const span_u8* decrypt_ed25519_privkey_list,
         size_t decrypt_ed25519_privkey_len,
         const unsigned char* group_ed25519_pubkey,
@@ -1205,7 +1205,7 @@ LIBSESSION_C_API session_decrypt_group_message_result session_decrypt_group_mess
         size_t ciphertext_len,
         char* error,
         size_t error_len) {
-    session_decrypt_group_message_result result = {};
+    bchat_decrypt_group_message_result result = {};
     for (size_t index = 0; index < decrypt_ed25519_privkey_len; index++) {
         std::span<const uint8_t> key = {
                 decrypt_ed25519_privkey_list[index].data, decrypt_ed25519_privkey_list[index].size};
@@ -1219,11 +1219,11 @@ LIBSESSION_C_API session_decrypt_group_message_result session_decrypt_group_mess
             result = {
                     .success = true,
                     .index = index,
-                    .plaintext = session::span_u8_copy_or_throw(
+                    .plaintext = bchat::span_u8_copy_or_throw(
                             result.plaintext.data, result.plaintext.size),
             };
-            assert(result_cpp.session_id.size() == sizeof(result.session_id));
-            std::memcpy(result.session_id, result_cpp.session_id.data(), sizeof(result.session_id));
+            assert(result_cpp.bchat_id.size() == sizeof(result.bchat_id));
+            std::memcpy(result.bchat_id, result_cpp.bchat_id.data(), sizeof(result.bchat_id));
             break;
         } catch (const std::exception& e) {
             std::string error_cpp = e.what();
@@ -1236,36 +1236,36 @@ LIBSESSION_C_API session_decrypt_group_message_result session_decrypt_group_mess
     return result;
 }
 
-LIBSESSION_C_API bool session_decrypt_ons_response(
+LIBBCHAT_C_API bool bchat_decrypt_ons_response(
         const char* name_in,
         const unsigned char* ciphertext_in,
         size_t ciphertext_len,
         const unsigned char* nonce_in,
-        char* session_id_out) {
+        char* bchat_id_out) {
     try {
         std::optional<std::span<const unsigned char>> nonce;
         if (nonce_in)
             nonce = std::span<const unsigned char>{
                     nonce_in, crypto_aead_xchacha20poly1305_ietf_NPUBBYTES};
 
-        auto session_id = session::decrypt_ons_response(
+        auto bchat_id = bchat::decrypt_ons_response(
                 name_in, std::span<const unsigned char>{ciphertext_in, ciphertext_len}, nonce);
 
-        std::memcpy(session_id_out, session_id.c_str(), session_id.size() + 1);
+        std::memcpy(bchat_id_out, bchat_id.c_str(), bchat_id.size() + 1);
         return true;
     } catch (...) {
         return false;
     }
 }
 
-LIBSESSION_C_API bool session_decrypt_push_notification(
+LIBBCHAT_C_API bool bchat_decrypt_push_notification(
         const unsigned char* payload_in,
         size_t payload_len,
         const unsigned char* enc_key_in,
         unsigned char** plaintext_out,
         size_t* plaintext_len) {
     try {
-        auto plaintext = session::decrypt_push_notification(
+        auto plaintext = bchat::decrypt_push_notification(
                 std::span<const unsigned char>{payload_in, payload_len},
                 std::span<const unsigned char>{enc_key_in, 32});
 
@@ -1278,14 +1278,14 @@ LIBSESSION_C_API bool session_decrypt_push_notification(
     }
 }
 
-LIBSESSION_C_API bool session_encrypt_xchacha20(
+LIBBCHAT_C_API bool bchat_encrypt_xchacha20(
         const unsigned char* plaintext_in,
         size_t plaintext_len,
         const unsigned char* enc_key_in,
         unsigned char** ciphertext_out,
         size_t* ciphertext_len) {
     try {
-        auto ciphertext = session::encrypt_xchacha20(
+        auto ciphertext = bchat::encrypt_xchacha20(
                 std::span<const unsigned char>{plaintext_in, plaintext_len},
                 std::span<const unsigned char>{enc_key_in, 32});
 
@@ -1298,14 +1298,14 @@ LIBSESSION_C_API bool session_encrypt_xchacha20(
     }
 }
 
-LIBSESSION_C_API bool session_decrypt_xchacha20(
+LIBBCHAT_C_API bool bchat_decrypt_xchacha20(
         const unsigned char* ciphertext_in,
         size_t ciphertext_len,
         const unsigned char* enc_key_in,
         unsigned char** plaintext_out,
         size_t* plaintext_len) {
     try {
-        auto plaintext = session::decrypt_xchacha20(
+        auto plaintext = bchat::decrypt_xchacha20(
                 std::span<const unsigned char>{ciphertext_in, ciphertext_len},
                 std::span<const unsigned char>{enc_key_in, 32});
 

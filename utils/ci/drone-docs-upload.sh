@@ -18,8 +18,8 @@ chmod 600 ~/ssh_key
 
 
 sftp -i ~/ssh_key -b - -o StrictHostKeyChecking=off apidocs@chianina.oxen.io <<SFTP
-put -r ./dist/libsession-util-c/site/* /home/apidocs/www/libsession-util-c/
-put -r ./dist/libsession-util-cpp/site/* /home/apidocs/www/libsession-util-cpp/
+put -r ./dist/libbchat-util-c/site/* /home/apidocs/www/libbchat-util-c/
+put -r ./dist/libbchat-util-cpp/site/* /home/apidocs/www/libbchat-util-cpp/
 SFTP
 
 set +o xtrace
