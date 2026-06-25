@@ -119,7 +119,7 @@ void BelnetRouter::_init() {
     try {
         _update_status(ConnectionStatus::connecting);
 
-        srouter = std::make_shared<session::router::SessionRouter>(test_ini, _loop);
+        srouter = std::make_shared<belnet::router::SessionRouter>(test_ini, _loop);
         srouter->on_connected(
                 [weak_self = weak_from_this(), this] {
                     auto self = weak_self.lock();
@@ -840,7 +840,7 @@ void BelnetRouter::_establish_tunnel(
             srouter_address,
             test_port,
             [weak_self = weak_from_this(), this, address_pubkey_hex, initiating_req_id](
-                    session::router::tunnel_info info) mutable {
+                    belnet::router::tunnel_info info) mutable {
                 auto self = weak_self.lock();
                 if (!self)
                     return;
@@ -908,7 +908,7 @@ void BelnetRouter::_establish_tunnel(
 }
 
 void BelnetRouter::_send_via_tunnel(
-        session::router::tunnel_info tunnel, Request request, network_response_callback_t callback) {
+        belnet::router::tunnel_info tunnel, Request request, network_response_callback_t callback) {
     // TODO: Is there a way to check that the 'tunnel_info' still active?.
 
     // If the request has already timedout at this point then just fail it immediately

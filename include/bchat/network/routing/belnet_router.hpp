@@ -14,10 +14,10 @@
 #include "bchat/network/routing/network_router.hpp"
 #include "bchat/network/mnode_pool.hpp"
 
-namespace session::router {
+namespace belnet::router {
 class SessionRouter;
 struct tunnel_info;
-};  // namespace session::router
+};  // namespace belnet::router
 
 namespace bchat::network {
 
@@ -37,11 +37,11 @@ class BelnetRouter : public IRouter, public std::enable_shared_from_this<BelnetR
     bool _suspended = false;
     config::BelnetRouter _config;
     std::shared_ptr<oxen::quic::Loop> _loop;
-    std::shared_ptr<session::router::SessionRouter> srouter;
+    std::shared_ptr<belnet::router::SessionRouter> srouter;
     std::weak_ptr<MnodePool> _mnode_pool;
     std::weak_ptr<ITransport> _transport;
 
-    std::unordered_map<std::string, session::router::tunnel_info> _active_tunnels;
+    std::unordered_map<std::string, belnet::router::tunnel_info> _active_tunnels;
     std::unordered_map<std::string, std::vector<std::pair<Request, network_response_callback_t>>>
             _pending_requests;
     std::unordered_map<std::string, std::pair<UploadRequest, std::thread>> _active_uploads;
@@ -90,7 +90,7 @@ class BelnetRouter : public IRouter, public std::enable_shared_from_this<BelnetR
             const uint16_t remote_port,
             const std::string& initiating_req_id);
     void _send_via_tunnel(
-            session::router::tunnel_info tunnel,
+            belnet::router::tunnel_info tunnel,
             Request request,
             network_response_callback_t callback);
 };

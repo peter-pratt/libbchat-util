@@ -4,12 +4,13 @@
 #include <unistd.h>
 #include <stdint.h>
 
-#include "session/network/bchat_network.h"
-#include "session/network/bchat_network_types.h"
+#include "bchat/network/bchat_network.h"
+#include "bchat/network/bchat_network_types.h"
+#include "bchat/network/master_node.h"
 
 // Global state for callback
 static volatile int nodes_received = -1;
-static network_service_node received_nodes[10];
+static network_master_node received_nodes[10];
 
 void on_status_change(CONNECTION_STATUS status, void* ctx) {
     const char* s =
@@ -21,7 +22,7 @@ void on_status_change(CONNECTION_STATUS status, void* ctx) {
     fflush(stdout);
 }
 
-void on_nodes_received(network_service_node* nodes, size_t count, void* ctx) {
+void on_nodes_received(network_master_node* nodes, size_t count, void* ctx) {
     printf("\n[CALLBACK] Received %zu nodes from Beldex network!\n", count);
 
     size_t print_count = count;
@@ -46,10 +47,10 @@ int main() {
     printf("=== Beldex Network Deep Connectivity Test ===\n\n");
     fflush(stdout);
 
-    session_network_config config = session_network_config_default();
-    config.netid     = SESSION_NETWORK_MAINNET;
-    config.router    = SESSION_NETWORK_ROUTER_ONION_REQUESTS;
-    config.transport = SESSION_NETWORK_TRANSPORT_QUIC;
+    bchat_network_config config = bchat_network_config_default();
+    config.netid     = BCHAT_NETWORK_MAINNET;
+    config.router    = BCHAT_NETWORK_ROUTER_ONION_REQUESTS;
+    config.transport = BCHAT_NETWORK_TRANSPORT_QUIC;
     config.cache_dir = "/tmp/beldex_test_cache";
     config.increase_no_file_limit = true;
 
@@ -59,14 +60,14 @@ int main() {
     printf("[1] Initializing network...\n");
     fflush(stdout);
 
-    bool ok = session_network_init(&network, &config, error);
+    bool ok = bchat_network_init(&network, &config, error);
     if (!ok || !network) {
         printf("[FAIL] Init failed: %s\n", error);
         return 1;
     }
     printf("[OK] Initialized\n\n");
 
-    session_network_set_status_changed_callback(network, on_status_change, NULL);
+    bchat_network_set_status_changed_callback(network, on_status_change, NULL);
 
     // Wait for CONNECTED
     printf("[2] Waiting for connection (15s max)...\n");
@@ -74,7 +75,7 @@ int main() {
     int connected = 0;
     for (int i = 0; i < 15; i++) {
         sleep(1);
-        CONNECTION_STATUS s = session_network_get_status(network);
+        CONNECTION_STATUS s = bchat_network_get_status(network);
         if (s == CONNECTION_STATUS_CONNECTED) {
             connected = 1;
             printf("[OK] Connected at %ds\n\n", i + 1);
@@ -87,15 +88,15 @@ int main() {
 
     if (!connected) {
         printf("[FAIL] Could not connect\n");
-        session_network_free(network);
+        bchat_network_free(network);
         return 1;
     }
 
-    // Fetch 5 random nodes from the Beldex masternode pool
-    printf("[3] Fetching 5 random masternodes from Beldex network...\n");
+    // Fetch 10 random nodes from the Beldex masternode pool
+    printf("[3] Fetching 10 random masternodes from Beldex network...\n");
     fflush(stdout);
 
-    session_network_get_random_nodes(network, 10, on_nodes_received, NULL);
+    bchat_network_get_random_nodes(network, 10, on_nodes_received, NULL);
 
     // Wait up to 15 seconds for callback
     for (int i = 0; i < 15; i++) {
@@ -107,7 +108,7 @@ int main() {
 
     if (nodes_received < 0) {
         printf("\n[FAIL] No nodes received within 15 seconds\n");
-        session_network_free(network);
+        bchat_network_free(network);
         return 1;
     }
 
@@ -115,13 +116,13 @@ int main() {
     printf("  Connected to Beldex network:  YES\n");
     printf("  Masternodes fetched:          %d\n", nodes_received);
     printf("  Time offset retrieved:        %s\n",
-        session_network_has_retrieved_time_offset(network) ? "YES" : "NO");
-    printf("  Hardfork:                     %u\n", session_network_hardfork(network));
-    printf("  Softfork:                     %u\n", session_network_softfork(network));
-    printf("\n[PASS] libsession-util is fully working with the Beldex network!\n");
+        bchat_network_has_retrieved_time_offset(network) ? "YES" : "NO");
+    printf("  Hardfork:                     %u\n", bchat_network_hardfork(network));
+    printf("  Softfork:                     %u\n", bchat_network_softfork(network));
+    printf("\n[PASS] libbchat-util is fully working with the Beldex network!\n");
     fflush(stdout);
 
-    session_network_suspend(network);
-    session_network_free(network);
+    bchat_network_suspend(network);
+    bchat_network_free(network);
     return 0;
 }
