@@ -33,8 +33,8 @@ const bchat_pro_backend_payment_provider_metadata BCHAT_PRO_BACKEND_PAYMENT_PROV
         .refund_platform_url                = string8_literal("https://support.google.com/googleplay/workflow/9813244?"),
         .refund_support_url                 = string8_literal("https://getbchat.org/android-refund"),
         .refund_status_url                  = string8_literal("https://getbchat.org/android-refund"),
-        .update_subscription_url            = string8_literal("https://play.google.com/store/account/subscriptions?package=network.loki.messenger"),
-        .cancel_subscription_url            = string8_literal("https://play.google.com/store/account/subscriptions?package=network.loki.messenger"),
+        .update_subscription_url            = string8_literal("https://play.google.com/store/account/subscriptions?package=io.beldex.bchat"),
+        .cancel_subscription_url            = string8_literal("https://play.google.com/store/account/subscriptions?package=io.beldex.bchat"),
     },
     /*BCHAT_PRO_PAYMENT_PROVIDER_IOS_APP_STORE*/ {
         .device                             = string8_literal("iOS"),
